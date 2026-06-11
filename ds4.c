@@ -16833,6 +16833,19 @@ static uint64_t metal_graph_q8_0_row_bytes(uint64_t in_dim) {
  * Metal Release Graph Allocation.
  * ========================================================================= */
 
+/* Prompt-lookup speculative drafting (DS4_PROMPT_LOOKUP_DRAFT=1): greedy decode
+ * drafts the continuation from the session's own token history and verifies it
+ * with the target model in one batched pass, reusing the MTP speculative
+ * verify/rollback machinery with the context as a zero-cost drafter. */
+static bool prompt_lookup_draft_enabled(void) {
+    static int cached = -1;
+    if (cached < 0) {
+        const char *e = getenv("DS4_PROMPT_LOOKUP_DRAFT");
+        cached = (e && e[0] && e[0] != '0') ? 1 : 0;
+    }
+    return cached == 1;
+}
+
 /* Allocate the Metal graph state for a chosen raw-cache capacity.  The model
  * weights are not copied here; tensors reference the mapped GGUF.
  *
@@ -16904,11 +16917,15 @@ static bool metal_graph_alloc_raw_cap(
     const bool enable_splitkv_spec = metal_graph_cuda_splitkv_spec_requested();
     const bool enable_splitkv_batch_verify =
         enable_splitkv_spec && metal_graph_cuda_splitkv_spec_batch_verify_requested();
-    const bool enable_spec_logits = enable_mtp || enable_splitkv_batch_verify;
-    const bool enable_prefix1_snapshot = enable_mtp || enable_splitkv_spec;
+    const bool enable_prompt_lookup = prompt_lookup_draft_enabled();
+    const bool enable_spec_logits =
+        enable_mtp || enable_splitkv_batch_verify || enable_prompt_lookup;
+    const bool enable_prefix1_snapshot =
+        enable_mtp || enable_splitkv_spec || enable_prompt_lookup;
     const bool enable_frontier_snapshot =
         enable_mtp ||
         enable_splitkv_spec ||
+        enable_prompt_lookup ||
         (metal_graph_cuda_greedy_splitkv_requested() &&
          metal_graph_cuda_greedy_splitkv_fallback_requested()) ||
         (metal_graph_cuda_greedy_vec4_requested() &&
@@ -17166,7 +17183,7 @@ static bool metal_graph_alloc_raw_cap(
                             ds4_gpu_tensor_alloc_ptr_on(
                                     layer_tier,
                                     DS4_SPEC_PREFIX_SLOTS * index_width * index_rows *
-                                        sizeof(float));
+                                    sizeof(float));
                     }
                 }
                 if (g->layer_index_state_kv[il]) {
@@ -49889,6 +49906,13 @@ struct ds4_session {
     bool checkpoint_valid;
     bool mtp_draft_valid;
     bool greedy_splitkv_anchor_valid;
+    /* Prompt-lookup drafting stats (DS4_PROMPT_LOOKUP_DRAFT). */
+    uint64_t pl_passes;
+    uint64_t pl_drafted;
+    uint64_t pl_committed;
+    uint64_t pl_no_match;
+    uint64_t pl_free_miss;
+    double pl_scan_sec;
 };
 
 #ifndef DS4_NO_GPU
@@ -59366,6 +59390,22 @@ void ds4_session_free(ds4_session *s) {
 #ifndef DS4_NO_GPU
     ds4_session_print_dspark_stats(s);
 #endif
+    if (s->pl_passes || s->pl_no_match || s->pl_free_miss) {
+        const uint64_t attempts = s->pl_passes + s->pl_no_match + s->pl_free_miss;
+        fprintf(stderr,
+                "ds4: prompt-lookup summary: attempts=%llu no_match=%llu first_miss=%llu "
+                "verify_passes=%llu drafted=%llu committed=%llu accept=%.1f%% "
+                "tokens/pass=%.2f scan=%.2f ms total\n",
+                (unsigned long long)attempts,
+                (unsigned long long)s->pl_no_match,
+                (unsigned long long)s->pl_free_miss,
+                (unsigned long long)s->pl_passes,
+                (unsigned long long)s->pl_drafted,
+                (unsigned long long)s->pl_committed,
+                s->pl_drafted ? 100.0 * (double)s->pl_committed / (double)s->pl_drafted : 0.0,
+                s->pl_passes ? (double)s->pl_committed / (double)s->pl_passes : 0.0,
+                s->pl_scan_sec * 1000.0);
+    }
     ds4_dist_session_free(s->distributed);
     if (ds4_session_is_cpu(s)) {
         kv_cache_free(&s->cpu_cache);
@@ -67347,6 +67387,220 @@ int ds4_session_eval_speculative_argmax(ds4_session *s, int first_token,
         }
     }
     return n_accept;
+#endif
+}
+
+/* Prompt-lookup drafter: propose the tokens that followed the most recent
+ * earlier occurrence of the checkpoint's last DS4_PL_NGRAM tokens.  Host-only,
+ * a backward memcmp scan of the token history (sub-millisecond even at very
+ * long contexts; the CPU is idle during decode). */
+#define DS4_PL_NGRAM 4
+/* Array bound; the effective depth defaults to 7 so the fused verify pass
+ * (anchor + drafts = 8 positions) stays on the small-batch mat-vec kernels,
+ * which cover 2..8 tokens (metal/dense.metal); batch 9+ falls onto the full
+ * prefill matmul path whose fixed cost eats the speculation win.  Tunable via
+ * DS4_PROMPT_LOOKUP_MAX (1..15; spec_logits holds 16 rows). */
+#define DS4_PL_MAX_DRAFT 15
+
+static int prompt_lookup_max_draft(void) {
+    static int cached = -1;
+    if (cached < 0) {
+        cached = 7;
+        const char *e = getenv("DS4_PROMPT_LOOKUP_MAX");
+        if (e && e[0]) {
+            char *end = NULL;
+            long v = strtol(e, &end, 10);
+            if (end != e && v >= 1 && v <= DS4_PL_MAX_DRAFT) cached = (int)v;
+        }
+    }
+    return cached;
+}
+
+/* The matched n-gram ends with `pending` (the sampled-but-not-yet-evaluated
+ * anchor token), so drafting happens before the anchor's forward pass and the
+ * anchor can join the verify batch. */
+static int prompt_lookup_propose(const token_vec *ckpt, int pending,
+                                 int draft_cap, int *drafts) {
+    const int n = DS4_PL_NGRAM;
+    const int len = ckpt->len;
+    if (draft_cap <= 0 || len < n) return 0;
+    if (draft_cap > DS4_PL_MAX_DRAFT) draft_cap = DS4_PL_MAX_DRAFT;
+    const int *v = ckpt->v;
+    int suffix[DS4_PL_NGRAM];
+    memcpy(suffix, v + len - (n - 1), (size_t)(n - 1) * sizeof(suffix[0]));
+    suffix[n - 1] = pending;
+    for (int j = len - n; j >= 0; j--) {
+        if (memcmp(v + j, suffix, (size_t)n * sizeof(v[0])) != 0) continue;
+        const int follow = j + n;
+        int count = len - follow;
+        if (count > draft_cap) count = draft_cap;
+        if (count <= 0) continue;
+        memcpy(drafts, v + follow, (size_t)count * sizeof(v[0]));
+        return count;
+    }
+    return 0;
+}
+
+/* Greedy prompt-lookup speculative eval.  Same contract and acceptance rule as
+ * ds4_session_eval_speculative_argmax, with the session's own token history as
+ * the drafter instead of the MTP head: commit one normal target token, draft
+ * the continuation from the most recent matching context span, verify the
+ * suffix with the target model in one batched pass, and commit only the
+ * agreeing prefix (rolling back speculative Metal state otherwise).  The
+ * batched verifier is the same one the MTP path uses, with the same non-quality
+ * caveat about batched reductions on nearly-tied logits. */
+int ds4_session_eval_prompt_lookup_argmax(ds4_session *s, int first_token,
+                                          int max_tokens, int eos_token,
+                                          int *accepted, int accepted_cap,
+                                          char *err, size_t errlen) {
+    if (!s || !accepted || max_tokens <= 0 || accepted_cap <= 0) return 0;
+    if (s->distributed || ds4_session_is_cpu(s)) {
+        if (ds4_session_eval(s, first_token, err, errlen) != 0) return -1;
+        accepted[0] = first_token;
+        return 1;
+    }
+#ifdef DS4_NO_GPU
+    (void)eos_token;
+    snprintf(err, errlen, "GPU support is not compiled in");
+    return -1;
+#else
+    ds4_engine *e = s->engine;
+
+    /*
+     * Fused one-pass cycle: unlike the MTP drafter, prompt lookup needs only the
+     * token history, so it can draft BEFORE the anchor token's forward pass and
+     * verify [anchor | drafts] together in one batched target pass -- one weight
+     * stream per cycle instead of the MTP path's sequential-eval-plus-verify two.
+     * On no match (or any uncertainty) the cycle is exactly the baseline eval.
+     */
+    int draft_cap = prompt_lookup_max_draft();
+    if (draft_cap > max_tokens - 1) draft_cap = max_tokens - 1;
+    if (draft_cap > accepted_cap - 1) draft_cap = accepted_cap - 1;
+    const int room = s->ctx_size - s->checkpoint.len;
+    if (draft_cap > room - 2) draft_cap = room - 2;
+    if (draft_cap > (int)s->graph.prefill_cap - 1) draft_cap = (int)s->graph.prefill_cap - 1;
+
+    int drafts[DS4_PL_MAX_DRAFT];
+    int draft_n = 0;
+    if (draft_cap > 0 && s->graph.spec_logits && first_token != eos_token) {
+        const double scan_t0 = now_sec();
+        draft_n = prompt_lookup_propose(&s->checkpoint, first_token, draft_cap, drafts);
+        s->pl_scan_sec += now_sec() - scan_t0;
+        /* Never propose past an EOS: tokens after it must not enter the
+         * checkpoint even if the target would agree with them. */
+        for (int i = 0; i < draft_n; i++) {
+            if (drafts[i] == eos_token) {
+                draft_n = i + 1;
+                break;
+            }
+        }
+    }
+    if (draft_n <= 0) {
+        s->pl_no_match++;
+        if (ds4_session_eval(s, first_token, err, errlen) != 0) return -1;
+        accepted[0] = first_token;
+        return 1;
+    }
+
+    const bool pl_log = getenv("DS4_PROMPT_LOOKUP_LOG") != NULL;
+    int row_tops[DS4_PL_MAX_DRAFT];
+    float *row_logits = xmalloc((size_t)DS4_N_VOCAB * sizeof(row_logits[0]));
+    ds4_spec_frontier frontier;
+    memset(&frontier, 0, sizeof(frontier));
+    const int start = s->checkpoint.len;
+    const int n_verify = 1 + draft_n;
+    const double verify_t0 = pl_log ? now_sec() : 0.0;
+    const bool have_frontier = spec_frontier_snapshot(&frontier, s);
+    bool ok = have_frontier;
+    bool verifier_may_have_mutated = false;
+    int n_accept = 0;
+    if (ok) {
+        token_vec_push(&s->checkpoint, first_token);
+        for (int i = 0; i < draft_n; i++) token_vec_push(&s->checkpoint, drafts[i]);
+        verifier_may_have_mutated = true;
+        ok = metal_graph_verify_suffix_tops(&s->graph, &e->model, &e->weights,
+                                            &s->checkpoint, (uint32_t)start,
+                                            (uint32_t)n_verify, false, row_tops, NULL);
+    }
+    if (ok) {
+        /* The anchor is the sampled target token and is always committed;
+         * row_tops[i] is the target's next token after position i, so it
+         * verifies drafts[i]. */
+        int commit_total = 1;
+        for (int i = 0; i < draft_n; i++) {
+            if (row_tops[i] != drafts[i]) break;
+            commit_total++;
+        }
+        if (commit_total == n_verify) {
+            ok = metal_graph_read_spec_logits_row(&s->graph,
+                                                  (uint32_t)(n_verify - 1),
+                                                  row_logits);
+        } else {
+            /* Partial accept: rebuild exact state for just the accepted prefix.
+             * A lone anchor replays through the normal decode path (exact
+             * one-token numerics, as the MTP partial path does); longer
+             * prefixes recommit through the batched pass. */
+            s->checkpoint.len = start;
+            ok = spec_frontier_restore(&frontier, s);
+            if (ok && commit_total == 1) {
+                s->pl_free_miss++;
+                spec_frontier_free(&frontier);
+                free(row_logits);
+                if (ds4_session_eval(s, first_token, err, errlen) != 0) return -1;
+                accepted[0] = first_token;
+                if (pl_log) {
+                    fprintf(stderr, "ds4: prompt-lookup anchor-only (drafted=%d) verify=%.3f ms\n",
+                            draft_n, (now_sec() - verify_t0) * 1000.0);
+                }
+                return 1;
+            }
+            if (ok) {
+                token_vec_push(&s->checkpoint, first_token);
+                for (int i = 0; i + 1 < commit_total; i++) token_vec_push(&s->checkpoint, drafts[i]);
+                ok = metal_graph_verify_suffix_tops(&s->graph, &e->model, &e->weights,
+                                                    &s->checkpoint, (uint32_t)start,
+                                                    (uint32_t)commit_total, false,
+                                                    row_tops, NULL);
+            }
+            if (ok) ok = metal_graph_read_spec_logits_row(&s->graph,
+                                                          (uint32_t)(commit_total - 1),
+                                                          row_logits);
+        }
+        if (ok) {
+            memcpy(s->logits, row_logits, (size_t)DS4_N_VOCAB * sizeof(s->logits[0]));
+            accepted[n_accept++] = first_token;
+            for (int i = 0; i + 1 < commit_total && n_accept < accepted_cap; i++) {
+                accepted[n_accept++] = drafts[i];
+                if (drafts[i] == eos_token) break;
+            }
+            s->checkpoint_valid = true;
+            s->mtp_draft_valid = false;
+            s->pl_passes++;
+            s->pl_drafted += (uint64_t)draft_n;
+            s->pl_committed += (uint64_t)(commit_total - 1);
+            if (pl_log) {
+                fprintf(stderr,
+                        "ds4: prompt-lookup fused drafted=%d committed=%d verify=%.3f ms\n",
+                        draft_n, commit_total - 1, (now_sec() - verify_t0) * 1000.0);
+            }
+            spec_frontier_free(&frontier);
+            free(row_logits);
+            return n_accept;
+        }
+    }
+    s->checkpoint.len = start;
+    if (have_frontier) (void)spec_frontier_restore(&frontier, s);
+    spec_frontier_free(&frontier);
+    free(row_logits);
+    if (!verifier_may_have_mutated) {
+        /* Snapshot failed before any state change: baseline cycle. */
+        if (ds4_session_eval(s, first_token, err, errlen) != 0) return -1;
+        accepted[0] = first_token;
+        return 1;
+    }
+    snprintf(err, errlen, "prompt-lookup verifier failed");
+    s->checkpoint_valid = false;
+    return -1;
 #endif
 }
 

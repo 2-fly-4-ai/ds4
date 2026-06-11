@@ -614,6 +614,23 @@ static int run_sampled_generation(ds4_engine *engine, const cli_config *cfg, con
                 ds4_session_free(session);
                 return 1;
             }
+        } else if (cfg->gen.temperature <= 0.0f &&
+                   getenv("DS4_PROMPT_LOOKUP_DRAFT") != NULL) {
+            cli_dist_busy_set(cfg, true);
+            ntok = ds4_session_eval_prompt_lookup_argmax(session,
+                                                         token,
+                                                         max_tokens - generated,
+                                                         ds4_token_eos(engine),
+                                                         toks,
+                                                         (int)(sizeof(toks) / sizeof(toks[0])),
+                                                         err,
+                                                         sizeof(err));
+            cli_dist_busy_set(cfg, false);
+            if (ntok < 0) {
+                fprintf(stderr, "ds4: decode failed: %s\n", err);
+                ds4_session_free(session);
+                return 1;
+            }
         } else {
             size_t piece_len = 0;
             char *piece = ds4_token_text(engine, token, &piece_len);
@@ -1225,7 +1242,8 @@ static int run_generation(ds4_engine *engine, const cli_config *cfg) {
             cfg->engine.tp.role == DS4_TP_LEADER ||
             getenv("DS4_CLI_FORCE_SESSION") != NULL ||
             cfg->gen.temperature > 0.0f ||
-            ds4_engine_mtp_draft_tokens(engine) > 1) {
+            ds4_engine_mtp_draft_tokens(engine) > 1 ||
+            getenv("DS4_PROMPT_LOOKUP_DRAFT") != NULL) {
             /* TP leaders always drive the session path: the sync/eval
              * mirroring that keeps the worker in lockstep lives there.
              * The env override exists so TP-vs-single-node validation
