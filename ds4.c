@@ -19664,9 +19664,14 @@ static bool metal_graph_capture_prefix_attn_state(
     const uint64_t bytes = ds4_gpu_tensor_bytes(g->layer_attn_state_kv[il]);
     const uint64_t offset = (uint64_t)slot * bytes;
     g->spec_prefix_n_comp[slot][il] = g->layer_n_comp[il];
-    return ds4_gpu_tensor_copy(g->spec_prefix1_attn_state_kv[il], offset,
+    /* Compute-kernel copies: a blit here would end and reopen the batch
+     * compute encoder around every capture, and these run interleaved with
+     * the per-row compressor dispatches. */
+    return ds4_gpu_tensor_copy_f32_inline(g->spec_prefix1_attn_state_kv[il],
+                                 offset,
                                  g->layer_attn_state_kv[il], 0, bytes) != 0 &&
-           ds4_gpu_tensor_copy(g->spec_prefix1_attn_state_score[il], offset,
+           ds4_gpu_tensor_copy_f32_inline(g->spec_prefix1_attn_state_score[il],
+                                 offset,
                                  g->layer_attn_state_score[il], 0, bytes) != 0;
 }
 
@@ -19686,9 +19691,11 @@ static bool metal_graph_capture_prefix_index_state(
     const uint64_t bytes = ds4_gpu_tensor_bytes(g->layer_index_state_kv[il]);
     const uint64_t offset = (uint64_t)slot * bytes;
     g->spec_prefix_n_index_comp[slot][il] = g->layer_n_index_comp[il];
-    return ds4_gpu_tensor_copy(g->spec_prefix1_index_state_kv[il], offset,
+    return ds4_gpu_tensor_copy_f32_inline(g->spec_prefix1_index_state_kv[il],
+                                 offset,
                                  g->layer_index_state_kv[il], 0, bytes) != 0 &&
-           ds4_gpu_tensor_copy(g->spec_prefix1_index_state_score[il], offset,
+           ds4_gpu_tensor_copy_f32_inline(g->spec_prefix1_index_state_score[il],
+                                 offset,
                                  g->layer_index_state_score[il], 0, bytes) != 0;
 }
 
