@@ -67520,7 +67520,8 @@ int ds4_session_eval_prompt_lookup_argmax(ds4_session *s, int first_token,
         verifier_may_have_mutated = true;
         ok = metal_graph_verify_suffix_tops(&s->graph, &e->model, &e->weights,
                                             &s->checkpoint, (uint32_t)start,
-                                            (uint32_t)n_verify, false, row_tops, NULL);
+                                            (uint32_t)n_verify, false, false,
+                                            row_tops, NULL, NULL);
     }
     if (ok) {
         /* The anchor is the sampled target token and is always committed;
@@ -67560,7 +67561,7 @@ int ds4_session_eval_prompt_lookup_argmax(ds4_session *s, int first_token,
                 ok = metal_graph_verify_suffix_tops(&s->graph, &e->model, &e->weights,
                                                     &s->checkpoint, (uint32_t)start,
                                                     (uint32_t)commit_total, false,
-                                                    row_tops, NULL);
+                                                    false, row_tops, NULL, NULL);
             }
             if (ok) ok = metal_graph_read_spec_logits_row(&s->graph,
                                                           (uint32_t)(commit_total - 1),

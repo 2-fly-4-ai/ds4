@@ -11906,7 +11906,8 @@ decode_again:
 
     server_generation_enter(s);
     bool greedy_chain_handled = false;
-    if (server_greedy_chain_request_shape_eligible(s, &j->req,
+    if (getenv("DS4_PROMPT_LOOKUP_DRAFT") == NULL &&
+        server_greedy_chain_request_shape_eligible(s, &j->req,
                                                     max_tokens, room) &&
         ds4_session_chain_greedy_supported(slot->session))
     {
@@ -12032,7 +12033,7 @@ decode_again:
              * forced-greedy tool-call payloads on otherwise sampled requests.
              * Committed tokens flow through the same per-token stop/stream
              * handling below, like the MTP batch path. */
-            ntok = ds4_session_eval_prompt_lookup_argmax(s->session,
+            ntok = ds4_session_eval_prompt_lookup_argmax(slot->session,
                                                          token,
                                                          max_tokens - completion,
                                                          ds4_token_eos(s->engine),
