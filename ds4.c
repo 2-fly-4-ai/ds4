@@ -62615,7 +62615,7 @@ int ds4_session_eval_begin(ds4_session *s, int token, char *err, size_t errlen) 
     }
     if (!metal_graph_encode_token_raw_swa(&s->graph, &e->model, &e->weights,
                                           token, (uint32_t)s->checkpoint.len,
-                                          true, false)) {
+                                          true, false, NULL)) {
         (void)ds4_gpu_synchronize();
         snprintf(err, errlen, "%s decode encode failed", ds4_backend_name(e->backend));
         s->checkpoint_valid = false;
@@ -63231,7 +63231,8 @@ static int ds4_sessions_eval_batch_metal(
                                                           items[i].token,
                                                           (uint32_t)s->checkpoint.len,
                                                           true,
-                                                          false);
+                                                          false,
+                                                          NULL);
             if (ok) ok = ds4_gpu_end_commands_async() != 0;
             if (ok) started = i + 1;
         }

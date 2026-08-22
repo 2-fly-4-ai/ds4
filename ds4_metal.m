@@ -18371,8 +18371,8 @@ int ds4_gpu_matmul_q8_0_top1_tensor(
             ~(NSUInteger)15u;
         const NSUInteger scratch_bytes = block_indices_offset +
             (NSUInteger)block_count * sizeof(uint32_t);
-        if (!ds4_gpu_ensure_scratch_buffer(&g_q8_top1_scratch_buffer,
-                                            &g_q8_top1_scratch_bytes,
+        if (!ds4_gpu_ensure_scratch_buffer(&g_q8_top1_scratch_buffer[g_ds4_stream],
+                                            &g_q8_top1_scratch_bytes[g_ds4_stream],
                                             scratch_bytes,
                                             "ds4_q8_top1_scratch")) {
             return 0;
@@ -18391,8 +18391,8 @@ int ds4_gpu_matmul_q8_0_top1_tensor(
         [enc setBytes:&args length:sizeof(args) atIndex:0];
         [enc setBuffer:wbuf offset:(NSUInteger)inner_offset atIndex:1];
         [enc setBuffer:xbuf offset:ds4_gpu_tensor_offset(x) atIndex:2];
-        [enc setBuffer:g_q8_top1_scratch_buffer offset:0 atIndex:3];
-        [enc setBuffer:g_q8_top1_scratch_buffer
+        [enc setBuffer:g_q8_top1_scratch_buffer[g_ds4_stream] offset:0 atIndex:3];
+        [enc setBuffer:g_q8_top1_scratch_buffer[g_ds4_stream]
                 offset:candidate_indices_offset atIndex:4];
         [enc setBytes:&index_offset length:sizeof(index_offset) atIndex:5];
         [enc setThreadgroupMemoryLength:32u * rows_per_group * sizeof(float)
@@ -18404,12 +18404,12 @@ int ds4_gpu_matmul_q8_0_top1_tensor(
         enc = ds4_gpu_compute_encoder(cb);
         [enc setComputePipelineState:block_pipeline];
         [enc setBytes:&candidate_count length:sizeof(candidate_count) atIndex:0];
-        [enc setBuffer:g_q8_top1_scratch_buffer offset:0 atIndex:1];
-        [enc setBuffer:g_q8_top1_scratch_buffer
+        [enc setBuffer:g_q8_top1_scratch_buffer[g_ds4_stream] offset:0 atIndex:1];
+        [enc setBuffer:g_q8_top1_scratch_buffer[g_ds4_stream]
                 offset:candidate_indices_offset atIndex:2];
-        [enc setBuffer:g_q8_top1_scratch_buffer
+        [enc setBuffer:g_q8_top1_scratch_buffer[g_ds4_stream]
                 offset:block_values_offset atIndex:3];
-        [enc setBuffer:g_q8_top1_scratch_buffer
+        [enc setBuffer:g_q8_top1_scratch_buffer[g_ds4_stream]
                 offset:block_indices_offset atIndex:4];
         [enc setThreadgroupMemoryLength:
                 reduce_threads * (sizeof(float) + sizeof(uint32_t))
@@ -18421,9 +18421,9 @@ int ds4_gpu_matmul_q8_0_top1_tensor(
         enc = ds4_gpu_compute_encoder(cb);
         [enc setComputePipelineState:reduce_pipeline];
         [enc setBytes:&block_count length:sizeof(block_count) atIndex:0];
-        [enc setBuffer:g_q8_top1_scratch_buffer
+        [enc setBuffer:g_q8_top1_scratch_buffer[g_ds4_stream]
                 offset:block_values_offset atIndex:1];
-        [enc setBuffer:g_q8_top1_scratch_buffer
+        [enc setBuffer:g_q8_top1_scratch_buffer[g_ds4_stream]
                 offset:block_indices_offset atIndex:2];
         [enc setBuffer:selected_buf offset:ds4_gpu_tensor_offset(selected) atIndex:3];
         [enc setBuffer:values_buf offset:ds4_gpu_tensor_offset(values) atIndex:4];
@@ -20977,8 +20977,8 @@ int ds4_gpu_dsv4_comp_rows_update_tensor(
         [enc setBuffer:ds4_gpu_tensor_buffer(state_score)
                 offset:ds4_gpu_tensor_offset(state_score) atIndex:5];
         [enc setBuffer:normbuf offset:(NSUInteger)norm_inner atIndex:6];
-        [enc setBuffer:g_compressor_pool_softmax_buffer offset:0 atIndex:7];
-        [enc setBuffer:g_compressor_pool_product_buffer offset:0 atIndex:8];
+        [enc setBuffer:g_compressor_pool_softmax_buffer[g_ds4_stream] offset:0 atIndex:7];
+        [enc setBuffer:g_compressor_pool_product_buffer[g_ds4_stream] offset:0 atIndex:8];
         [enc setBuffer:ds4_gpu_tensor_buffer(work_t)
                 offset:ds4_gpu_tensor_offset(work_t) atIndex:9];
         [enc setBuffer:ds4_gpu_tensor_buffer(comp_cache)
