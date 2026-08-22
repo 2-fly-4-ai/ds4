@@ -197,6 +197,179 @@ kernel void kernel_mul_mv_q8_0_f32(
     kernel_mul_mv_q8_0_f32_impl<N_R0_Q8_0, constant ds4_metal_args_mul_mv &>(args, src0, src1, dst, shmem, tgpig, tiisg, sgitg);
 }
 
+// Greedy output-head variant.  It preserves kernel_mul_mv_q8_0_f32's
+// per-row K traversal and reduction tree, but retains only the best of two
+// vocabulary rows per threadgroup.  A tiny second pass reduces these
+// candidates to the final token id, avoiding the full F32 logits row and the
+// generic argsort path when the caller needs only greedy top-1.
+[[host_name("kernel_mul_mv_q8_0_f32_top1_candidates")]]
+kernel void kernel_mul_mv_q8_0_f32_top1_candidates(
+        constant ds4_metal_args_mul_mv & args,
+        device const char * src0,
+        device const char * src1,
+        device      float * candidate_values,
+        device       uint * candidate_indices,
+        constant     uint & index_offset,
+        threadgroup  char * shmem [[threadgroup(0)]],
+        uint3  tgpig[[threadgroup_position_in_grid]],
+        ushort tiisg[[thread_index_in_simdgroup]],
+        ushort sgitg[[simdgroup_index_in_threadgroup]]) {
+    const short NSG = FC_mul_mv_nsg;
+    constexpr short NW = N_SIMDWIDTH;
+    constexpr short NQ = 8;
+    constexpr short NR0 = 2;
+
+    const int nb = args.ne00 / QK8_0;
+    const int r0 = (int)tgpig.x * NR0;
+    device const float *y = (device const float *)src1;
+
+    device const block_q8_0 *ax[NR0];
+    FOR_UNROLL (short row = 0; row < NR0; ++row) {
+        const int rr = min(r0 + (int)row, args.ne01 - 1);
+        ax[row] = (device const block_q8_0 *)
+            ((device const char *)src0 + (ulong)rr * args.nb01);
+    }
+
+    float sumf[NR0] = { 0.f };
+    const short ix = tiisg / (NW / NQ);
+    const short il = tiisg % (NW / NQ);
+    const int ib0 = sgitg * NQ + ix;
+    float yl[NQ];
+    device const float *yb = y + ib0 * QK8_0 + il * NQ;
+
+    for (int ib = ib0; ib < nb; ib += NSG * NQ) {
+        FOR_UNROLL (short i = 0; i < NQ; ++i) yl[i] = yb[i];
+        FOR_UNROLL (short row = 0; row < NR0; ++row) {
+            device const int8_t *qs = ax[row][ib].qs + il * NQ;
+            float sumq = 0.f;
+            FOR_UNROLL (short i = 0; i < NQ; ++i) sumq += qs[i] * yl[i];
+            sumf[row] += sumq * ax[row][ib].d;
+        }
+        yb += NSG * NQ * QK8_0;
+    }
+
+    threadgroup float *partial[NR0];
+    FOR_UNROLL (short row = 0; row < NR0; ++row) {
+        partial[row] = (threadgroup float *)shmem + NW * row;
+        if (sgitg == 0) partial[row][tiisg] = 0.f;
+        sumf[row] = simd_sum(sumf[row]);
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    FOR_UNROLL (short row = 0; row < NR0; ++row) {
+        if (tiisg == 0) partial[row][sgitg] = sumf[row];
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    if (sgitg == 0) {
+        float best_value = 0.f;
+        uint best_index = index_offset + (uint)r0;
+        FOR_UNROLL (short row = 0; row < NR0; ++row) {
+            const float value = simd_sum(partial[row][tiisg]);
+            if (tiisg == 0 && r0 + row < args.ne01) {
+                const uint index = index_offset + (uint)(r0 + row);
+                if (row == 0 || value > best_value ||
+                    (value == best_value && index < best_index)) {
+                    best_value = value;
+                    best_index = index;
+                }
+            }
+        }
+        if (tiisg == 0) {
+            candidate_values[tgpig.x] = best_value;
+            candidate_indices[tgpig.x] = best_index;
+        }
+    }
+}
+
+[[host_name("kernel_q8_0_top1_reduce_candidates")]]
+kernel void kernel_q8_0_top1_reduce_candidates(
+        constant uint & count,
+        device const float * candidate_values,
+        device const uint  * candidate_indices,
+        device uint  * selected,
+        device float * values,
+        threadgroup char * shmem [[threadgroup(0)]],
+        uint tid [[thread_index_in_threadgroup]],
+        uint nth [[threads_per_threadgroup]]) {
+    float best_value = -INFINITY;
+    uint best_index = 0xffffffffu;
+    for (uint i = tid; i < count; i += nth) {
+        const float value = candidate_values[i];
+        const uint index = candidate_indices[i];
+        if (best_index == 0xffffffffu || value > best_value ||
+            (value == best_value && index < best_index)) {
+            best_value = value;
+            best_index = index;
+        }
+    }
+
+    threadgroup float *tg_values = (threadgroup float *)shmem;
+    threadgroup uint *tg_indices =
+        (threadgroup uint *)(shmem + (ulong)nth * sizeof(float));
+    tg_values[tid] = best_value;
+    tg_indices[tid] = best_index;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    for (uint stride = nth >> 1; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            const float other_value = tg_values[tid + stride];
+            const uint other_index = tg_indices[tid + stride];
+            if (other_index != 0xffffffffu &&
+                (tg_indices[tid] == 0xffffffffu || other_value > tg_values[tid] ||
+                 (other_value == tg_values[tid] && other_index < tg_indices[tid]))) {
+                tg_values[tid] = other_value;
+                tg_indices[tid] = other_index;
+            }
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+    if (tid == 0) {
+        selected[0] = tg_indices[0];
+        values[0] = tg_values[0];
+    }
+}
+
+[[host_name("kernel_q8_0_top1_reduce_blocks")]]
+kernel void kernel_q8_0_top1_reduce_blocks(
+        constant uint & count,
+        device const float * candidate_values,
+        device const uint  * candidate_indices,
+        device float * block_values,
+        device uint  * block_indices,
+        threadgroup char * shmem [[threadgroup(0)]],
+        uint group [[threadgroup_position_in_grid]],
+        uint tid [[thread_index_in_threadgroup]],
+        uint nth [[threads_per_threadgroup]]) {
+    const uint i = group * nth + tid;
+    float value = i < count ? candidate_values[i] : -INFINITY;
+    uint index = i < count ? candidate_indices[i] : 0xffffffffu;
+
+    threadgroup float *tg_values = (threadgroup float *)shmem;
+    threadgroup uint *tg_indices =
+        (threadgroup uint *)(shmem + (ulong)nth * sizeof(float));
+    tg_values[tid] = value;
+    tg_indices[tid] = index;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    for (uint stride = nth >> 1; stride > 0; stride >>= 1) {
+        if (tid < stride) {
+            const float other_value = tg_values[tid + stride];
+            const uint other_index = tg_indices[tid + stride];
+            if (other_index != 0xffffffffu &&
+                (tg_indices[tid] == 0xffffffffu || other_value > tg_values[tid] ||
+                 (other_value == tg_values[tid] && other_index < tg_indices[tid]))) {
+                tg_values[tid] = other_value;
+                tg_indices[tid] = other_index;
+            }
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+    if (tid == 0) {
+        block_values[group] = tg_values[0];
+        block_indices[group] = tg_indices[0];
+    }
+}
+
 
 // Decode Q-A/KV pair. Both projections consume the same activation row but
 // have independent weight ranges and output extents. Keep the standalone Q8_0

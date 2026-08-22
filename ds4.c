@@ -262,21 +262,6 @@ int ds4_gpu_indexer_top2_value_tensor(
     (void)n_tokens; (void)index_offset;
     return 0;
 }
-int ds4_gpu_matmul_q8_0_top1_tensor(
-        ds4_gpu_tensor       *selected,
-        ds4_gpu_tensor       *values,
-        const void             *model_map,
-        uint64_t                model_size,
-        uint64_t                weight_offset,
-        uint64_t                in_dim,
-        uint64_t                out_dim,
-        const ds4_gpu_tensor *x,
-        uint32_t                index_offset) {
-    (void)selected; (void)values; (void)model_map; (void)model_size;
-    (void)weight_offset; (void)in_dim; (void)out_dim; (void)x;
-    (void)index_offset;
-    return 0;
-}
 int ds4_gpu_dsv4_qkv_rms_norm_rows_kv_rope_tensor(
         ds4_gpu_tensor       *q_out,
         const ds4_gpu_tensor *q,
@@ -15274,6 +15259,10 @@ typedef struct {
      * instead of the encode-time constant, and the host-side hash-selected
      * override is skipped (it is unused by the resident fixed-route MoE). */
     ds4_gpu_tensor *chain_token_view;
+    /* Optional output ring slot for the Metal Q8 vocab-projection/top-1 path.
+     * When set, the output head writes the greedy id directly and deliberately
+     * leaves the full logits workspace stale. */
+    ds4_gpu_tensor *chain_top1_view;
 } ds4_gpu_graph;
 
 /* Tensors that are temporary for chunked prefill and grouped multi-session
@@ -25300,7 +25289,20 @@ static bool metal_graph_encode_output_head(
     if (ok) {
         metal_graph_debug_dump_tensor("result_norm", metal_graph_output_norm(g), DS4_N_EMBD, DS4_N_LAYER, 0);
     }
-    if (ok && g->tp_world == 2 && g->tp_logits_half) {
+    if (ok && g->chain_top1_view) {
+        ok = weights->output &&
+             weights->output->type == DS4_TENSOR_Q8_0 &&
+             ds4_gpu_matmul_q8_0_top1_tensor(
+                 g->chain_top1_view,
+                 g->comp_mask_by_tier[g->head_tier],
+                 model->map,
+                 model->size,
+                 weights->output->abs_offset,
+                 DS4_N_EMBD,
+                 vocab_dim,
+                 metal_graph_output_norm(g),
+                 0) != 0;
+    } else if (ok && g->tp_world == 2 && g->tp_logits_half) {
         /* Vocab-split: this rank computes its half of the head rows into
          * its logits view; the halves are bit-identical to the full head
          * (same kernel, same rows) and the worker ships its half to the
@@ -25332,7 +25334,7 @@ static bool metal_graph_encode_output_head(
                                                    metal_graph_output_norm(g),
                                                    1);
     }
-    if (ok) {
+    if (ok && !g->chain_top1_view) {
         metal_graph_debug_dump_tensor("result_output", metal_graph_logits(g), vocab_dim, DS4_N_LAYER, 0);
     }
 #undef DS4_METAL_PROFILE_OUTPUT_STAGE
@@ -31085,6 +31087,30 @@ static bool metal_graph_eval_token_raw_swa(
  * --------------------------------------------------------------------- */
 #define DS4_GREEDY_CHAIN_AHEAD 2
 
+static bool metal_graph_greedy_output_fused_top1_supported(
+        const ds4_gpu_graph *g,
+        const ds4_weights   *weights) {
+#if defined(__APPLE__)
+    const char *disable =
+        getenv("DS4_METAL_DISABLE_GREEDY_OUTPUT_FUSED_TOP1");
+    if (disable && disable[0] && strcmp(disable, "0") != 0) {
+        return false;
+    }
+    return g && weights && weights->output &&
+           g->placement == NULL && g->tp_world < 2 &&
+           g->head_tier >= 0 && g->head_tier < DS4_MAX_GPUS &&
+           g->comp_mask_by_tier[g->head_tier] != NULL &&
+           weights->output->type == DS4_TENSOR_Q8_0 &&
+           weights->output->ndim == 2 &&
+           weights->output->dim[0] == DS4_N_EMBD &&
+           weights->output->dim[1] == DS4_N_VOCAB;
+#else
+    (void)g;
+    (void)weights;
+    return false;
+#endif
+}
+
 /* Chains n_evals evals from pos0 with ring[0] = seed_token, calling on_token
  * for the seed and then for every confirmed id in order; a false return stops
  * the chain early (up to AHEAD-1 already-committed evals are discarded).
@@ -31140,19 +31166,30 @@ static int metal_graph_greedy_chain(
         ds4_gpu_tensor *vin = ds4_gpu_tensor_view(ring,
                                                   (uint64_t)j * sizeof(int32_t),
                                                   sizeof(int32_t));
+        ds4_gpu_tensor *vout = ds4_gpu_tensor_view(
+            ring, (uint64_t)(j + 1) * sizeof(int32_t), sizeof(int32_t));
+        /* A session caller needs the last full logits row to preserve its
+         * post-chain sampling invariant.  Fuse every preceding step; CLI
+         * callers with logits_out == NULL can fuse the whole chain.  The
+         * verification mode also keeps logits materialized for its oracle. */
+        const bool fused_top1 =
+            vout != NULL &&
+            metal_graph_greedy_output_fused_top1_supported(g, weights) &&
+            !(logits_out && j == n_evals - 1) &&
+            getenv("DS4_GREEDY_CHAIN_VERIFY") == NULL;
         g->chain_token_view = vin;
-        ok = vin != NULL &&
+        g->chain_top1_view = fused_top1 ? vout : NULL;
+        ok = vin != NULL && vout != NULL &&
              metal_graph_encode_token_raw_swa(g, model, weights,
                                               0, pos0 + (uint32_t)j,
                                               true, true, vin);
         g->chain_token_view = NULL;
+        g->chain_top1_view = NULL;
         ds4_gpu_tensor_free(vin);
-        if (!ok) break;
-        ds4_gpu_tensor *vout = ds4_gpu_tensor_view(ring,
-                                                   (uint64_t)(j + 1) * sizeof(int32_t),
-                                                   sizeof(int32_t));
-        ok = vout != NULL &&
-             ds4_gpu_argmax_tensor(vout, metal_graph_logits(g), DS4_N_VOCAB) != 0;
+        if (ok && !fused_top1) {
+            ok = ds4_gpu_argmax_tensor(vout, metal_graph_logits(g),
+                                       DS4_N_VOCAB) != 0;
+        }
         ds4_gpu_tensor_free(vout);
         if (!ok) break;
         uint64_t ev = 0;

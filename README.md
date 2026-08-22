@@ -1084,6 +1084,19 @@ including `response.output_text.delta`, function-call argument events, and
 terminal `response.completed` / `response.incomplete` / `response.failed`
 events.
 
+To reduce per-token JSON framing and socket overhead, the server sends the first
+generated token immediately and then coalesces up to two tokens per SSE update.
+It also flushes after 75 ms so slow long-context decoding remains responsive.
+`DS4_STREAM_TOKEN_BATCH=1` restores one update per token; values from 1 through
+32 are accepted. `DS4_STREAM_MAX_DELAY_MS` changes the latency cap from 0
+(disabled) through 1000 ms.
+
+On Apple Silicon, greedy generation with the Q8 output head also projects the
+vocabulary and selects its exact top-1 token in one Metal path instead of
+materializing and sorting the complete logits row. Lowest-token-id tie breaking
+is preserved. Set `DS4_METAL_DISABLE_GREEDY_OUTPUT_FUSED_TOP1=1` before launch
+to restore the older full-logits path for comparison or troubleshooting.
+
 For browser JavaScript clients served from another origin, start the server with
 `--cors` to emit `Access-Control-Allow-*` headers. This only changes HTTP
 headers; it does not expose the server on the LAN. Use `--host 0.0.0.0`
