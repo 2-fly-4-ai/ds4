@@ -29275,7 +29275,8 @@ static bool metal_graph_encode_layer_attention_batch(
             !topk_prefill_needed &&
             !g->quality && !g->ssd_streaming && !g->ssd_streaming_cold &&
             g->placement == NULL && g->tp_world < 2u &&
-            ds4_gpu_device_is_pre_m5_apple_silicon() &&
+            (ds4_gpu_device_is_pre_m5_apple_silicon() ||
+             ds4_gpu_device_is_m5_apple_silicon()) &&
             getenv("DS4_METAL_DISABLE_PRE_M5_BATCH_INDEXER_QUERY_PRUNE") == NULL;
 #else
         const bool prune_unused_indexer_query = false;
