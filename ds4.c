@@ -63637,8 +63637,10 @@ static float ds4_dspark_margin_gate(void) {
 static bool ds4_dspark_margin_allows_propose(const ds4_session *s) {
     const float gate = ds4_dspark_margin_gate();
     if (gate <= 0.0f || !s || !s->logits) return true;
-    float m1 = -INFINITY;
-    float m2 = -INFINITY;
+    /* FLT_MAX remains well-defined under the release -ffast-math build,
+     * unlike an infinity literal, and every finite model logit exceeds it. */
+    float m1 = -FLT_MAX;
+    float m2 = -FLT_MAX;
     for (uint32_t i = 0; i < DS4_N_VOCAB; i++) {
         const float v = s->logits[i];
         if (v > m1) {
