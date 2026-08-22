@@ -9833,7 +9833,7 @@ static slot_reuse slot_probe_reuse_locked(server *s, server_slot *slot,
     }
 
     int rewind_to = -1;
-    if (ds4_engine_is_glm_dsa(s->engine)) {
+    if (s->engine && ds4_engine_is_glm_dsa(s->engine)) {
         rewind_to = live_prefix_rewind_target(
             true, live_pos, req->prompt.len, common);
     } else {
@@ -9843,6 +9843,14 @@ static slot_reuse slot_probe_reuse_locked(server *s, server_slot *slot,
         rewind_to = kv_rewind_reuse_target(
             live_pos, req->prompt.len, common, rewind_min,
             !(rr && strcmp(rr, "0") == 0));
+        /* A tiny strict-prefix match is ambiguous across resident batched
+         * sessions (often only a shared system header). Do not sacrifice a
+         * conversation slot for it; single-session exact-repeat reuse stays
+         * unchanged. */
+        if (s->batched_mode && common == req->prompt.len &&
+            common < rewind_min) {
+            rewind_to = -1;
+        }
     }
     if (rewind_to >= 0) {
         pr.kind = REUSE_MEMORY_REWIND;
@@ -14138,6 +14146,7 @@ static void test_slot_probe_and_routing_scores(void) {
     server_slot slots[3] = {0};
     s.slots = slots;
     s.slot_count = 3;
+    s.batched_mode = true;
     /* All checkpoints freshly used: in the protected staleness tier, where
      * the eviction cost is the checkpoint length (-live semantics). */
     const time_t now = 1000000;
@@ -14317,6 +14326,7 @@ static void test_slot_routing_staleness_tiers(void) {
 
 static void test_slot_probe_live_state_tiers(void) {
     server s = {0};
+    s.batched_mode = true;
     int ckpt_tok[10];
     for (int i = 0; i < 10; i++) ckpt_tok[i] = i + 1;
 
