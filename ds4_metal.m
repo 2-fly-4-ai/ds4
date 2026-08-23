@@ -26366,8 +26366,9 @@ int ds4_gpu_attention_output_low_q8_tensor(
              * offsets and loop bounds become compile-time constants. */
             const bool force_flash_decode_static_for_test =
                 (g_test_flags & DS4_GPU_TEST_ATTN_OUT_LOW_Q8_STATIC) != 0u;
-            const bool use_pre_m5_flash_decode_static =
+            const bool use_flash_decode_static =
                 (ds4_gpu_device_is_pre_m5_apple_silicon() ||
+                 ds4_gpu_device_is_m5_apple_silicon() ||
                  force_flash_decode_static_for_test) &&
                 (!g_attn_out_low_q8_static_unavailable ||
                  force_flash_decode_static_for_test) &&
@@ -26377,11 +26378,11 @@ int ds4_gpu_attention_output_low_q8_tensor(
                 low_dim == 8192u && row_a_bytes == 4352u &&
                 out_a_bytes == 35651584u;
             id<MTLComputePipelineState> pipeline = ds4_gpu_get_mul_mv_pipeline(
-                use_pre_m5_flash_decode_static ?
+                use_flash_decode_static ?
                     "kernel_dsv4_attn_out_low_q8_0_flash_decode_static_f32" :
                     "kernel_dsv4_attn_out_low_q8_0_f32",
                 4);
-            if (!pipeline && use_pre_m5_flash_decode_static) {
+            if (!pipeline && use_flash_decode_static) {
                 /* A custom/older Metal source may not contain this optional
                  * kernel. Latch the miss until cleanup so decode does not
                  * retry PSO creation and log once per layer and token. */
