@@ -22,6 +22,7 @@ GLM_ANTIREZ_Q4_FILE="GLM-5.2-UD-Q4_K_RoutedQ4K.gguf"
 GLM53_Q2_FILE="GLM-5.3-Flash-Q2.gguf"
 GLM53_Q4_FILE="GLM-5.3-Flash-Q4_K.gguf"
 GLM53_FP8_FILE="GLM-5.3-Flash-FP8.gguf"
+GLM53_VISION_FILE="GLM-5.3-Flash-Vision-Encoder.gguf"
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 OUT_DIR=${DS4_GGUF_DIR:-"$ROOT/gguf"}
@@ -55,6 +56,7 @@ Usage:
   ./download_model.sh glm-53-flash-antirez-fp8 [--token TOKEN]
   ./download_model.sh glm-53-flash-antirez-q2 [--token TOKEN]
   ./download_model.sh glm-53-flash-antirez-q4 [--token TOKEN]
+  ./download_model.sh glm53-vision [--token TOKEN]
 
 Targets:
 
@@ -135,6 +137,10 @@ Targets:
 
   glm-53-flash-antirez-fp8
        Long-form alias for glm53-fp8.
+
+  glm53-vision
+       GLM 5.3 Flash vision encoder, about 1.1 GB on disk. Load it separately
+       with --vision; this target does not update ./ds4flash.gguf.
 
 Options:
   --token TOKEN  Hugging Face token. Otherwise HF_TOKEN or the local HF token
@@ -223,6 +229,12 @@ case "$MODEL" in
     glm53-fp8|glm-53-flash-antirez-fp8)
         REPO=$GLM53_REPO
         MODEL_FILE=$GLM53_FP8_FILE
+        FORCE_HF_DOWNLOAD=1
+        LINK_MODEL=0
+        ;;
+    glm53-vision)
+        REPO=$GLM53_REPO
+        MODEL_FILE=$GLM53_VISION_FILE
         FORCE_HF_DOWNLOAD=1
         LINK_MODEL=0
         ;;
