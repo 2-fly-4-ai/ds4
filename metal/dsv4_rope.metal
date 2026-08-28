@@ -58,6 +58,11 @@ struct ds4_metal_args_dsv4_head_norm_rope {
     float beta_slow;
 };
 
+struct ds4_metal_args_dsv4_batch_qkv_finalize {
+    uint32_t raw_cap;
+    uint32_t raw_pos0;
+};
+
 static float rope_yarn_ramp(const float low, const float high, const int i0) {
     const float y = (i0 / 2 - low) / max(0.001f, high - low);
     return 1.0f - min(1.0f, max(0.0f, y));
@@ -420,6 +425,101 @@ kernel void kernel_dsv4_head_rms_norm_rope_tail_f32(
         const float x1 = xs[i0 + 1] * scale;
         xs[i0] = x0 * cos_theta - x1 * sin_theta;
         xs[i0 + 1] = x0 * sin_theta + x1 * cos_theta;
+    }
+}
+
+// KV half of the batch finalizer as a separate PSO. The host can dispatch it
+// concurrently with the unchanged Q-head norm/RoPE PSO, retaining that PSO's
+// exact compiled arithmetic. The KV PSO collapses the four post-q_b KV
+// dispatches; together the active path turns five serial dispatches into two
+// concurrent dispatches.
+kernel void kernel_dsv4_batch_kv_rope_fp8_store_f32(
+        constant ds4_metal_args_dsv4_rope_tail & args,
+        constant ds4_metal_args_dsv4_batch_qkv_finalize & store,
+        device const int32_t * positions,
+        device float * kvraw,
+        device float * raw_cache,
+        threadgroup float * scratch [[threadgroup(0)]],
+        uint3 tgpig [[threadgroup_position_in_grid]],
+        uint tid [[thread_index_in_threadgroup]],
+        ushort3 ntg [[threads_per_threadgroup]]) {
+    const int i1 = tgpig.x;
+    const int i2 = tgpig.y;
+    const int n_nope = (int)args.ne00 - args.n_dims;
+    if (args.mode != 0 || n_nope < 0) {
+        return;
+    }
+
+    device float *kv = (device float *)((device char *)kvraw +
+        (uint64_t)i2 * args.nb02 + (uint64_t)i1 * args.nb01);
+
+    float corr_dims[2];
+    rope_yarn_corr_dims(args.n_dims, args.n_ctx_orig, args.freq_base,
+                        args.beta_fast, args.beta_slow, corr_dims);
+    const float theta_base = (float)positions[i2];
+    const float inv_ndims = -1.f / args.n_dims;
+
+    for (int r = tid; r < args.n_dims; r += ntg.x) {
+        if ((r & 1) != 0) {
+            continue;
+        }
+#ifdef DS4_METAL_ROPE_EXP2_LOG2
+        const float theta =
+            theta_base * exp2(inv_ndims * (float)r * log2(args.freq_base));
+#else
+        const float theta =
+            theta_base * pow(args.freq_base, inv_ndims * r);
+#endif
+        float cos_theta;
+        float sin_theta;
+        rope_yarn(theta, args.freq_scale, corr_dims, r,
+                  args.ext_factor, args.attn_factor,
+                  &cos_theta, &sin_theta);
+        if (args.inverse) {
+            sin_theta = -sin_theta;
+        }
+
+        const int j0 = n_nope + r;
+        const int j1 = j0 + 1;
+        const float x0 = kv[j0];
+        const float x1 = kv[j1];
+        kv[j0] = x0 * cos_theta - x1 * sin_theta;
+        kv[j1] = x0 * sin_theta + x1 * cos_theta;
+    }
+
+    threadgroup_barrier(mem_flags::mem_device_and_threadgroup);
+
+    device float *raw = raw_cache +
+        (uint64_t)((store.raw_pos0 + (uint)i2) % store.raw_cap) *
+        (uint64_t)args.ne00;
+    for (int off = 0; off < n_nope; off += 64) {
+        float v = 0.0f;
+        if (off + (int)tid < n_nope) {
+            v = kv[off + tid];
+            scratch[tid] = abs(v);
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+
+        for (uint stride = 32; stride > 0; stride >>= 1) {
+            if (tid < stride) {
+                scratch[tid] = max(scratch[tid], scratch[tid + stride]);
+            }
+            threadgroup_barrier(mem_flags::mem_threadgroup);
+        }
+
+        const float amax = max(scratch[0], 1.0e-4f);
+        const float fp8_scale = exp2(ceil(log2(amax / 448.0f)));
+        if (off + (int)tid < n_nope) {
+            const float q = dsv4_e4m3fn_dequant(
+                clamp(v / fp8_scale, -448.0f, 448.0f)) * fp8_scale;
+            kv[off + tid] = q;
+            raw[off + tid] = (float)((half)q);
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+
+    for (int i = n_nope + (int)tid; i < args.ne00; i += 64) {
+        raw[i] = (float)((half)kv[i]);
     }
 }
 
@@ -828,6 +928,417 @@ kernel void kernel_dsv4_comp_row_finalize_f32(
     }
 }
 
+struct ds4_metal_args_dsv4_comp_rows_update {
+    ds4_metal_args_dsv4_rope_affine_pair rope;
+    float    rms_eps;
+    uint32_t head_dim;         /* 512 (attention) or 128 (indexer)          */
+    uint32_t width;            /* state/batch row width: coff * head_dim    */
+    uint32_t ratio;            /* 4 or 128                                  */
+    uint32_t pos0;
+    uint32_t n_tokens;
+    uint32_t row_stride;       /* batch kv/score row stride in floats       */
+    uint32_t ape_type;         /* 0 = F32, 1 = F16                          */
+    uint32_t comp_row0;        /* first cache row this call appends         */
+    uint32_t cache_row_stride; /* cache row stride in elements              */
+    uint32_t out_f16;          /* 1: finalize in work row + commit to half  */
+    uint32_t quant_mode;       /* 0 = FP8 E4M3 tail, 1 = Hadamard+FP4       */
+    uint32_t capture_slots;    /* speculative prefix slots to snapshot      */
+    uint32_t state_rows;       /* coff * ratio (8 or 128)                   */
+};
+
+/* Batch-path sibling of the decode finalize fusion above.  The speculative
+ * verify path (n_tokens 2..6) and unaligned prefill chunks used to run a host
+ * loop per token: one store dispatch, and on every ratio-th token a pool +
+ * norm + rope + quantize + commit + shift chain plus two prefix-capture blits.
+ * This kernel replays that whole per-layer loop in ONE single-threadgroup
+ * dispatch.  One threadgroup because every token depends on the state the
+ * previous token wrote (the compressor is a recurrence): sequencing inside one
+ * threadgroup with device barriers is the only way to keep the chain on-GPU
+ * without a dispatch per step.
+ *
+ * Each phase reproduces its standalone kernel bit-exactly:
+ *  - store:  kernel_dsv4_compressor_store_one (elementwise, one lane per col).
+ *  - pool r4:  ds4_dsv4_compressor_exact_pool_ratio4_col, the exact body the
+ *    standalone exact-pool kernel runs, one column per simdgroup; its device
+ *    volatile softmax/product round-trips through the SAME host scratch
+ *    buffers, so the compiler cannot keep the normalized softmax in registers
+ *    and the dispatch-boundary store/load semantics are preserved.
+ *  - pool r128:  the GGML soft_max_f32_4(ne00=128, nth=32) -> mul ->
+ *    sum_rows(nth=128) chain, one score column per simdgroup for the softmax
+ *    and eight 128-thread cohorts for the sum_rows two-stage simd_sum tree.
+ *    The transpose staging copy of the fallback is a bit-preserving load and
+ *    is replaced by direct gathers; softmax and product still materialize in
+ *    device scratch with volatile reloads at each former dispatch boundary.
+ *  - norm/rope/fp8/commit/qat:  verbatim kernel_dsv4_comp_row_finalize_f32
+ *    phases (same virtual widths; threads outside a phase's width still
+ *    execute every barrier so barriers stay uniform); the rope tail uses the
+ *    shared noinline helper with comp_pos = pos + 1 - ratio.
+ *  - shift:  kernel_dsv4_ratio4_shift_f32 (elementwise row move).
+ *  - capture:  elementwise copy of both state tensors into prefix slot t,
+ *    replacing the two per-token blit encoders.
+ * All loop bounds derive from args (no arrays sized by n_tokens), so the same
+ * kernel serves verify chunks and long unaligned prefill chunks alike. */
+[[max_total_threads_per_threadgroup(1024)]]
+kernel void kernel_dsv4_comp_rows_update_f32(
+        constant ds4_metal_args_dsv4_comp_rows_update & args [[buffer(0)]],
+        device const float * batch_kv     [[buffer(1)]],
+        device const float * batch_sc     [[buffer(2)]],
+        device const char  * ape          [[buffer(3)]],
+        device       float * state_kv     [[buffer(4)]],
+        device       float * state_score  [[buffer(5)]],
+        device const float * norm_w       [[buffer(6)]],
+        device       float * pool_softmax [[buffer(7)]],
+        device       float * pool_product [[buffer(8)]],
+        device       float * work         [[buffer(9)]],
+        device       half  * cache_f16    [[buffer(10)]],
+        device       float * prefix_kv    [[buffer(11)]],
+        device       float * prefix_score [[buffer(12)]],
+        threadgroup  float * shmem        [[threadgroup(0)]],
+        uint  tiitg [[thread_index_in_threadgroup]],
+        ushort tiisg [[thread_index_in_simdgroup]],
+        ushort sgitg [[simdgroup_index_in_threadgroup]]) {
+    const uint nth = 1024u;
+    if (args.head_dim == 0u || args.width == 0u || args.ratio == 0u ||
+        (args.head_dim & 31u) != 0u) {
+        return;
+    }
+
+    uint emit_index = 0u;
+    for (uint t = 0u; t < args.n_tokens; ++t) {
+        const uint pos = args.pos0 + t;
+        const uint pos_mod = pos % args.ratio;
+        const bool emit = ((pos + 1u) % args.ratio) == 0u;
+
+        /* ---- store: verbatim kernel_dsv4_compressor_store_one ---- */
+        {
+            const uint dst_row = args.ratio == 4u ? args.ratio + pos_mod
+                                                  : pos_mod;
+            device const float * kv_row =
+                batch_kv + (uint64_t)t * args.row_stride;
+            device const float * sc_row =
+                batch_sc + (uint64_t)t * args.row_stride;
+            for (uint gid = tiitg; gid < args.width; gid += nth) {
+                const uint dst = dst_row * args.width + gid;
+                const uint ape_i = pos_mod * args.width + gid;
+                float ape_v;
+                if (args.ape_type == 1u) {
+                    ape_v = (float)(((device const half *)ape)[ape_i]);
+                } else {
+                    ape_v = ((device const float *)ape)[ape_i];
+                }
+                state_kv[dst] = kv_row[gid];
+                state_score[dst] = sc_row[gid] + ape_v;
+            }
+        }
+        threadgroup_barrier(mem_flags::mem_device);
+
+        if (emit) {
+            device float * row = args.out_f16 != 0u
+                ? work
+                : work + (uint64_t)(args.comp_row0 + emit_index) *
+                         args.cache_row_stride;
+
+            /* ---- pool ---- */
+            if (args.ratio == 4u) {
+                /* One state column per simdgroup: each 32-lane simdgroup
+                 * replays the standalone exact-pool kernel's 32-thread
+                 * threadgroup, with a private 32-float scratch slice. */
+                for (uint base = 0u; base < args.head_dim; base += 32u) {
+                    ds4_dsv4_compressor_exact_pool_ratio4_col(
+                            state_kv,
+                            state_score,
+                            pool_softmax,
+                            pool_product,
+                            row,
+                            shmem + (uint)sgitg * 32u,
+                            args.head_dim,
+                            /* host dispatches replay=1, n_comp=1 */
+                            1.0f,
+                            0.0f,
+                            base + (uint)sgitg,
+                            (uint)tiisg);
+                }
+            } else {
+                /* Ratio-128 pool: the fallback runs the generic GGML chain on
+                 * a [head_dim][128] transposed scratch.  Reproduce each of its
+                 * three dispatches. */
+                const uint n_rows = args.ratio; /* 128 */
+                /* (a) kernel_soft_max_f32_4(ne00=128, nth=32): one scratch row
+                 * (= one state column) per simdgroup, one float4 per lane.
+                 * No mask/sink sources, scale 1.0 -- keep the literal
+                 * `x*scale + (float4)(0.0f)` arithmetic of the kernel. */
+                const float sm_scale = 1.0f;
+                for (uint base = 0u; base < args.head_dim; base += 32u) {
+                    const uint col = base + (uint)sgitg;
+                    float4 score4;
+                    for (uint j = 0u; j < 4u; ++j) {
+                        score4[j] = state_score[
+                            (uint64_t)(4u * (uint)tiisg + j) * args.width + col];
+                    }
+                    device float4 * pdst4 = (device float4 *)
+                        (pool_softmax + (uint64_t)col * n_rows);
+
+                    float4 lmax4 = -INFINITY;
+                    for (int i00 = (int)tiisg; i00 < (int)(n_rows / 4u);
+                         i00 += 32) {
+                        lmax4 = fmax(lmax4, score4 * sm_scale +
+                                            (float4)(0.0f));
+                    }
+                    const float lmax =
+                        MAX(MAX(lmax4[0], lmax4[1]), MAX(lmax4[2], lmax4[3]));
+                    const float max_val = simd_max(lmax);
+
+                    float4 lsum4 = 0.0f;
+                    for (int i00 = (int)tiisg; i00 < (int)(n_rows / 4u);
+                         i00 += 32) {
+                        const float4 exp_score4 =
+                            exp((score4 * sm_scale + (float4)(0.0f)) - max_val);
+                        lsum4 += exp_score4;
+                        pdst4[i00] = exp_score4;
+                    }
+                    const float lsum =
+                        lsum4[0] + lsum4[1] + lsum4[2] + lsum4[3];
+                    threadgroup_barrier(mem_flags::mem_none);
+                    const float sum = simd_sum(lsum);
+                    const float inv_sum = 1.0f / sum;
+                    for (int i00 = (int)tiisg; i00 < (int)(n_rows / 4u);
+                         i00 += 32) {
+                        pdst4[i00] *= inv_sum;
+                    }
+                }
+                threadgroup_barrier(mem_flags::mem_device);
+                /* (b) elementwise multiply into the product scratch.  The
+                 * fallback's mul reads the softmax from device after its own
+                 * dispatch boundary: reload through volatile.  The KV operand
+                 * was a bit-preserving transpose copy; gather it directly. */
+                {
+                    device volatile const float * reloaded_softmax =
+                        (device volatile const float *)pool_softmax;
+                    const uint total = args.head_dim * n_rows;
+                    for (uint idx = tiitg; idx < total; idx += nth) {
+                        const uint d = idx / n_rows;
+                        const uint r = idx % n_rows;
+                        float value = state_kv[(uint64_t)r * args.width + d];
+                        value *= reloaded_softmax[idx];
+                        pool_product[idx] = value;
+                    }
+                }
+                threadgroup_barrier(mem_flags::mem_device);
+                /* (c) kernel_sum_rows_f32_f32(ne00=128, nth=128): eight
+                 * 128-thread cohorts (four simdgroups each) replay the
+                 * two-stage simd_sum tree with a private 32-float scratch. */
+                {
+                    device volatile const float * reloaded_product =
+                        (device volatile const float *)pool_product;
+                    const uint cohort = tiitg >> 7u;      /* 0..7  */
+                    const uint ltid = tiitg & 127u;       /* 0..127 */
+                    const uint lsg = (uint)sgitg & 3u;    /* 0..3  */
+                    threadgroup float * sh = shmem + cohort * 32u;
+                    for (uint base = 0u; base < args.head_dim; base += 8u) {
+                        const uint d = base + cohort;
+                        /* Each pass reuses the cohort scratch that simdgroups
+                         * 1..3 of the cohort read at the end of the previous
+                         * pass; the standalone kernel had one dispatch per
+                         * row, so this ordering came for free there. */
+                        threadgroup_barrier(mem_flags::mem_threadgroup);
+                        if (lsg == 0u) {
+                            sh[tiisg] = 0.0f;
+                        }
+                        float sumf = 0.0f;
+                        sumf += reloaded_product[(uint64_t)d * n_rows + ltid];
+                        sumf = simd_sum(sumf);
+                        threadgroup_barrier(mem_flags::mem_threadgroup);
+                        if (tiisg == 0) {
+                            sh[lsg] = sumf;
+                        }
+                        threadgroup_barrier(mem_flags::mem_threadgroup);
+                        sumf = sh[tiisg];
+                        sumf = simd_sum(sumf);
+                        if (ltid == 0u) {
+                            row[d] = sumf;
+                        }
+                    }
+                }
+            }
+            threadgroup_barrier(mem_flags::mem_device);
+
+            /* ---- norm: verbatim comp_row_finalize phases ---- */
+            if (args.head_dim == 512u) {
+                device float4 * y4 = (device float4 *)row;
+                device const float4 * x4 = (device const float4 *)row;
+                device const float4 * w4 = (device const float4 *)norm_w;
+                if (sgitg == 0) {
+                    shmem[tiisg] = 0.0f;
+                }
+                float sumf = 0.0f;
+                if (tiitg < 128) {
+                    sumf = dot(x4[tiitg], x4[tiitg]);
+                }
+                sumf = simd_sum(sumf);
+                threadgroup_barrier(mem_flags::mem_threadgroup);
+                if (tiitg < 128 && tiisg == 0) {
+                    shmem[sgitg] = sumf;
+                }
+                threadgroup_barrier(mem_flags::mem_threadgroup);
+                float total = 0.0f;
+                if (tiitg < 128) {
+                    total = simd_sum(shmem[tiisg]);
+                }
+                const float mean  = total / 512.0f;
+                const float scale = 1.0f/sqrt(mean + args.rms_eps);
+                if (tiitg < 128) {
+                    y4[tiitg] = (x4[tiitg]*scale)*w4[tiitg];
+                }
+            } else {
+                device float4 * y4 = (device float4 *)row;
+                device const float4 * x4 = (device const float4 *)row;
+                device const float4 * w4 = (device const float4 *)norm_w;
+                if (sgitg == 0) {
+                    shmem[tiisg] = 0.0f;
+                }
+                float sumf = 0.0f;
+                if (tiitg < 32) {
+                    sumf = dot(x4[tiitg], x4[tiitg]);
+                }
+                sumf = simd_sum(sumf);
+                threadgroup_barrier(mem_flags::mem_threadgroup);
+                if (tiisg == 0) {
+                    shmem[sgitg] = sumf;
+                }
+                threadgroup_barrier(mem_flags::mem_threadgroup);
+                float total = 0.0f;
+                if (tiitg < 32) {
+                    total = simd_sum(shmem[tiisg]);
+                }
+                const float mean  = total / 128.0f;
+                const float scale = 1.0f/sqrt(mean + args.rms_eps);
+                if (tiitg < 32) {
+                    y4[tiitg] = (x4[tiitg]*scale)*w4[tiitg];
+                }
+            }
+            threadgroup_barrier(mem_flags::mem_device);
+
+            /* ---- rope: shared noinline helper, comp_pos per emit ---- */
+            ds4_rope_tail_pair_affine_row(args.rope,
+                                          (device const char *)row,
+                                          (device char *)row,
+                                          (int)args.head_dim - args.rope.n_dims,
+                                          pos + 1u - args.ratio,
+                                          tiitg,
+                                          64u);
+            threadgroup_barrier(mem_flags::mem_device);
+
+            /* ---- quantize ---- */
+            if (args.quant_mode == 0u) {
+                /* FP8 E4M3 round-trip on [0, head_dim - n_rot); the host gate
+                 * guarantees a multiple of 64 so every block is full. */
+                const int n_nope = (int)args.head_dim - args.rope.n_dims;
+                for (int off = 0; off < n_nope; off += 64) {
+                    float v = 0.0f;
+                    if (tiitg < 64) {
+                        v = row[off + tiitg];
+                        shmem[tiitg] = abs(v);
+                    }
+                    threadgroup_barrier(mem_flags::mem_threadgroup);
+                    for (uint stride = 32; stride > 0; stride >>= 1) {
+                        if (tiitg < stride) {
+                            shmem[tiitg] = max(shmem[tiitg],
+                                               shmem[tiitg + stride]);
+                        }
+                        threadgroup_barrier(mem_flags::mem_threadgroup);
+                    }
+                    const float amax = max(shmem[0], 1.0e-4f);
+                    const float scale = exp2(ceil(log2(amax / 448.0f)));
+                    if (tiitg < 64) {
+                        const float q = dsv4_e4m3fn_dequant(
+                            clamp(v / scale, -448.0f, 448.0f)) * scale;
+                        row[off + tiitg] = q;
+                    }
+                    threadgroup_barrier(mem_flags::mem_threadgroup);
+                }
+            } else {
+                /* Hadamard + FP4: verbatim indexer QAT phase (128 lanes). */
+                threadgroup float *vals = shmem;
+                threadgroup float *absbuf = shmem + 128;
+                if (tiitg < 128) {
+                    vals[tiitg] = row[tiitg];
+                }
+                threadgroup_barrier(mem_flags::mem_threadgroup);
+                for (uint stride = 1u; stride < 128u; stride <<= 1u) {
+                    if (tiitg < 128 && (tiitg & stride) == 0u) {
+                        const uint base = (tiitg & ~(2u * stride - 1u)) +
+                                          (tiitg & (stride - 1u));
+                        const float a = vals[base];
+                        const float b = vals[base + stride];
+                        vals[base] = a + b;
+                        vals[base + stride] = a - b;
+                    }
+                    threadgroup_barrier(mem_flags::mem_threadgroup);
+                }
+                float v = 0.0f;
+                if (tiitg < 128) {
+                    v = vals[tiitg] * 0.08838834764831845f;
+                    absbuf[tiitg] = abs(v);
+                }
+                threadgroup_barrier(mem_flags::mem_threadgroup);
+                const uint block = tiitg >> 5u;
+                const uint lane = tiitg & 31u;
+                const uint block_base = block * 32u;
+                for (uint stride = 16u; stride > 0u; stride >>= 1u) {
+                    if (tiitg < 128 && lane < stride) {
+                        absbuf[block_base + lane] =
+                            max(absbuf[block_base + lane],
+                                absbuf[block_base + lane + stride]);
+                    }
+                    threadgroup_barrier(mem_flags::mem_threadgroup);
+                }
+                if (tiitg < 128) {
+                    const float amax = max(absbuf[block_base],
+                                           7.052966104933725e-38f);
+                    const float scale = exp2(ceil(log2(amax / 6.0f)));
+                    row[tiitg] = dsv4_e2m1fn_dequant(
+                        clamp(v / scale, -6.0f, 6.0f)) * scale;
+                }
+            }
+            threadgroup_barrier(mem_flags::mem_device);
+
+            /* ---- commit: per-element f32->f16 (value-wise exact) ---- */
+            if (args.out_f16 != 0u && tiitg < 128 && args.head_dim == 512u) {
+                device const float4 * x4 = (device const float4 *)row;
+                device half4 * o4 = (device half4 *)
+                    (cache_f16 + (uint64_t)(args.comp_row0 + emit_index) *
+                                 args.cache_row_stride);
+                o4[tiitg] = half4(x4[tiitg]);
+            }
+
+            /* ---- shift: verbatim kernel_dsv4_ratio4_shift_f32 ---- */
+            if (args.ratio == 4u) {
+                const uint n0 = 4u * args.width;
+                for (uint gid = tiitg; gid < n0; gid += nth) {
+                    state_kv[gid] = state_kv[n0 + gid];
+                    state_score[gid] = state_score[n0 + gid];
+                }
+            }
+            emit_index++;
+        }
+        threadgroup_barrier(mem_flags::mem_device);
+
+        /* ---- speculative prefix capture (replaces the two blits) ---- */
+        if (args.capture_slots != 0u && t + 1u < args.n_tokens &&
+            t < args.capture_slots) {
+            const uint64_t n = (uint64_t)args.state_rows * args.width;
+            device float * dkv = prefix_kv + (uint64_t)t * n;
+            device float * dsc = prefix_score + (uint64_t)t * n;
+            for (uint64_t i = tiitg; i < n; i += nth) {
+                dkv[i] = state_kv[i];
+                dsc[i] = state_score[i];
+            }
+            /* The next token's store overwrites the state these reads use. */
+            threadgroup_barrier(mem_flags::mem_device);
+        }
+    }
+}
+
 // Host-visible packed FlashAttention + exact inverse-RoPE decode kernel.
 kernel void kernel_dsv4_flash_attn_vec_packed32_reduce_rope_f16_dk512_dv512(
         constant ds4_metal_args_flash_attn_ext_vec & args [[buffer(0)]],
@@ -866,6 +1377,67 @@ kernel void kernel_dsv4_flash_attn_vec_packed32_reduce_rope_f16_dk512_dv512(
 
     ds4_flash_attn_vec_packed8_reduce_f16_512(
         args, q, k, v, mask, sinks, pad, dst, shmem,
+        head, tiisg, sgitg);
+
+    /* Same producer/consumer boundary as the current reduce+RoPE kernel. */
+    threadgroup_barrier(mem_flags::mem_device);
+
+    const int n_nope = rope.head_dim - rope.n_dims;
+    device char * row = dst + (uint64_t)head * rope.row_bytes;
+    ds4_rope_tail_pair_affine_row(rope,
+                                  (device const char *)row,
+                                  row,
+                                  n_nope,
+                                  rope.pos0,
+                                  tiitg,
+                                  32u * 32u);
+}
+
+// Direct-KV sibling of the packed32 reduce+RoPE decode kernel above: reads
+// the F32 raw ring and F16 compressed cache in place (see
+// ds4_flash_attn_vec_packed8_reduce_f16_512_direct_kv in flash_attn.metal)
+// so the gathered KV staging dispatch is skipped entirely.
+kernel void kernel_dsv4_flash_attn_vec_packed32_reduce_rope_f16_dk512_dv512_direct_kv(
+        constant ds4_metal_args_flash_attn_ext_vec & args [[buffer(0)]],
+        device const char * q                         [[buffer(1)]],
+        device const char * raw_kv                    [[buffer(2)]],
+        device const char * comp_kv                   [[buffer(3)]],
+        device const char * mask                      [[buffer(4)]],
+        device const char * sinks                     [[buffer(5)]],
+        constant ds4_metal_args_flash_kv_direct & kv  [[buffer(6)]],
+        device       char * dst                       [[buffer(7)]],
+        constant ds4_metal_args_dsv4_rope_affine_pair & rope
+                                                        [[buffer(8)]],
+        threadgroup char * shmem [[threadgroup(0)]],
+        uint head       [[threadgroup_position_in_grid]],
+        ushort tiitg    [[thread_index_in_threadgroup]],
+        ushort tiisg    [[thread_index_in_simdgroup]],
+        ushort sgitg    [[simdgroup_index_in_threadgroup]]) {
+    /* Same uniform specialization guard as the staged packed32 kernel; nb11
+     * / nb21 remain the F16 compressed row stride (raw rows are a fixed
+     * 2048-byte F32 stride inside the helper). */
+    if (!FC_flash_attn_ext_vec_has_mask ||
+        !FC_flash_attn_ext_vec_has_sinks ||
+         FC_flash_attn_ext_vec_has_bias ||
+         FC_flash_attn_ext_vec_has_scap ||
+         FC_flash_attn_ext_vec_nsg != 1 ||
+         FC_flash_attn_ext_vec_nwg != 32 ||
+         FC_flash_attn_ext_vec_ns10 != 512 ||
+         FC_flash_attn_ext_vec_ns20 != 512 ||
+         args.ne01 != 1 || args.ne02 != 64 || args.ne03 != 1 ||
+         args.ne_12_2 != 1 || args.ne_12_3 != 1 ||
+         args.ne31 != 1 || args.ne32 != 1 || args.ne33 != 1 ||
+         args.ne11 <= 0 || args.ne11 > 1024 || head >= (uint)args.ne02 ||
+         args.nb02 != 2048 || args.nb11 != 1024 || args.nb21 != 1024 ||
+         kv.n_raw == 0 || kv.n_raw > (uint)args.ne11 ||
+         kv.raw_cap < kv.n_raw || kv.raw_start >= kv.raw_cap ||
+         rope.head_dim != 512 || rope.n_dims != 64 ||
+         rope.row_bytes != 2048 || rope.inverse == 0) {
+        return;
+    }
+
+    ds4_flash_attn_vec_packed8_reduce_f16_512_direct_kv(
+        args, q, raw_kv, comp_kv, mask, sinks, kv, dst, shmem,
         head, tiisg, sgitg);
 
     /* Same producer/consumer boundary as the current reduce+RoPE kernel. */

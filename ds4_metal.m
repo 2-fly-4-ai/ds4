@@ -26343,7 +26343,10 @@ static int ds4_gpu_encode_flash_attention_prefill_static_mixed_heads_nonvec_long
 
     const uint32_t nqptg = 8;
     const uint32_t ncpsg = 64;
-    const uint32_t nsg = head_dim >= 512 ? 8u : 4u;
+    /* Wide 512-element heads perform better with four SIMD groups: each group
+     * owns two of the eight query rows, which reduces scheduling and barrier
+     * pressure without changing the reduction arithmetic. */
+    const uint32_t nsg = 4u;
     const bool has_kvpad = (n_keys % ncpsg) != 0;
     const bool bc_mask = (n_q % nqptg) != 0;
     const NSUInteger row_bytes = (NSUInteger)head_dim * sizeof(float);
@@ -26983,7 +26986,7 @@ static int ds4_gpu_encode_flash_attention_prefill_raw_heads_nonvec(
 
     const uint32_t nqptg = 8;
     const uint32_t ncpsg = 64;
-    const uint32_t nsg = head_dim >= 512 ? 8u : 4u;
+    const uint32_t nsg = 4u;
     const bool has_kvpad = (n_kv % ncpsg) != 0;
     const bool bc_mask = (n_q % nqptg) != 0;
     const NSUInteger row_bytes = (NSUInteger)head_dim * sizeof(float);
