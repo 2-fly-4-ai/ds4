@@ -485,6 +485,10 @@ int ds4_session_eval_prompt_lookup_argmax(ds4_session *s, int first_token,
                                           int *accepted, int accepted_cap,
                                           char *err, size_t errlen);
 void ds4_session_invalidate(ds4_session *s);
+/* Save/restore the compact GLM-5.3 recurrent state at a hot API prompt
+ * boundary. Other backends return false and keep their existing rewind path. */
+bool ds4_session_mark_rewind_point(ds4_session *s);
+bool ds4_session_can_rewind_to(const ds4_session *s, int pos);
 void ds4_session_rewind(ds4_session *s, int pos);
 int ds4_session_pos(ds4_session *s);
 int ds4_session_ctx(ds4_session *s);

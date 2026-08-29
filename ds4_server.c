@@ -8559,6 +8559,7 @@ struct server_slot {
     char *live_text;
     size_t live_text_len;
     int live_text_pos;              /* checkpoint.len at render time; 0 = stale */
+    int hot_rewind_pos;             /* published GLM KDA prompt snapshot */
 
     job *assigned;
     job *running;
@@ -9959,8 +9960,13 @@ static slot_reuse slot_probe_reuse_locked(server *s, server_slot *slot,
 
     int rewind_to = -1;
     if (s->engine && ds4_engine_is_glm_dsa(s->engine)) {
-        rewind_to = live_prefix_rewind_target(
-            true, live_pos, req->prompt.len, common);
+        if (common == req->prompt.len && live_pos > common &&
+            slot->hot_rewind_pos == common) {
+            rewind_to = common;
+        } else {
+            rewind_to = live_prefix_rewind_target(
+                true, live_pos, req->prompt.len, common);
+        }
     } else {
         const char *rr = getenv("DS4_KV_REWIND_REUSE");
         const char *rm = getenv("DS4_KV_REWIND_MIN_TOKENS");
@@ -11937,6 +11943,20 @@ static void generate_job_inner(server *s, server_slot *slot, job *j) {
     ds4_session_set_progress(slot->session, NULL, NULL);
     ds4_session_set_display_progress(slot->session, NULL, NULL);
     kv_cache_maybe_store_continued(s, slot);
+    if (s->engine && ds4_engine_is_glm_dsa(s->engine) &&
+        prompt_for_sync->len > 1 && j->req.max_tokens > 0 &&
+        server_prefill_enter(s, slot)) {
+        const bool marked = ds4_session_mark_rewind_point(slot->session);
+        server_prefill_leave(s);
+        pthread_mutex_lock(&s->tool_mu);
+        slot->hot_rewind_pos = marked ? prompt_for_sync->len : 0;
+        pthread_mutex_unlock(&s->tool_mu);
+        if (!marked) {
+            server_log(DS4_LOG_WARNING,
+                       "ds4-server: GLM hot prompt rewind snapshot unavailable at %d tokens",
+                       prompt_for_sync->len);
+        }
+    }
     server_log(DS4_LOG_PREFILL,
                "ds4-server: %s ctx=%s%s%s prompt done %.3fs",
                j->req.kind == REQ_CHAT ? "chat" : "completion",

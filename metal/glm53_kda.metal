@@ -286,6 +286,46 @@ kernel void kernel_glm53_kda_prefill_recurrence(
     *state_ptr = h;
 }
 
+kernel void kernel_glm53_kda_prefill_recurrence_outofplace(
+        constant glm53_kda_args &args,
+        device const float   *q,
+        device const float   *k,
+        device const float   *v,
+        device const float   *decay,
+        device const float   *raw_beta,
+        device const float   *state,
+        device float         *out,
+        device float         *state_out,
+        uint2 tgpig [[threadgroup_position_in_grid]],
+        ushort lane [[thread_index_in_simdgroup]],
+        ushort sg [[simdgroup_index_in_threadgroup]]) {
+    constexpr uint D = 128u;
+    const uint head = tgpig.x;
+    const uint value = tgpig.y * 4u + sg;
+    if (head >= args.n_heads || value >= D) return;
+    const uint projection = args.n_heads * D;
+    const uint k0 = lane * 4u;
+    const ulong state_offset = ((ulong)head * D + value) * D + k0;
+    float4 h = *((device const float4 *)(state + state_offset));
+
+    for (uint token = 0; token < args.n_rows; token++) {
+        const ulong base = (ulong)token * projection + head * D;
+        const float4 q4 = *((device const float4 *)(q + base + k0));
+        const float4 k4 = *((device const float4 *)(k + base + k0));
+        const float4 decay4 =
+            *((device const float4 *)(decay + base + k0));
+        h *= decay4;
+        const float hk = simd_sum(dot(h, k4));
+        const float beta = 1.0f /
+            (1.0f + exp(-raw_beta[(ulong)token * args.n_heads + head]));
+        const float delta_v = (v[base + value] - hk) * beta;
+        h = fma(k4, float4(delta_v), h);
+        const float result = simd_sum(dot(h, q4));
+        if (lane == 0u) out[base + value] = result;
+    }
+    *((device float4 *)(state_out + state_offset)) = h;
+}
+
 kernel void kernel_glm53_kda_prefill_output(
         constant glm53_kda_args &args,
         device float         *out,

@@ -3119,6 +3119,35 @@ int ds4_gpu_glm53_kda_prefill(
         float                 gate_lower_bound,
         float                 norm_eps);
 
+#if defined(__APPLE__)
+/* Metal verifier variant: read committed KDA state and write candidate state
+ * separately so rejection needs no 136 MiB rollback copy. */
+int ds4_gpu_glm53_kda_prefill_outofplace(
+        ds4_gpu_tensor       *out,
+        const ds4_gpu_tensor *conv_state,
+        const ds4_gpu_tensor *recurrent_state,
+        ds4_gpu_tensor       *conv_state_out,
+        ds4_gpu_tensor       *recurrent_state_out,
+        ds4_gpu_tensor       *q,
+        ds4_gpu_tensor       *k,
+        ds4_gpu_tensor       *v,
+        ds4_gpu_tensor       *raw_gate,
+        const ds4_gpu_tensor *raw_beta,
+        const ds4_gpu_tensor *output_gate,
+        const void           *model_map,
+        uint64_t              model_size,
+        uint64_t              q_conv_offset,
+        uint64_t              k_conv_offset,
+        uint64_t              v_conv_offset,
+        uint64_t              a_log_offset,
+        uint64_t              dt_bias_offset,
+        uint64_t              output_norm_offset,
+        uint32_t              n_heads,
+        uint32_t              n_tokens,
+        float                 gate_lower_bound,
+        float                 norm_eps);
+#endif
+
 /* Decode-island CUDA graph capture (CUDA backend; Metal/ROCm/CPU stub it
  * out and stay eager).  Design ported from the Entrpi/ds4 batched-serving
  * fork's per-layer decode graph capture.  The key identifies a captured

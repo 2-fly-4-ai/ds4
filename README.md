@@ -189,12 +189,22 @@ tokens, avoiding calibration overhead on short answers. Set
 `DS4_GLM_MTP_ADAPT=0` to force continuous speculation, or
 `DS4_GLM_MTP_ADAPT_LOG=1` to print suspend/resume decisions.
 
+Once GLM 5.3 speculation is confirmed, drafts whose top-logit margin is below
+1.0 use an ordinary decode step instead of paying for a low-confidence
+verification. Set `DS4_GLM_MTP_MARGIN_GATE=0` to disable this gate, or another
+positive value for diagnostic threshold sweeps. The gate preserves greedy
+output; it only decides whether to attempt the speculative verifier.
+
 On GLM 5.3, accepted speculative cycles use a two-row shared output head and
 advance the first nextn position through its KV cache-only path. The growing
 nextn attention index is updated incrementally rather than rebuilt each step.
+Metal greedy verification also writes KDA recurrent state to a shadow buffer:
+acceptance swaps tensor handles, while rejection leaves committed state
+untouched. This avoids copying roughly 136 MiB before each verifier pass.
 These preserve greedy output while removing unused GPU and host work. For
-diagnostic A/B runs only, set `DS4_GLM_MTP_BATCH_HEAD=0` or
-`DS4_GLM_MTP_CACHE_ONLY=0` to restore the corresponding older path.
+diagnostic A/B runs only, set `DS4_GLM_MTP_BATCH_HEAD=0`,
+`DS4_GLM_MTP_CACHE_ONLY=0`, or `DS4_GLM_MTP_DISABLE_KDA_SHADOW=1` to restore
+the corresponding older path.
 
 GLM 5.2 uses the Metal, CUDA, or ROCm graph backend. GLM 5.3 is validated on
 Metal, with Q2 also validated on CUDA. Directional steering, `--power` below
@@ -1120,6 +1130,12 @@ so relative runtime files such as `metal/*.metal` resolve from the project tree.
 By default the server keeps one mutable backend/KV checkpoint in memory, so
 stateless clients that resend a longer version of the same prompt can reuse the
 shared prefix instead of pre-filling from token zero.
+
+For GLM 5.3 the server also keeps a compact in-RAM KDA/logits checkpoint at the
+most recent completed prompt boundary. An exact repeat or regenerate request
+restores that boundary directly after generation instead of rebuilding the
+recurrent state from token zero. This hot checkpoint adds about 136 MiB per
+resident GLM 5.3 session; it is separate from the optional disk KV cache.
 
 `--batched-session N` preallocates `N` independent resident KV sessions. Ready
 decode steps are evaluated together, while long prefills alternate in bounded
