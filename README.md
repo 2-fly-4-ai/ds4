@@ -180,6 +180,21 @@ and timing counters:
   --mtp-timing --temp 0
 ```
 
+GLM 5.3 embedded MTP adapts to the generated token stream. It measures a
+16-draft window and keeps speculation active only at 75% acceptance or better;
+otherwise it uses ordinary decode and probes again after exponentially backed
+off intervals. Unconfirmed speculation is skipped for the final 192 requested
+tokens, avoiding calibration overhead on short answers. Set
+`DS4_GLM_MTP_ADAPT=0` to force continuous speculation, or
+`DS4_GLM_MTP_ADAPT_LOG=1` to print suspend/resume decisions.
+
+On GLM 5.3, accepted speculative cycles use a two-row shared output head and
+advance the first nextn position through its KV cache-only path. The growing
+nextn attention index is updated incrementally rather than rebuilt each step.
+These preserve greedy output while removing unused GPU and host work. For
+diagnostic A/B runs only, set `DS4_GLM_MTP_BATCH_HEAD=0` or
+`DS4_GLM_MTP_CACHE_ONLY=0` to restore the corresponding older path.
+
 GLM 5.2 uses the Metal, CUDA, or ROCm graph backend. GLM 5.3 is validated on
 Metal, with Q2 also validated on CUDA. Directional steering, `--power` below
 100, an explicit `--prefill-chunk`, and an external `--mtp-model` file are not

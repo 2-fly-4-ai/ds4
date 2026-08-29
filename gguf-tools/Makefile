@@ -45,9 +45,12 @@ endif
 CFLAGS ?= -O3 -Wall -Wextra -std=c11 $(NATIVE_CPU_FLAG)
 CPPFLAGS ?= -D_GNU_SOURCE
 
-.PHONY: all clean quality-score quality-llama-score
+.PHONY: all clean quality-score quality-llama-score gguf-requantize-dense
 
-all: deepseek4-quantize $(QUANTS_SHARED)
+all: deepseek4-quantize gguf-requantize-dense $(QUANTS_SHARED)
+
+gguf-requantize-dense: gguf_requantize_dense.c quants.c quants.h
+	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ gguf_requantize_dense.c quants.c -lm -pthread
 
 deepseek4-quantize: deepseek4-quantize.c quants.c quants.h
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ deepseek4-quantize.c quants.c -lm -pthread
@@ -63,5 +66,5 @@ quality-llama-score:
 	$(CXX) $(LLAMA_CPP_CXXFLAGS) -o quality-testing/score_llama quality-testing/score_llama.cpp $(LLAMA_CPP_LDLIBS)
 
 clean:
-	rm -f deepseek4-quantize libds4quants.dylib libds4quants.so \
+	rm -f deepseek4-quantize gguf-requantize-dense libds4quants.dylib libds4quants.so \
 		quality-testing/score_official quality-testing/score_llama
