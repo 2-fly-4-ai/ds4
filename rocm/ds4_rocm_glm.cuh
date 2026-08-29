@@ -3980,6 +3980,7 @@ static int glm_rocm_routed_moe_wrap(
         const ds4_gpu_tensor *weights,
         uint32_t n_total_expert,
         uint32_t n_expert,
+        float swiglu_clamp,
         uint32_t layer_index,
         const ds4_gpu_tensor *x,
         uint32_t n_tokens,
@@ -4022,7 +4023,7 @@ static int glm_rocm_routed_moe_wrap(
                                              down_row_bytes, expert_in_dim,
                                              expert_mid_dim, out_dim, selected,
                                              weights, n_total_expert, n_expert,
-                                             0.0f, x, NULL, layer_index,
+                                             swiglu_clamp, x, NULL, layer_index,
                                              force_resident,
                                              NULL, NULL, NULL, NULL, NULL);
     }
@@ -4034,7 +4035,7 @@ static int glm_rocm_routed_moe_wrap(
                                            down_row_bytes, expert_in_dim,
                                            expert_mid_dim, out_dim, selected,
                                            weights, n_total_expert, n_expert,
-                                           0.0f, x, layer_index, n_tokens, NULL,
+                                           swiglu_clamp, x, layer_index, n_tokens, NULL,
                                            force_resident);
 }
 
@@ -4062,6 +4063,7 @@ extern "C" int ds4_gpu_glm_routed_moe_one_tensor(
         const ds4_gpu_tensor *weights,
         uint32_t n_total_expert,
         uint32_t n_expert,
+        float swiglu_clamp,
         uint32_t layer_index,
         const ds4_gpu_tensor *x,
         bool force_resident) {
@@ -4071,7 +4073,8 @@ extern "C" int ds4_gpu_glm_routed_moe_one_tensor(
                                     up_expert_bytes, up_row_bytes, down_expert_bytes,
                                     down_row_bytes, expert_in_dim, expert_mid_dim,
                                     out_dim, selected, weights, n_total_expert,
-                                    n_expert, layer_index, x, 1, n_expert * expert_mid_dim,
+                                    n_expert, swiglu_clamp, layer_index, x, 1,
+                                    n_expert * expert_mid_dim,
                                     force_resident);
 }
 
@@ -4099,6 +4102,7 @@ extern "C" int ds4_gpu_glm_routed_moe_batch_tensor(
         const ds4_gpu_tensor *weights,
         uint32_t n_total_expert,
         uint32_t n_expert,
+        float swiglu_clamp,
         uint32_t layer_index,
         const ds4_gpu_tensor *x,
         uint32_t n_tokens,
@@ -4110,7 +4114,7 @@ extern "C" int ds4_gpu_glm_routed_moe_batch_tensor(
                                     up_expert_bytes, up_row_bytes, down_expert_bytes,
                                     down_row_bytes, expert_in_dim, expert_mid_dim,
                                     out_dim, selected, weights, n_total_expert,
-                                    n_expert, layer_index, x, n_tokens,
+                                    n_expert, swiglu_clamp, layer_index, x, n_tokens,
                                     mid_token_stride, force_resident);
 }
 
@@ -4138,6 +4142,7 @@ extern "C" int ds4_gpu_glm_routed_moe_batch_direct_scalar_q4_tensor(
         const ds4_gpu_tensor *weights,
         uint32_t n_total_expert,
         uint32_t n_expert,
+        float swiglu_clamp,
         uint32_t layer_index,
         const ds4_gpu_tensor *x,
         uint32_t n_tokens,
@@ -4148,6 +4153,6 @@ extern "C" int ds4_gpu_glm_routed_moe_batch_direct_scalar_q4_tensor(
                                     up_expert_bytes, up_row_bytes, down_expert_bytes,
                                     down_row_bytes, expert_in_dim, expert_mid_dim,
                                     out_dim, selected, weights, n_total_expert,
-                                    n_expert, layer_index, x, n_tokens,
+                                    n_expert, swiglu_clamp, layer_index, x, n_tokens,
                                     mid_token_stride, false);
 }
