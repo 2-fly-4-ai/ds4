@@ -52,6 +52,9 @@ Usage:
   ./download_model.sh glm53-q2 [--token TOKEN]
   ./download_model.sh glm53-q4 [--token TOKEN]
   ./download_model.sh glm53-fp8 [--token TOKEN]
+  ./download_model.sh glm-53-flash-antirez-fp8 [--token TOKEN]
+  ./download_model.sh glm-53-flash-antirez-q2 [--token TOKEN]
+  ./download_model.sh glm-53-flash-antirez-q4 [--token TOKEN]
 
 Targets:
 
@@ -123,6 +126,15 @@ Targets:
        Text-only GLM 5.3 Flash native FP8 GGUF, about 305 GiB on disk. It
        preserves the released weights without requantization. DwarfStar
        inference support for this paired FP8-code/scale format is pending.
+
+  glm-53-flash-antirez-q2
+       Long-form alias for glm53-q2.
+
+  glm-53-flash-antirez-q4
+       Long-form alias for glm53-q4.
+
+  glm-53-flash-antirez-fp8
+       Long-form alias for glm53-fp8.
 
 Options:
   --token TOKEN  Hugging Face token. Otherwise HF_TOKEN or the local HF token
@@ -198,17 +210,17 @@ case "$MODEL" in
         MODEL_FILE=$GLM_ANTIREZ_Q4_FILE
         FORCE_HF_DOWNLOAD=1
         ;;
-    glm53-q2)
+    glm53-q2|glm-53-flash-antirez-q2)
         REPO=$GLM53_REPO
         MODEL_FILE=$GLM53_Q2_FILE
         FORCE_HF_DOWNLOAD=1
         ;;
-    glm53-q4)
+    glm53-q4|glm-53-flash-antirez-q4)
         REPO=$GLM53_REPO
         MODEL_FILE=$GLM53_Q4_FILE
         FORCE_HF_DOWNLOAD=1
         ;;
-    glm53-fp8)
+    glm53-fp8|glm-53-flash-antirez-fp8)
         REPO=$GLM53_REPO
         MODEL_FILE=$GLM53_FP8_FILE
         FORCE_HF_DOWNLOAD=1
