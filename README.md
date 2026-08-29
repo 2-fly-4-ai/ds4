@@ -206,6 +206,13 @@ diagnostic A/B runs only, set `DS4_GLM_MTP_BATCH_HEAD=0`,
 `DS4_GLM_MTP_CACHE_ONLY=0`, or `DS4_GLM_MTP_DISABLE_KDA_SHADOW=1` to restore
 the corresponding older path.
 
+Resident single-GPU GLM decode also appends the output head to the final layer
+command stream instead of submitting and waiting for a second command buffer.
+The change is byte-identical at the full-logit level and helps most at short
+full-attention contexts; set `DS4_METAL_DISABLE_GLM_FULL_OUTPUT_MERGE=1` only
+for diagnostic A/B runs. The M5 Max measurements are tracked in
+`speed-bench/m5_max_automatic_glm53_full_output_merge.csv`.
+
 GLM 5.2 uses the Metal, CUDA, or ROCm graph backend. GLM 5.3 is validated on
 Metal, with Q2 also validated on CUDA. Directional steering, `--power` below
 100, an explicit `--prefill-chunk`, and an external `--mtp-model` file are not

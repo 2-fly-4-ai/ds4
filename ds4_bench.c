@@ -59,6 +59,7 @@ typedef struct {
     uint64_t simulate_used_memory_bytes;
     double step_mul;
     const char *dump_frontier_logits_dir;
+    const char *dump_decode_logits_dir;
     ds4_dist_options dist;
     ds4_tp_options tp;
     bool warm_weights;
@@ -286,6 +287,8 @@ static bench_config parse_options(int argc, char **argv) {
             c.csv_path = need_arg(&i, argc, argv, arg);
         } else if (!strcmp(arg, "--dump-frontier-logits-dir")) {
             c.dump_frontier_logits_dir = need_arg(&i, argc, argv, arg);
+        } else if (!strcmp(arg, "--dump-decode-logits-dir")) {
+            c.dump_decode_logits_dir = need_arg(&i, argc, argv, arg);
         } else if (!strcmp(arg, "--expert-profile")) {
             c.expert_profile_path = need_arg(&i, argc, argv, arg);
         } else if (!strcmp(arg, "-t") || !strcmp(arg, "--threads")) {
@@ -503,6 +506,59 @@ static int write_frontier_logits_json(
         return 1;
     }
     free(logits);
+    return 0;
+}
+
+/* Optional raw F32 frontier capture after each forced/greedy decode step.
+ * This is intentionally binary: correctness A/B runs can archive hundreds of
+ * full-vocabulary rows without spending most of their time formatting JSON. */
+static int write_decode_logits_f32(
+        const bench_config *cfg,
+        ds4_engine         *engine,
+        ds4_session        *session,
+        int                 frontier,
+        int                 step) {
+    if (!cfg->dump_decode_logits_dir) return 0;
+
+    const int vocab = ds4_engine_vocab_size(engine);
+    float *logits = malloc((size_t)vocab * sizeof(logits[0]));
+    if (!logits) {
+        fprintf(stderr, "ds4-bench: out of memory copying decode logits\n");
+        return 1;
+    }
+    if (ds4_session_copy_logits(session, logits, vocab) != vocab) {
+        fprintf(stderr,
+                "ds4-bench: failed to copy decode logits at frontier %d step %d\n",
+                frontier, step);
+        free(logits);
+        return 1;
+    }
+
+    char path[PATH_MAX];
+    const int n = snprintf(path,
+                           sizeof(path),
+                           "%s/frontier_%06d_step_%06d.f32",
+                           cfg->dump_decode_logits_dir,
+                           frontier,
+                           step);
+    if (n <= 0 || (size_t)n >= sizeof(path)) {
+        fprintf(stderr, "ds4-bench: decode logits path is too long\n");
+        free(logits);
+        return 1;
+    }
+    FILE *fp = fopen(path, "wb");
+    if (!fp) {
+        fprintf(stderr, "ds4-bench: failed to open %s: %s\n", path, strerror(errno));
+        free(logits);
+        return 1;
+    }
+    const size_t wrote = fwrite(logits, sizeof(logits[0]), (size_t)vocab, fp);
+    const int close_rc = fclose(fp);
+    free(logits);
+    if (wrote != (size_t)vocab || close_rc != 0) {
+        fprintf(stderr, "ds4-bench: failed to write %s\n", path);
+        return 1;
+    }
     return 0;
 }
 
@@ -867,6 +923,11 @@ int main(int argc, char **argv) {
 #endif
             if (ds4_session_eval(session, token, err, sizeof(err)) != 0) {
                 fprintf(stderr, "ds4-bench: decode at frontier %d failed: %s\n", frontier, err);
+                rc = 1;
+                break;
+            }
+            if (write_decode_logits_f32(&cfg, engine, session,
+                                        frontier, i + 1) != 0) {
                 rc = 1;
                 break;
             }

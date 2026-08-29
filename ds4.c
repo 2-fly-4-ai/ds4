@@ -43369,13 +43369,22 @@ static bool glm53_graph_kda_attention(
         ds4_glm_gpu_graph       *g,
         const ds4_model         *model,
         const ds4_layer_weights *l,
-        uint32_t                 il) {
+        uint32_t                 il,
+        uint32_t                 pos) {
     if (!g || !model || !l || il >= DS4_MAX_LAYER ||
         !g->layer_kda_conv_state[il] ||
         !g->layer_kda_recurrent_state[il]) {
         return false;
     }
     const uint32_t projection = DS4_N_KDA_HEAD * DS4_N_KDA_HEAD_DIM;
+    const bool stage_profile = metal_graph_decode_stage_profile_enabled(il);
+    double stage_t0 = stage_profile ? now_sec() : 0.0;
+#define DS4_GLM_PROFILE_KDA_STAGE(name_) do {                              \
+        if (ok && stage_profile) {                                          \
+            ok = metal_graph_layer_stage_profile_boundary(                  \
+                "glm_decode_kda", (name_), il, pos, 1, &stage_t0);          \
+        }                                                                   \
+    } while (0)
     bool qk_paired = false;
 #if !defined(__APPLE__) && !defined(DS4_ROCM_BUILD) && !defined(DS4_NO_GPU)
     if (l->kda_q->type == DS4_TENSOR_Q4_K &&
@@ -43396,27 +43405,35 @@ static bool glm53_graph_kda_attention(
     bool ok = qk_paired ||
         glm53_graph_matmul(g->kda_q, model, l->kda_q,
                            DS4_N_EMBD, projection, g->attn_norm);
+    DS4_GLM_PROFILE_KDA_STAGE("kda_q");
     if (ok && !qk_paired) {
         ok = glm53_graph_matmul(g->kda_k, model, l->kda_k,
                                 DS4_N_EMBD, projection, g->attn_norm);
     }
+    DS4_GLM_PROFILE_KDA_STAGE("kda_k");
     if (ok) ok = glm53_graph_matmul(g->kda_v, model, l->kda_v,
                                          DS4_N_EMBD, projection, g->attn_norm);
+    DS4_GLM_PROFILE_KDA_STAGE("kda_v");
     if (ok) ok = glm53_graph_matmul(g->kda_lowrank, model, l->kda_f_a,
                                          DS4_N_EMBD, DS4_N_KDA_HEAD_DIM,
                                          g->attn_norm);
+    DS4_GLM_PROFILE_KDA_STAGE("kda_f_a");
     if (ok) ok = glm53_graph_matmul(g->kda_raw_gate, model, l->kda_f_b,
                                          DS4_N_KDA_HEAD_DIM, projection,
                                          g->kda_lowrank);
+    DS4_GLM_PROFILE_KDA_STAGE("kda_f_b");
     if (ok) ok = glm53_graph_matmul(g->kda_raw_beta, model, l->kda_beta,
                                          DS4_N_EMBD, DS4_N_KDA_HEAD,
                                          g->attn_norm);
+    DS4_GLM_PROFILE_KDA_STAGE("kda_beta");
     if (ok) ok = glm53_graph_matmul(g->kda_lowrank, model, l->kda_g_a,
                                          DS4_N_EMBD, DS4_N_KDA_HEAD_DIM,
                                          g->attn_norm);
+    DS4_GLM_PROFILE_KDA_STAGE("kda_g_a");
     if (ok) ok = glm53_graph_matmul(g->kda_output_gate, model, l->kda_g_b,
                                          DS4_N_KDA_HEAD_DIM, projection,
                                          g->kda_lowrank);
+    DS4_GLM_PROFILE_KDA_STAGE("kda_g_b");
     if (ok) ok = ds4_gpu_glm53_kda_decode(
             g->kda_out,
             g->layer_kda_conv_state[il],
@@ -43439,12 +43456,15 @@ static bool glm53_graph_kda_attention(
             1,
             DS4_KDA_GATE_LOWER_BOUND,
             DS4_RMS_EPS) != 0;
+    DS4_GLM_PROFILE_KDA_STAGE("kda_recurrence");
     if (ok) ok = glm53_graph_matmul(g->attn_out,
                                          model,
                                          l->kda_output,
                                          projection,
                                          DS4_N_EMBD,
                                          g->kda_out);
+    DS4_GLM_PROFILE_KDA_STAGE("kda_output");
+#undef DS4_GLM_PROFILE_KDA_STAGE
     return ok;
 }
 
@@ -43549,6 +43569,9 @@ static bool glm_graph_forward_output_head(
         plain = g->hc_output;
     }
     if (ok) ok = glm_graph_encode_output_head_from(g, model, weights, plain);
+    if (ok && ds4_gpu_stage_counters_enabled()) {
+        ok = ds4_gpu_stage_counter_sample("output_head") != 0;
+    }
     if (ok) ok = ds4_gpu_end_commands() != 0;
     else (void)ds4_gpu_synchronize();
     if (ok && glm_debug_hidden_dump_layer() < 0)
@@ -50683,6 +50706,14 @@ static bool glm_graph_forward_token(
         return false;
     }
 
+    /* GLM uses the same Metal command-buffer stage sampler as DeepSeek, but
+     * previously never reset or reported it around a complete decode token.
+     * Deferred MTP/batch calls share a caller-owned stream, so keep those out
+     * of this per-token diagnostic. */
+    const bool stage_counters =
+        !defer_completion && ds4_gpu_stage_counters_enabled();
+    if (stage_counters) ds4_gpu_stage_counter_reset();
+
     const bool tp_split_indexed_heads =
         use_indexed_attention && g->tp_world == 2 && g->tp_out && g->tp_in &&
         !g->ssd_streaming && (DS4_N_HEAD % 2u) == 0u;
@@ -50719,6 +50750,18 @@ static bool glm_graph_forward_token(
     const bool decode_output_profile = false;
     const bool merge_indexed_output =
         logits_out != NULL && use_indexed_attention && !decode_output_profile;
+    /* Resident single-GPU full-attention decode used to close and wait for
+     * the layer command stream, then open a second stream for the output
+     * head.  The head reads the final HC state in-order, so encode it onto
+     * the existing stream just like indexed decode does.  Keep streaming,
+     * placement, and TP paths on their established mapping/synchronization
+     * cadence. */
+    const bool merge_full_output =
+        logits_out != NULL && !use_indexed_attention && !decode_output_profile &&
+        !g->ssd_streaming && g->placement == NULL && g->tp_world < 2 &&
+        getenv("DS4_METAL_DISABLE_GLM_FULL_OUTPUT_MERGE") == NULL;
+    const bool merge_decode_output =
+        merge_indexed_output || merge_full_output;
     double decode_output_stage_t0 = decode_output_profile ? now_sec() : 0.0;
     const bool decode_flush_profile = false;
     uint32_t decode_flush_layer0 = 0;
@@ -50802,6 +50845,9 @@ static bool glm_graph_forward_token(
                                                   DS4_N_EMBD) != 0;
         }
     }
+    if (ok && stage_counters) {
+        ok = ds4_gpu_stage_counter_sample("token_input") != 0;
+    }
     if (ok && streaming_decode_sync_each_layer) {
         ok = ds4_gpu_end_commands() != 0;
     }
@@ -50839,7 +50885,8 @@ static bool glm_graph_forward_token(
         double decode_stage_t0 = decode_stage_profile ? now_sec() : 0.0;
         if (decode_stage_profile) {
             ok = metal_graph_layer_stage_profile_boundary("glm_decode_attn",
-                                                          NULL,
+                                                          stage_counters ?
+                                                              "layer_entry" : NULL,
                                                           il,
                                                           pos,
                                                           1,
@@ -50869,7 +50916,7 @@ static bool glm_graph_forward_token(
         DS4_GLM_PROFILE_DECODE_STAGE("glm_decode_attn", "attn_norm");
         if (ok && glm53_kda) {
             DS4_GLM_FT_STAGE("KDA attention");
-            ok = glm53_graph_kda_attention(g, model, l, il);
+            ok = glm53_graph_kda_attention(g, model, l, il, pos);
             goto glm53_attention_done;
         }
         const uint32_t decode_ablate = glm_decode_ablate_mask();
@@ -51649,7 +51696,10 @@ glm53_attention_done:
     }
 #undef DS4_GLM_PROFILE_DECODE_STAGE
 #undef DS4_GLM_FT_STAGE
-    if (ok && (merge_indexed_output ||
+    if (ok && stage_counters) {
+        ok = ds4_gpu_stage_counter_sample("layers_tail") != 0;
+    }
+    if (ok && (merge_decode_output ||
                (defer_completion && logits_out != NULL))) {
         if (g->ssd_streaming) {
             if (!static_decode_map) {
@@ -51658,6 +51708,9 @@ glm53_attention_done:
             if (ok) ok = glm_graph_begin_commands_if_needed();
         }
         ok = glm_graph_encode_output_head(g, model, weights);
+        if (ok && stage_counters) {
+            ok = ds4_gpu_stage_counter_sample("output_head") != 0;
+        }
         if (g->ssd_streaming) {
             if (ok) ok = glm_graph_end_commands_if_active();
             else (void)ds4_gpu_synchronize();
@@ -51686,7 +51739,21 @@ glm53_attention_done:
                                      sizeof(float)) != 0;
     }
     if (ok && logits_out && !defer_completion) {
-        if (use_indexed_attention) {
+        if (merge_decode_output) {
+            if (glm_debug_hidden_dump_layer() < 0)
+                glm_debug_dump_hidden_row(g->glm53 ? g->hc_output : g->cur, 0);
+            ok = ds4_gpu_tensor_read(g->logits,
+                                     0,
+                                     logits_out,
+                                     (uint64_t)DS4_N_VOCAB * sizeof(float)) != 0;
+            if (decode_output_profile) {
+                const double now = now_sec();
+                fprintf(stderr,
+                        "ds4: GLM decode output profile pos=%u logits_read=%.3f ms\n",
+                        pos,
+                        (now - decode_output_stage_t0) * 1000.0);
+            }
+        } else if (use_indexed_attention) {
             if (!merge_indexed_output) {
                 if (g->ssd_streaming && !static_decode_map) {
                     ok = glm_graph_stream_map_output(g, model, weights);
@@ -51751,6 +51818,10 @@ glm53_attention_done:
         ok = glm_graph_end_commands_if_active();
     } else if (!ok) {
         (void)ds4_gpu_synchronize();
+    }
+    if (stage_counters) {
+        if (ok) ds4_gpu_stage_counter_report(pos);
+        else ds4_gpu_stage_counter_reset();
     }
     if (!ok && getenv("DS4_GLM_TP_DEBUG")) {
         fprintf(stderr,

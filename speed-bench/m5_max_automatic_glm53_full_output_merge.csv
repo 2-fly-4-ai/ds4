@@ -1,0 +1,13 @@
+suite,order,mode,ctx_tokens,prefill_tokens,prefill_tps,gen_tokens,gen_tps,gen_first_ms,gen_steady_tokens,gen_steady_tps,notes
+abba,a,old_separate_output,2048,2048,533.10,256,26.87,42.880,255,26.89,rollback env enabled
+abba,a,new_merged_output,2048,2048,533.63,256,27.07,43.276,255,27.08,default candidate
+abba,b,new_merged_output,2048,2048,527.84,256,27.02,42.729,255,27.04,default candidate
+abba,b,old_separate_output,2048,2048,502.51,256,26.81,43.665,255,26.82,rollback env enabled
+context_sweep,old,old_separate_output,512,512,336.05,64,31.05,42.512,63,31.21,shared 3649-token allocation
+context_sweep,old,old_separate_output,2048,1536,375.26,64,26.16,51.526,63,26.31,incremental prefill
+context_sweep,old,old_separate_output,3584,1536,383.76,64,22.13,60.507,63,22.25,incremental prefill
+context_sweep,new,new_merged_output,512,512,348.13,64,32.87,36.812,63,32.98,shared 3649-token allocation
+context_sweep,new,new_merged_output,2048,1536,391.70,64,26.73,50.913,63,26.88,incremental prefill
+context_sweep,new,new_merged_output,3584,1536,390.97,64,22.33,61.782,63,22.47,incremental prefill
+indexed_regression,new,new_merged_output,4096,4096,423.79,64,31.72,34.647,63,31.77,indexed decode boundary
+indexed_regression,new,new_merged_output,16384,12288,381.53,64,31.65,35.292,63,31.71,indexed decode unchanged
