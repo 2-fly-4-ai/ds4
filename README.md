@@ -182,7 +182,8 @@ and timing counters:
 
 GLM 5.3 embedded MTP adapts to the generated token stream. It measures a
 16-draft window and keeps speculation active only at 75% acceptance or better;
-otherwise it uses ordinary decode and probes again after exponentially backed
+if the stream can no longer reach that threshold, it stops the window early.
+Otherwise it uses ordinary decode and probes again after exponentially backed
 off intervals. Unconfirmed speculation is skipped for the final 192 requested
 tokens, avoiding calibration overhead on short answers. Set
 `DS4_GLM_MTP_ADAPT=0` to force continuous speculation, or

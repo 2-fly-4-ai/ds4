@@ -63926,13 +63926,16 @@ static int ds4_session_glm_spec_cycle_adaptive(
     if (rc >= 2) s->glm_mtp_adapt_hits++;
     const uint32_t window = s->glm_mtp_adapt_backoff != 0 ?
         DS4_GLM_MTP_ADAPT_PROBE_WINDOW : DS4_GLM_MTP_ADAPT_WINDOW;
-    if (s->glm_mtp_adapt_trials < window) return rc;
+    const uint32_t required_hits =
+        (window * DS4_GLM_MTP_ADAPT_MIN_PERCENT + 99u) / 100u;
+    const uint32_t remaining_trials = window - s->glm_mtp_adapt_trials;
+    const bool can_still_qualify =
+        s->glm_mtp_adapt_hits + remaining_trials >= required_hits;
+    if (s->glm_mtp_adapt_trials < window && can_still_qualify) return rc;
 
     const uint32_t trials = s->glm_mtp_adapt_trials;
     const uint32_t hits = s->glm_mtp_adapt_hits;
-    const bool profitable =
-        (uint64_t)hits * 100u >=
-        (uint64_t)trials * DS4_GLM_MTP_ADAPT_MIN_PERCENT;
+    const bool profitable = trials == window && hits >= required_hits;
     s->glm_mtp_adapt_trials = 0;
     s->glm_mtp_adapt_hits = 0;
     if (profitable) {
