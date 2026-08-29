@@ -48961,6 +48961,8 @@ static bool glm_graph_forward_indexed_tokens(
         const ds4_weights *weights,
         const int         *tokens,
         const float       *input_hc,
+        const ds4_vision_span *images,
+        size_t             image_count,
         uint32_t           pos0,
         uint32_t           n_tokens,
         float             *output_hc,
@@ -49045,8 +49047,13 @@ static bool glm_graph_forward_indexed_tokens(
         if (tokens[i] < 0 || tokens[i] >= (int)DS4_N_VOCAB) return false;
     }
     if (!input_hc && !g->has_token_embd) return false;
+    if (input_hc && image_count != 0) return false;
     if (logits_out && !g->has_output_head) return false;
     glm_graph_reset_prefill_seed_capture(g);
+
+    glm_vision_overlay vision_overlay = {0};
+    if (!glm_vision_overlay_prepare(&vision_overlay, images, image_count,
+                                    pos0, n_tokens)) return false;
 
     const double trace_upload_t0 = trace ? now_sec() : 0.0;
     bool ok = glm_graph_upload_tokens(g->prefill_tokens, tokens, n_tokens);
@@ -49084,6 +49091,7 @@ static bool glm_graph_forward_indexed_tokens(
         ds4_gpu_tensor_free(after_attn_view);
         ds4_gpu_tensor_free(next_view);
         ds4_gpu_tensor_free(cur_view);
+        glm_vision_overlay_free(&vision_overlay);
         return false;
     }
     ds4_gpu_tensor *cur = g->glm53 ? cur_view : g->batch_cur;
@@ -49227,6 +49235,21 @@ static bool glm_graph_forward_indexed_tokens(
                                                DS4_N_EMBD,
                                                DS4_N_HC) != 0;
         }
+#if defined(__APPLE__)
+        for (size_t i = 0; ok && i < vision_overlay.count; i++) {
+            const glm_vision_overlay_segment *segment =
+                    &vision_overlay.segments[i];
+            ok = ds4_gpu_glm53_scatter_image_hc(
+                    hc_cur,
+                    vision_overlay.tensor,
+                    segment->dst_row,
+                    segment->src_row,
+                    segment->rows,
+                    n_tokens,
+                    DS4_N_EMBD,
+                    DS4_N_HC) != 0;
+        }
+#endif
         if (trace) {
             const double ms = (now_sec() - t0) * 1000.0;
             if (trace_all || ms >= trace_slow_ms || !ok) {
@@ -50552,6 +50575,7 @@ glm53_indexed_attention_done:
     ds4_gpu_tensor_free(after_attn_view);
     ds4_gpu_tensor_free(next_view);
     ds4_gpu_tensor_free(cur_view);
+    glm_vision_overlay_free(&vision_overlay);
     ds4_gpu_set_glm_streaming_prefill_full_layer(false);
     return ok;
 }
@@ -50617,6 +50641,8 @@ static bool glm_graph_prefill_range(
                                                  weights,
                                                  tokens + done,
                                                  NULL,
+                                                 NULL,
+                                                 0,
                                                  pos,
                                                  chunk,
                                                  NULL,
@@ -50699,6 +50725,8 @@ static bool glm_graph_prefill_range(
                                                       weights,
                                                       tokens + done,
                                                       NULL,
+                                                      NULL,
+                                                      0,
                                                       pos,
                                                       chunk,
                                                       NULL,
@@ -50755,6 +50783,8 @@ static bool glm_graph_prefill_range(
                                                           weights,
                                                           tokens + done,
                                                           NULL,
+                                                          NULL,
+                                                          0,
                                                           cur_pos,
                                                           chunk,
                                                           NULL,
@@ -64401,6 +64431,8 @@ static int ds4_session_glm_spec_cycle_impl(
                                                              &e->weights,
                                                              toks,
                                                              NULL,
+                                                             NULL,
+                                                             0,
                                                              pos,
                                                              2,
                                                              s->glm_mtp_hc,
@@ -64424,7 +64456,7 @@ static int ds4_session_glm_spec_cycle_impl(
         if (!glm_graph_indexed_prefill_batch_ready(g, pos) ||
             glm_graph_limit_indexed_prefill_chunk(g, pos, 2u) < 2u ||
             !glm_graph_forward_indexed_tokens(g, &e->model, &e->weights,
-                                              toks, NULL, pos, 2,
+                                              toks, NULL, NULL, 0, pos, 2,
                                               s->glm_mtp_hc, s->logits,
                                               NULL, NULL, pos, 0, 2)) {
             if (errlen) snprintf(err, errlen, "glm mtp: verify failed");
@@ -65063,6 +65095,8 @@ int ds4_session_eval_layer_slice(ds4_session *s,
                                                       &e->weights,
                                                       tokens + done,
                                                       chunk_input,
+                                                      NULL,
+                                                      0,
                                                       pos,
                                                       chunk,
                                                       chunk_output,
@@ -65785,6 +65819,8 @@ static int ds4_session_sync_internal(ds4_session *s, const ds4_tokens *prompt, c
                                             &e->weights,
                                             prompt->v + i,
                                             NULL,
+                                            s->sync_images,
+                                            s->sync_image_count,
                                             pos,
                                             chunk,
                                             NULL,
@@ -66078,6 +66114,8 @@ static int ds4_session_sync_internal(ds4_session *s, const ds4_tokens *prompt, c
                                                       &e->weights,
                                                       prompt->v + i,
                                                       NULL,
+                                                      s->sync_images,
+                                                      s->sync_image_count,
                                                       pos,
                                                       chunk,
                                                       NULL,
@@ -66263,6 +66301,8 @@ static int ds4_session_sync_internal(ds4_session *s, const ds4_tokens *prompt, c
                                                                   &e->weights,
                                                                   prompt->v + i,
                                                                   NULL,
+                                                                  s->sync_images,
+                                                                  s->sync_image_count,
                                                                   (uint32_t)i,
                                                                   chunk,
                                                                   NULL,
