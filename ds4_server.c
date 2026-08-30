@@ -10177,6 +10177,15 @@ static bool kv_cache_store_live_prefix_text(server *s, server_slot *slot,
     char err[160] = {0};
     ds4_kvstore_trailer_hooks hooks = kv_cache_tool_map_hooks(s, NULL);
     pthread_mutex_lock(&s->inference_mu);
+    /* The payload contains image-conditioned KV rows, but the disk key and
+     * trailer do not contain image fingerprints. Never let generic image
+     * placeholder tokens become a cache hit for a different image.
+     * sync_image_count covers progress-callback writes during prefill;
+     * checkpoint_image_count covers completed sessions. */
+    if (ds4_session_has_vision_state(slot->session)) {
+        pthread_mutex_unlock(&s->inference_mu);
+        return false;
+    }
     pthread_mutex_lock(&s->kv_mu);
     bool ok = ds4_kvstore_store_live_prefix_text(&s->kv, s->engine,
                                                   slot->session,
@@ -10440,6 +10449,12 @@ static slot_reuse slot_probe_reuse_locked(server *s, server_slot *slot,
     slot_reuse pr = { REUSE_NONE, 0, 0, 0 };
     if (!s || !slot || !slot->session || !req) return pr;
     if (!ds4_session_checkpoint_valid(slot->session)) return pr;
+    /* Token or visible-text equality is insufficient for multimodal state:
+     * generic image placeholders can represent different embeddings. Keep
+     * image identity in the one reuse verdict shared by routing and execution. */
+    if (!ds4_session_vision_state_matches(slot->session,
+                                          req->images,
+                                          req->image_count)) return pr;
     const ds4_tokens *live = ds4_session_tokens(slot->session);
     if (!live || live->len <= 0) return pr;
     const int live_pos = live->len;
@@ -11436,6 +11451,25 @@ static int server_session_sync(server *s, server_slot *slot,
            DS4_SESSION_SYNC_INTERRUPTED : 0;
 }
 
+static int server_multimodal_resume_frontier(int live, int common,
+                                             int prompt_len,
+                                             bool image_state_matches) {
+    return common == live && prompt_len >= live && image_state_matches
+           ? live : 0;
+}
+
+static int server_multimodal_resume_pos(ds4_session *session,
+                                        const ds4_tokens *prompt,
+                                        const ds4_vision_span *images,
+                                        size_t image_count) {
+    if (!session || !prompt) return 0;
+    const int live = ds4_session_pos(session);
+    const int common = ds4_session_common_prefix(session, prompt);
+    return server_multimodal_resume_frontier(
+        live, common, prompt->len,
+        ds4_session_vision_state_matches(session, images, image_count));
+}
+
 static int server_session_sync_multimodal(server *s, server_slot *slot,
                                           const ds4_tokens *prompt,
                                           const ds4_vision_span *images,
@@ -11453,7 +11487,13 @@ static int server_session_sync_multimodal(server *s, server_slot *slot,
         return rc;
     }
 
-    int done = 0;
+    /* Start at the exact live frontier when both tokens and image identities
+     * match. Starting at zero made the first scheduling slice truncate a
+     * perfectly reusable long checkpoint, forcing a complete refill. */
+    pthread_mutex_lock(&s->inference_mu);
+    int done = server_multimodal_resume_pos(slot->session, prompt,
+                                            images, image_count);
+    pthread_mutex_unlock(&s->inference_mu);
     bool called = false;
     while (!g_stop_requested && !slot_job_cancelled(slot) &&
            (!called || done < prompt->len)) {
@@ -11817,6 +11857,19 @@ static void canonicalize_tool_checkpoint(server *s, server_slot *slot,
         goto done;
     }
     free(live_text);
+
+    if (j->req.image_count != 0) {
+        /* Rebuilding through the text-only disk cache would either lose the
+         * vision embeddings or restore rows for an unverified image. Keep the
+         * correctly conditioned sampled frontier instead. */
+        server_log(DS4_LOG_WARNING,
+                   "ds4-server: multimodal tool checkpoint canonicalization skipped ctx=%s common=%d live=%d canonical=%d reason=preserve-image-state",
+                   ctx, common, live_len, canonical.len);
+        trace_event(s, trace_id,
+                    "multimodal tool checkpoint canonicalization skipped: common=%d live=%d canonical=%d",
+                    common, live_len, canonical.len);
+        goto done;
+    }
 
     if (common < j->req.prompt.len) {
         trace_event(s, trace_id,
@@ -12197,14 +12250,13 @@ static void generate_job_inner(server *s, server_slot *slot, job *j) {
     char err[160];
     err[0] = '\0';
     const bool multimodal = j->req.image_count != 0;
-    if (multimodal) {
-        pthread_mutex_lock(&s->inference_mu);
-        ds4_session_invalidate(slot->session);
-        pthread_mutex_unlock(&s->inference_mu);
-        request_live_state_clear(s, slot);
-    }
+    pthread_mutex_lock(&s->inference_mu);
     const int old_pos = ds4_session_pos(slot->session);
     const int common = ds4_session_common_prefix(slot->session, &j->req.prompt);
+    const bool live_vision_match =
+        ds4_session_vision_state_matches(slot->session,
+                                         j->req.images, j->req.image_count);
+    pthread_mutex_unlock(&s->inference_mu);
     trace_cache_diag cache_diag = {0};
     trace_cache_capture(&cache_diag, ds4_session_tokens(slot->session),
                         &j->req.prompt, old_pos, common);
@@ -12337,10 +12389,16 @@ static void generate_job_inner(server *s, server_slot *slot, job *j) {
     uint8_t disk_cache_ext_flags = 0;
     if (cached == 0 && old_pos > 0) {
         server_log(DS4_LOG_WARNING,
-                   "ds4-server: live kv cache miss%s live=%d prompt=%d common=%d reason=%s",
+                   "ds4-server: live kv cache miss%s live=%d prompt=%d common=%d vision=%s reason=%s",
                    responses_protocol ? " RESPPROTO" : "",
                    old_pos, j->req.prompt.len, common,
+                   live_vision_match ? "match" : "mismatch",
                    trace_cache_miss_reason(&cache_diag));
+    }
+    if (multimodal && cached > 0) {
+        server_log(DS4_LOG_KVCACHE,
+                   "ds4-server: multimodal live kv hit images=%zu cached=%d prompt=%d identity=fingerprint-match",
+                   j->req.image_count, cached, prompt_for_sync->len);
     }
     if (cached == 0) slot->continued_last_store_tokens = 0;
     if (!multimodal && s->kv.enabled && cached == 0 &&
@@ -15365,6 +15423,13 @@ static void test_dispatch_routes_alien_request_to_empty_slot(void) {
     ds4_session_free_test_checkpoint(slots[1].session);
     pthread_mutex_destroy(&s.tool_mu);
     pthread_cond_destroy(&s.cv);
+}
+
+static void test_multimodal_prefill_resume_frontier(void) {
+    TEST_ASSERT(server_multimodal_resume_frontier(160, 160, 170, true) == 160);
+    TEST_ASSERT(server_multimodal_resume_frontier(160, 159, 170, true) == 0);
+    TEST_ASSERT(server_multimodal_resume_frontier(160, 160, 159, true) == 0);
+    TEST_ASSERT(server_multimodal_resume_frontier(160, 160, 170, false) == 0);
 }
 
 static void test_batched_live_continuation_slot_binding(void) {
@@ -20298,6 +20363,7 @@ static void ds4_server_unit_tests_run(void) {
     test_batched_prefill_round_robin();
     test_mixed_prefill_quantum_option();
     test_kv_rewind_reuse_target();
+    test_multimodal_prefill_resume_frontier();
     test_batched_live_continuation_slot_binding();
     test_slot_probe_and_routing_scores();
     test_slot_probe_live_state_tiers();
