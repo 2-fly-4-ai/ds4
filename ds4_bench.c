@@ -804,7 +804,7 @@ int main(int argc, char **argv) {
             return 1;
         }
     }
-    fprintf(out, "ctx_tokens,prefill_tokens,prefill_tps,gen_tokens,gen_tps,gen_first_ms,gen_steady_tokens,gen_steady_tps,kvcache_bytes\n");
+    fprintf(out, "ctx_tokens,prefill_tokens,prefill_tps,gen_tokens,gen_tps,gen_first_ms,gen_steady_tokens,gen_steady_tps,kvcache_bytes,gen_first64_tps,gen_middle64_tps,gen_final64_tps\n");
     fflush(out);
 
     const int eos = ds4_token_eos(engine);
@@ -885,6 +885,15 @@ int main(int argc, char **argv) {
         int *gen_token_buf = cfg.show_output && cfg.gen_tokens > 0
             ? malloc((size_t)cfg.gen_tokens * sizeof(gen_token_buf[0]))
             : NULL;
+        double *gen_token_sec = cfg.gen_tokens > 0
+            ? malloc((size_t)cfg.gen_tokens * sizeof(gen_token_sec[0]))
+            : NULL;
+        if (cfg.gen_tokens > 0 && !gen_token_sec) {
+            fprintf(stderr, "ds4-bench: out of memory recording decode timings\n");
+            free(gen_token_buf);
+            rc = 1;
+            break;
+        }
         int gen_token_count = 0;
         int cuda_profile_start = -1;
         int cuda_profile_tokens = 0;
@@ -939,6 +948,7 @@ int main(int argc, char **argv) {
             }
 #endif
             const double token_t1 = bench_now_sec();
+            gen_token_sec[i] = token_t1 - token_t0;
             if (i == 0) gen_first_sec = token_t1 - token_t0;
             else gen_steady_sec += token_t1 - token_t0;
             if (gen_token_buf) gen_token_buf[gen_token_count++] = token;
@@ -959,19 +969,24 @@ int main(int argc, char **argv) {
             fflush(stderr);
         }
         free(gen_token_buf);
-        if (rc != 0) break;
+        if (rc != 0) {
+            free(gen_token_sec);
+            break;
+        }
 
         if (!need_restore_after_generation) {
             /* Nothing later depends on the frontier state. */
         } else if (distributed || !have_snapshot) {
             if (ds4_session_sync(session, &prefix, err, sizeof(err)) != 0) {
                 fprintf(stderr, "ds4-bench: replay restore at %d failed: %s\n", frontier, err);
+                free(gen_token_sec);
                 rc = 1;
                 break;
             }
         } else {
             if (ds4_session_load_snapshot(session, &snap, err, sizeof(err)) != 0) {
                 fprintf(stderr, "ds4-bench: restore at %d failed: %s\n", frontier, err);
+                free(gen_token_sec);
                 rc = 1;
                 break;
             }
@@ -979,8 +994,19 @@ int main(int argc, char **argv) {
 
         const double gen_sec = gen_t1 - gen_t0;
         const int gen_steady_tokens = gen_done > 1 ? gen_done - 1 : 0;
+        const int block_tokens = gen_done < 64 ? gen_done : 64;
+        const int middle_start = block_tokens > 0 ? (gen_done - block_tokens) / 2 : 0;
+        const int final_start = gen_done - block_tokens;
+        double first_block_sec = 0.0;
+        double middle_block_sec = 0.0;
+        double final_block_sec = 0.0;
+        for (int i = 0; i < block_tokens; i++) {
+            first_block_sec += gen_token_sec[i];
+            middle_block_sec += gen_token_sec[middle_start + i];
+            final_block_sec += gen_token_sec[final_start + i];
+        }
         fprintf(out,
-                "%d,%d,%.2f,%d,%.2f,%.3f,%d,%.2f,%llu\n",
+                "%d,%d,%.2f,%d,%.2f,%.3f,%d,%.2f,%llu,%.2f,%.2f,%.2f\n",
                 frontier,
                 prefill_tokens,
                 prefill_sec > 0.0 ? (double)prefill_tokens / prefill_sec : 0.0,
@@ -989,7 +1015,11 @@ int main(int argc, char **argv) {
                 gen_first_sec * 1000.0,
                 gen_steady_tokens,
                 gen_steady_sec > 0.0 ? (double)gen_steady_tokens / gen_steady_sec : 0.0,
-                (unsigned long long)(have_snapshot ? snap.len : 0));
+                (unsigned long long)(have_snapshot ? snap.len : 0),
+                first_block_sec > 0.0 ? (double)block_tokens / first_block_sec : 0.0,
+                middle_block_sec > 0.0 ? (double)block_tokens / middle_block_sec : 0.0,
+                final_block_sec > 0.0 ? (double)block_tokens / final_block_sec : 0.0);
+        free(gen_token_sec);
         fflush(out);
 
         previous = frontier;

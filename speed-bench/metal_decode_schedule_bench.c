@@ -371,7 +371,9 @@ int main(int argc, char **argv) {
         .model_path = cfg.model_path,
         .backend = DS4_BACKEND_METAL,
         .context_size = cfg.ctx,
-        .prefill_chunk = 4096,
+        /* Zero selects each architecture's normal graph-tuned default and is
+         * required by GLM, which does not accept a manual prefill chunk. */
+        .prefill_chunk = 0,
         .power_percent = 100,
         .warm_weights = true,
     };

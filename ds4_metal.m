@@ -5247,6 +5247,9 @@ static const char *ds4_gpu_mv_ext_f32_name(int16_t r1ptg) {
     case 3: return "kernel_mul_mv_ext_f32_f32_r1_3";
     case 4: return "kernel_mul_mv_ext_f32_f32_r1_4";
     case 5: return "kernel_mul_mv_ext_f32_f32_r1_5";
+    case 6: return "kernel_mul_mv_ext_f32_f32_r1_6";
+    case 7: return "kernel_mul_mv_ext_f32_f32_r1_7";
+    case 8: return "kernel_mul_mv_ext_f32_f32_r1_8";
     default: return NULL;
     }
 }
@@ -5257,6 +5260,9 @@ static const char *ds4_gpu_mv_ext_q8_pair_swiglu_name(int16_t r1ptg) {
     case 3: return "kernel_mul_mv_ext_q8_0_pair_swiglu_f32_r1_3";
     case 4: return "kernel_mul_mv_ext_q8_0_pair_swiglu_f32_r1_4";
     case 5: return "kernel_mul_mv_ext_q8_0_pair_swiglu_f32_r1_5";
+    case 6: return "kernel_mul_mv_ext_q8_0_pair_swiglu_f32_r1_6";
+    case 7: return "kernel_mul_mv_ext_q8_0_pair_swiglu_f32_r1_7";
+    case 8: return "kernel_mul_mv_ext_q8_0_pair_swiglu_f32_r1_8";
     default: return NULL;
     }
 }

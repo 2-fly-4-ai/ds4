@@ -1029,8 +1029,10 @@ header and footer removed: <https://www.gutenberg.org/ebooks/45334>.
 
 Use `--step-incr N` for different linear spacing, or `--step-mul F` for
 exponential sweeps. Output is CSV with one row per frontier: latest prefill
-interval tokens/sec, generation tokens/sec at that frontier, and
-`kvcache_bytes`.
+interval tokens/sec, generation tokens/sec at that frontier, `kvcache_bytes`,
+and decode throughput for the first, middle, and final 64-token blocks. The
+block columns make warm bursts and sustained thermal drift visible instead of
+hiding both in one average.
 
 Sessions prefill long prompts in 4096-token chunks by default. Use
 `--prefill-chunk 2048`, for example, to match the strict official-vector

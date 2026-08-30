@@ -230,6 +230,31 @@ fusion neutral, direct-KV negative, and the concurrent shared-expert stream
 remaining wall−GPU gap is ~0.1 ms/token; further gains need a cheaper MoE or
 attention core, not packaging.
 
+### GLM 5.3 warm-equilibrium decode on M5 Max
+
+`m5_max_automatic_glm53_warm_blocks.csv` records a 192-token teacher-forced
+sweep on an M5 Max 128 GB in macOS Automatic mode using the 88 GB custom
+Q2/Q4K-attention quant. `ds4-bench` reports the first, middle, and final
+64-token blocks separately. This avoids mistaking an opening power/thermal
+burst for sustained throughput: the final blocks measured 29.83 t/s at a
+512-token prefix, 26.70 t/s at 2K, 25.35 t/s at 8K, and 24.46 t/s at 16K.
+
+Metal stage counters attribute the warm 2K token chiefly to routed MoE
+(~7.67 ms), attention (~5.49 ms), FFN RMS normalization (~2.42 ms), and
+attention RMS normalization (~2.15 ms). The rejected probes were: eight-expert
+IQ2 pack2, direct Q2 top-eight sum, eight-expert full-FFN overlap, direct raw-KV
+attention, and alternate indexed-attention splits. They were flat/slower or
+failed the full-logit oracle. A four-layer command-buffer interval showed a
+short warm gain but diverged after 44 forced rows and was also speed-neutral
+over 160 tokens, so it was reverted.
+
+For GLM native API batching, row-tile pipelines now cover 6, 7, and 8 rows for
+F32 dense projections and the Q8 pair-SwiGLU path. Model-backed mixed-prefix
+oracles at those widths passed with the same argmax and `max_abs=0.00013113`;
+aggregate throughput measured 61.57, 63.63, and 68.77 rows/s respectively
+(1.75x, 1.81x, and 2.05x over serial execution). This raises multi-request
+capacity; it does not change single-session decode speed.
+
 ### Metal decode schedule A/B
 
 Build the balanced, same-engine Metal decode comparison with:
