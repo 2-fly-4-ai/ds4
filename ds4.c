@@ -67013,6 +67013,25 @@ int ds4_session_argmax_excluding(ds4_session *s, int excluded_id) {
     return best;
 }
 
+int ds4_session_argmax_ignoring_eos(ds4_session *s,
+                                    ds4_think_mode think_mode) {
+    if (!s || !s->logits) return -1;
+    int best = -1;
+    float best_logit = DS4_NEG_INF;
+    for (uint32_t i = 0; i < DS4_N_VOCAB; i++) {
+        if (ds4_token_is_stop_for_think_mode(s->engine, (int)i,
+                                             think_mode)) {
+            continue;
+        }
+        const float v = s->logits[i];
+        if (best < 0 || v > best_logit) {
+            best = (int)i;
+            best_logit = v;
+        }
+    }
+    return best;
+}
+
 int ds4_sample_logits(const float *logits, int n_vocab, float temperature,
                       int top_k, float top_p, float min_p, uint64_t *rng) {
     if (!logits || n_vocab <= 0) return 0;
@@ -69922,6 +69941,8 @@ static int ds4_session_eval_dspark_speculative_argmax(
         int          n_accept,
         int          max_tokens,
         int          eos_token,
+        bool         ignore_eos,
+        ds4_think_mode think_mode,
         int         *accepted,
         int          accepted_cap,
         int          first_token,
@@ -70029,6 +70050,26 @@ static int ds4_session_eval_dspark_speculative_argmax(
     }
     s->dspark_draft_valid = false;
     s->dspark_draft_len = 0;
+
+    if (ignore_eos) {
+        for (int i = 0; i < draft_n; i++) {
+            if (ds4_token_is_stop_for_think_mode(s->engine, drafts[i],
+                                                 think_mode)) {
+                draft_n = i;
+                break;
+            }
+        }
+        if (draft_n == 0) {
+            if (stats_enabled) {
+                ds4_dspark_stats_note_len(
+                    s->dspark_stats.accepted_len_hist, 0);
+            }
+            ds4_session_dspark_scheduler_note(
+                s, 0, false, DS4_DSPARK_SCHED_EXTRA_MS());
+            DS4_DSPARK_STATS_FINISH();
+            return n_accept;
+        }
+    }
 
     /* Fold: the committed token rides as verify row zero. Its correctness
      * holds by construction (the greedy first_token is the argmax of the
@@ -73717,10 +73758,11 @@ static int ds4_sessions_eval_batch_with_prefill_cuda(
     return rc;
 }
 
-int ds4_session_eval_speculative_argmax(ds4_session *s, int first_token,
-                                        int max_tokens, int eos_token,
-                                        int *accepted, int accepted_cap,
-                                        char *err, size_t errlen) {
+static int ds4_session_eval_speculative_argmax_impl(
+        ds4_session *s, int first_token, int max_tokens, int eos_token,
+        bool ignore_eos, ds4_think_mode think_mode,
+        int *accepted, int accepted_cap,
+        char *err, size_t errlen) {
     if (!s || max_tokens <= 0 || accepted_cap <= 0) return 0;
     if (s->distributed) {
         if (!accepted) return 0;
@@ -73784,6 +73826,7 @@ int ds4_session_eval_speculative_argmax(ds4_session *s, int first_token,
     }
 #ifdef DS4_NO_GPU
     (void)s; (void)first_token; (void)max_tokens; (void)eos_token;
+    (void)ignore_eos; (void)think_mode;
     (void)accepted; (void)accepted_cap;
     snprintf(err, errlen, "GPU support is not compiled in");
     return -1;
@@ -73841,7 +73884,8 @@ int ds4_session_eval_speculative_argmax(ds4_session *s, int first_token,
         s->dspark_draft_prev_token == first_token &&
         first_token != eos_token && max_tokens > 1 && accepted_cap > 1) {
         const int fold_accept = ds4_session_eval_dspark_speculative_argmax(
-                s, 0, max_tokens, eos_token, accepted, accepted_cap,
+                s, 0, max_tokens, eos_token, ignore_eos, think_mode,
+                accepted, accepted_cap,
                 first_token, true, err, errlen);
         if (fold_accept != 0) return fold_accept;
         /* The fold declined before mutating anything; fall through to the
@@ -73863,6 +73907,8 @@ int ds4_session_eval_speculative_argmax(ds4_session *s, int first_token,
                                                           n_accept,
                                                           max_tokens,
                                                           eos_token,
+                                                          ignore_eos,
+                                                          think_mode,
                                                           accepted,
                                                           accepted_cap,
                                                           first_token,
@@ -73901,6 +73947,8 @@ int ds4_session_eval_speculative_argmax(ds4_session *s, int first_token,
     int draft_n = 1;
     drafts[0] = s->mtp_draft_token;
     s->mtp_draft_valid = false;
+    if (ignore_eos && ds4_token_is_stop_for_think_mode(
+            s->engine, drafts[0], think_mode)) return n_accept;
     const bool strict_mtp = e->quality || getenv("DS4_MTP_STRICT") != NULL;
     float mtp_margin_threshold = e->mtp_margin;
     const char *mtp_margin_env = getenv("DS4_MTP_MIN_MARGIN");
@@ -73931,7 +73979,7 @@ int ds4_session_eval_speculative_argmax(ds4_session *s, int first_token,
         }
         return n_accept;
     }
-    if (drafts[0] == eos_token) draft_cap = 1;
+    if (!ignore_eos && drafts[0] == eos_token) draft_cap = 1;
     const uint32_t mtp_base_raw = s->graph.mtp_n_raw;
     /*
      * MTP has its own raw SWA cache. Recursive drafting writes speculative
@@ -73964,8 +74012,12 @@ int ds4_session_eval_speculative_argmax(ds4_session *s, int first_token,
             return n_accept;
         }
         drafts[draft_n] = mtp_top >= 0 ? mtp_top : sample_argmax(s->mtp_logits, DS4_N_VOCAB);
+        if (ignore_eos && ds4_token_is_stop_for_think_mode(
+                s->engine, drafts[draft_n], think_mode)) {
+            break;
+        }
         if (drafts[draft_n] == eos_token) {
-            draft_n++;
+            if (!ignore_eos) draft_n++;
             break;
         }
     }
@@ -74698,6 +74750,24 @@ int ds4_session_eval_prompt_lookup_argmax(ds4_session *s, int first_token,
     s->checkpoint_valid = false;
     return -1;
 #endif
+}
+
+int ds4_session_eval_speculative_argmax(ds4_session *s, int first_token,
+                                        int max_tokens, int eos_token,
+                                        int *accepted, int accepted_cap,
+                                        char *err, size_t errlen) {
+    return ds4_session_eval_speculative_argmax_impl(
+        s, first_token, max_tokens, eos_token, false, DS4_THINK_HIGH,
+        accepted, accepted_cap, err, errlen);
+}
+
+int ds4_session_eval_speculative_argmax_ignoring_eos(
+        ds4_session *s, int first_token, int max_tokens, int eos_token,
+        ds4_think_mode think_mode,
+        int *accepted, int accepted_cap, char *err, size_t errlen) {
+    return ds4_session_eval_speculative_argmax_impl(
+        s, first_token, max_tokens, eos_token, true, think_mode,
+        accepted, accepted_cap, err, errlen);
 }
 
 int ds4_session_eval_speculative(ds4_session *s, int first_token,
