@@ -37269,6 +37269,12 @@ static uint32_t glm_graph_compact_cache_is_f16(void) {
 
 static bool glm_graph_expanded_kv_cache_enabled(bool ssd_streaming) {
     (void)ssd_streaming;
+    const char *compact = getenv("DS4_GLM53_COMPACT_MLA");
+    if (ds4_model_is_glm53() && compact && compact[0] &&
+        (strcmp(compact, "0") == 0 || strcasecmp(compact, "false") == 0 ||
+         strcasecmp(compact, "off") == 0 || strcasecmp(compact, "no") == 0)) {
+        return true;
+    }
     /* Absorbed MLA keeps the shared latent cache through the dense prefix,
      * then reuses it for sparse DSA without materializing per-head K/V. */
     return false;

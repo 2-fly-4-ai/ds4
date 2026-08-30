@@ -213,6 +213,12 @@ full-attention contexts; set `DS4_METAL_DISABLE_GLM_FULL_OUTPUT_MERGE=1` only
 for diagnostic A/B runs. The M5 Max measurements are tracked in
 `speed-bench/m5_max_automatic_glm53_full_output_merge.csv`.
 
+GLM 5.3 uses absorbed compact MLA by default: the dense 4K prefix attends over
+the shared latent cache instead of allocating expanded per-head K/V, and the
+same cache continues into sparse DSA. This substantially lowers per-session
+memory and enables compact-cache native session batching. Set
+`DS4_GLM53_COMPACT_MLA=0` only for matched expanded-KV diagnostic comparisons.
+
 GLM 5.2 uses the Metal, CUDA, or ROCm graph backend. GLM 5.3 is validated on
 Metal, with Q2 also validated on CUDA. Directional steering, `--power` below
 100, an explicit `--prefill-chunk`, and an external `--mtp-model` file are not
