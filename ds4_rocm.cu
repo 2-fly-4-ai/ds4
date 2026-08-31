@@ -39,6 +39,7 @@
 #include <vector>
 
 #include "ds4_gpu.h"
+#include "ds4_image.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
