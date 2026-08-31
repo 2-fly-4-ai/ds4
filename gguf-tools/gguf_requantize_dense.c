@@ -444,7 +444,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(arg, "--glm53-kda") && i + 1 < argc) glm53_kda_type = parse_type(argv[++i]);
         else if (!strcmp(arg, "--glm53-dsa") && i + 1 < argc) glm53_dsa_type = parse_type(argv[++i]);
         else if (!strcmp(arg, "--output") && i + 1 < argc) out_type = parse_type(argv[++i]);
-        else if (!strcmp(arg, "--tensor-type") && i + 2 < argc) {
+        else if (!strcmp(arg, "--tensor-type") && i + 1 < argc) {
             char *spec = argv[++i];
             char *eq = strchr(spec, '=');
             if (!eq) die("--tensor-type expects PFX=TYPE");

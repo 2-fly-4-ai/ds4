@@ -119,6 +119,25 @@ gguf-tools/deepseek4-quantize \
 `--compare-tensor` regenerates a single tensor and byte-compares it against the
 template or `--compare-gguf`.  `--threads N` controls routed-expert workers.
 
+### Late attention-output Q4 variant
+
+For the Flash Q2 model, re-encoding only the two attention-output projections
+in target layers 27 through 42 as `Q4_K` reduces the model by about 0.5 GiB and
+improves M5 Max steady decode by about 3.8%, without changing prefill speed.
+The helper below reproduces the tested 32-tensor conversion and verifies every
+untouched tensor byte-for-byte:
+
+```sh
+gguf-tools/build_ds4f_q2_late_attention_q4.sh \
+  gguf/DeepSeek-V4-Flash-IQ2XXS-w2Q2K-AProjQ8-SExpQ8-OutQ8-chat-v2-imatrix-0731.gguf \
+  gguf/DeepSeek-V4-Flash-IQ2XXS-w2Q2K-AOutQ4K-L27-42-chat-v2-imatrix-0731.gguf
+```
+
+The accepted model passed the strict Flash smoke vectors. Across the tracked
+100-case official continuation fixture, average NLL changed from `0.404687070`
+to `0.403532568` (-0.285%, lower is better), first-token matches changed from
+56 to 62, and average greedy prefix length changed from 5.17 to 5.43.
+
 ## Convert A DSpark Support Checkpoint
 
 The DSpark Flash checkpoint is published as Hugging Face safetensors and stores
