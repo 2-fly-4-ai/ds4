@@ -255,6 +255,17 @@ aggregate throughput measured 61.57, 63.63, and 68.77 rows/s respectively
 (1.75x, 1.81x, and 2.05x over serial execution). This raises multi-request
 capacity; it does not change single-session decode speed.
 
+`m5_max_automatic_glm53_mtp_matrix.csv` records a matched temperature-zero
+plain/MTP sweep across repetitive output, story writing, Python, JSON, SQL,
+technical prose, mathematical reasoning, thinking mode, and an 11,137-token
+raw prefix. MTP ranged from -1.9% after adaptive suspension to +42.9% on a
+numbered sequence. The long-prefix continuation improved 32.84 -> 44.48 t/s
+(+35.4%) with byte-identical output. Seven of nine complete outputs were
+byte-identical. Python matched the MTP-enabled no-speculation session rather
+than the direct CLI generator; the open-ended story also branched after
+speculative state. Every committed draft still matched the verifier's target,
+but exact ordinary-greedy transcript parity must not be assumed for all prompts.
+
 ### Metal decode schedule A/B
 
 Build the balanced, same-engine Metal decode comparison with:
