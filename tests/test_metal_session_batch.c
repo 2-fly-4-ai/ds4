@@ -125,6 +125,18 @@ static uint32_t context_size_from_env(void) {
     return (uint32_t)size;
 }
 
+static uint32_t prompt_tokens_from_env(const char *name) {
+    const char *value = getenv(name);
+    if (!value || !value[0]) return 0;
+    char *end = NULL;
+    unsigned long tokens = strtoul(value, &end, 10);
+    if (end == value || *end != '\0' || tokens < 2 || tokens > UINT32_MAX) {
+        fprintf(stderr, "FAIL: invalid %s=%s\n", name, value);
+        exit(1);
+    }
+    return (uint32_t)tokens;
+}
+
 static char *read_prompt_file(const char *path) {
     if (!path || !path[0]) return NULL;
     FILE *fp = fopen(path, "rb");
@@ -220,6 +232,22 @@ int main(void) {
     const int session_count = session_count_from_env();
     const int decode_steps = decode_steps_from_env();
     const uint32_t context_size = context_size_from_env();
+    const uint32_t prompt_tokens =
+        prompt_tokens_from_env("DS4_TEST_PROMPT_TOKENS");
+    const uint32_t prompt_token_step =
+        prompt_tokens_from_env("DS4_TEST_PROMPT_TOKEN_STEP");
+    if (prompt_tokens != 0 && prompt_tokens >= context_size) {
+        fprintf(stderr,
+                "FAIL: DS4_TEST_PROMPT_TOKENS=%u must be below context=%u\n",
+                prompt_tokens, context_size);
+        return 1;
+    }
+    if (prompt_token_step != 0 && prompt_tokens == 0) {
+        fprintf(stderr,
+                "FAIL: DS4_TEST_PROMPT_TOKEN_STEP requires "
+                "DS4_TEST_PROMPT_TOKENS\n");
+        return 1;
+    }
     const float logit_tolerance = logit_tolerance_from_env();
     const bool skip_mixed = getenv("DS4_TEST_SKIP_MIXED") != NULL;
     const bool live_controls = getenv("DS4_TEST_LIVE_CONTROLS") != NULL;
@@ -313,6 +341,23 @@ int main(void) {
                                prompt_file_text ? prompt_file_text : prompts[i % 8],
                                DS4_THINK_NONE,
                                &prompt[i]);
+        if (prompt_tokens != 0) {
+            const uint64_t reduction = (uint64_t)i * prompt_token_step;
+            if (reduction + 2u >= prompt_tokens) {
+                fprintf(stderr,
+                        "FAIL: prompt token step leaves session=%d too short\n",
+                        i);
+                return 1;
+            }
+            const uint32_t target = prompt_tokens - (uint32_t)reduction;
+            if ((uint32_t)prompt[i].len < target) {
+                fprintf(stderr,
+                        "FAIL: encoded prompt has %d tokens, needs %u\n",
+                        prompt[i].len, target);
+                return 1;
+            }
+            prompt[i].len = (int)target;
+        }
         if (ds4_session_create(&batched[i], engine, context_size) != 0) {
             fail("session create", i, -1);
         }

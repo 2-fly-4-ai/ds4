@@ -68207,6 +68207,8 @@ static bool glm53_graph_native_session_batch_supported(
         (uint32_t)count > first->ctx_cap) {
         return false;
     }
+    const bool long_batch_disabled =
+        getenv("DS4_GLM53_DISABLE_LONG_SESSION_BATCH") != NULL;
     for (int i = 0; i < count; i++) {
         ds4_session *s = items[i].session;
         ds4_glm_gpu_graph *g = &s->glm_graph;
@@ -68218,7 +68220,9 @@ static bool glm53_graph_native_session_batch_supported(
             g->layer_end != first->layer_end ||
             g->tp_world != first->tp_world ||
             g->tp_rank != first->tp_rank ||
-            pos >= glm_graph_dense_compact_attention_limit(g)) {
+            (long_batch_disabled && !g->full_kv_cache &&
+             pos >= glm_graph_dense_compact_attention_limit(g)) ||
+            (g->compact_cache_cap != 0 && pos >= g->compact_cache_cap)) {
             return false;
         }
     }
@@ -68407,6 +68411,37 @@ static bool glm53_graph_encode_dsa_session_batch(
                 rows);
     }
 
+    bool need_sparse_indexer = false;
+    if (mirror_indexer && !batch->full_kv_cache) {
+        for (int i = 0; i < count; i++) {
+            ds4_glm_gpu_graph *g = &items[i].session->glm_graph;
+            const uint32_t visible =
+                (uint32_t)items[i].session->checkpoint.len + 1u;
+            if (visible > glm_graph_dense_compact_attention_limit(g)) {
+                need_sparse_indexer = true;
+                break;
+            }
+        }
+    }
+    if (ok && need_sparse_indexer) {
+        ok = glm53_graph_matmul_rows(
+                batch->batch_indexer_q,
+                model,
+                l->indexer_attn_q_b,
+                DS4_N_LORA_Q,
+                (uint64_t)DS4_N_INDEXER_HEAD * DS4_N_INDEXER_HEAD_DIM,
+                batch->batch_q_rank_norm,
+                rows);
+        if (ok) ok = glm53_graph_matmul_rows(
+                batch->batch_indexer_weights,
+                model,
+                l->indexer_proj,
+                DS4_N_EMBD,
+                DS4_N_INDEXER_HEAD,
+                batch->batch_attn_norm,
+                rows);
+    }
+
     for (int i = 0; ok && i < count; i++) {
         ds4_session *s = items[i].session;
         ds4_glm_gpu_graph *g = &s->glm_graph;
@@ -68447,10 +68482,26 @@ static bool glm53_graph_encode_dsa_session_batch(
         ds4_gpu_tensor *heads = glm_graph_tensor_row_view_strided(
                 batch->batch_heads, (uint32_t)i,
                 batch->heads_dim, batch->heads_dim);
+        const uint32_t visible = pos + 1u;
+        const uint32_t dense_limit =
+            glm_graph_dense_compact_attention_limit(g);
+        const bool sparse_indexer = !batch->full_kv_cache &&
+            visible > dense_limit;
+        ds4_gpu_tensor *indexer_q = sparse_indexer && mirror_indexer ?
+            glm_graph_tensor_row_view_strided(
+                batch->batch_indexer_q, (uint32_t)i,
+                (uint64_t)DS4_N_INDEXER_HEAD * DS4_N_INDEXER_HEAD_DIM,
+                (uint64_t)DS4_N_INDEXER_HEAD * DS4_N_INDEXER_HEAD_DIM) : NULL;
+        ds4_gpu_tensor *indexer_weights = sparse_indexer && mirror_indexer ?
+            glm_graph_tensor_row_view_strided(
+                batch->batch_indexer_weights, (uint32_t)i,
+                DS4_N_INDEXER_HEAD, DS4_N_INDEXER_HEAD) : NULL;
         ok = q && kv_raw && heads &&
              (batch->full_kv_cache ? (k_nope && value) : qk_low != NULL) &&
              (!mirror_compact || kv_norm) &&
-             (!mirror_indexer || (indexer_k && indexer_gate));
+             (!mirror_indexer || (indexer_k && indexer_gate)) &&
+             (!sparse_indexer || !mirror_indexer ||
+              (indexer_q && indexer_weights));
         if (ok && mirror_indexer) {
             ok = ds4_gpu_glm53_indexer_pool_update_tensor(
                     g->layer_indexer_key_cache[il],
@@ -68486,9 +68537,54 @@ static bool glm53_graph_encode_dsa_session_batch(
                     glm_graph_compact_cache_is_f16()) != 0;
         }
         if (ok && !g->full_kv_cache) {
-            const uint32_t visible = pos + 1u;
-            ok = ds4_gpu_glm_fill_selected_range_tensor(
-                    g->indexer_selected, visible) != 0;
+            uint32_t selected_count = visible;
+            if (visible <= dense_limit) {
+                ok = ds4_gpu_glm_fill_selected_range_tensor(
+                        g->indexer_selected, visible) != 0;
+            } else {
+                selected_count = glm53_graph_indexer_selected_limit();
+                if (mirror_indexer) {
+                    if (ok && glm_graph_indexer_qat()) {
+                        ok = ds4_gpu_dsv4_indexer_qat_tensor(
+                                indexer_q,
+                                DS4_N_INDEXER_HEAD,
+                                DS4_N_INDEXER_HEAD_DIM) != 0;
+                    }
+                    const float indexer_scale = 1.0f /
+                        sqrtf((float)(DS4_N_INDEXER_HEAD_DIM *
+                                      DS4_N_INDEXER_HEAD));
+                    const uint32_t score_rows =
+                        visible / DS4_GLM53_INDEX_POOL_SIZE;
+                    const uint32_t selected_pools =
+                        glm_graph_indexer_top_k_limit() /
+                        DS4_GLM53_INDEX_POOL_SIZE;
+                    if (ok) ok = ds4_gpu_glm_indexer_score_one_tensor(
+                            g->indexer_scores,
+                            indexer_q,
+                            indexer_weights,
+                            g->layer_indexer_key_cache[il],
+                            score_rows,
+                            DS4_N_INDEXER_HEAD,
+                            DS4_N_INDEXER_HEAD_DIM,
+                            indexer_scale,
+                            glm_graph_compact_cache_is_f16()) != 0;
+                    if (ok) ok = ds4_gpu_indexer_topk_tensor(
+                            g->indexer_pool_selected,
+                            g->indexer_scores,
+                            score_rows,
+                            1,
+                            selected_pools) != 0;
+                    if (ok) ok = ds4_gpu_glm53_expand_pool_selection_tensor(
+                            g->indexer_selected,
+                            g->indexer_pool_selected,
+                            1,
+                            pos,
+                            selected_pools,
+                            glm_graph_indexer_top_k_limit(),
+                            DS4_GLM53_INDEX_POOL_SIZE,
+                            selected_count) != 0;
+                }
+            }
             if (ok) ok = ds4_gpu_glm_qk_lowrank_typed_tensor(
                     qk_low,
                     q,
@@ -68511,7 +68607,7 @@ static bool glm53_graph_encode_dsa_session_batch(
                     l->attn_v_b->abs_offset,
                     l->attn_v_b->type,
                     g->indexer_selected,
-                    visible,
+                    selected_count,
                     g->compact_cache_cap,
                     glm_graph_compact_cache_is_f16(),
                     DS4_N_HEAD,
@@ -68564,6 +68660,8 @@ static bool glm53_graph_encode_dsa_session_batch(
                     DS4_N_VALUE_MLA,
                     true) != 0;
         }
+        ds4_gpu_tensor_free(indexer_weights);
+        ds4_gpu_tensor_free(indexer_q);
         ds4_gpu_tensor_free(heads);
         ds4_gpu_tensor_free(indexer_gate);
         ds4_gpu_tensor_free(indexer_k);

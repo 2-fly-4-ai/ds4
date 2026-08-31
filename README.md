@@ -276,13 +276,15 @@ sampling distribution.
 ./ds4-agent -m gguf/GLM-5.3-Flash-Q2.gguf --mtp --ctx 50000
 ```
 
-For a small multi-user server on one M5 Max, four 4096-token sessions fit the
-tested Q2 layout. Native decode batching is used below token 4096; longer
-sessions automatically use the ordered fallback.
+For a small multi-user server on one M5 Max, four 8192-token sessions fit the
+tested Q2 layout. Native decode batching supports both the dense prefix and the
+long-context compact sparse-attention path; unsupported configurations use the
+ordered fallback. Set `DS4_GLM53_DISABLE_LONG_SESSION_BATCH=1` only for a
+diagnostic A/B against that fallback.
 
 ```sh
 ./ds4-server -m gguf/GLM-5.3-Flash-Q2.gguf \
-  --ctx 4096 --batched-session 4
+  --ctx 8192 --batched-session 4
 ```
 
 To run Q4 on one Mac without making it resident:
@@ -1213,7 +1215,7 @@ separate session evaluations. The current backend behavior is:
 | --- | --- |
 | Metal, resident DeepSeek Flash | Native shared-expert and QKV batching from two rows upward when supported; ordered fallback otherwise. |
 | Metal, GLM 5.2 | Ordered exact fallback. |
-| Metal, GLM 5.3 | Native decode batching below token 4096; ordered exact fallback at longer contexts. |
+| Metal, GLM 5.3 | Native decode batching for dense and compact sparse-attention contexts; ordered fallback for unsupported configurations. |
 | CUDA, DeepSeek Flash on a supported multi-GPU TP/EP layout | Native decode and mixed prefill/decode, with exact fallbacks for unsupported kernel shapes. |
 | CUDA single GPU, including DGX Spark | Ordered exact fallback. |
 
@@ -1802,6 +1804,15 @@ DS4_TEST_MODEL=/path/to/model.gguf DS4_TEST_SESSION_COUNT=4 \
 # GLM 5.3 native row batching uses a bounded numerical comparison.
 DS4_TEST_MODEL=/path/to/GLM-5.3-Flash-Q2.gguf \
   DS4_TEST_SESSION_COUNT=4 DS4_TEST_LOGIT_TOLERANCE=0.001 \
+  make test-metal-session-batch
+
+# Pin and stagger long prompt lengths to cover sparse attention and mixed
+# dense/sparse session positions. The prompt file must encode to at least 6000
+# tokens.
+DS4_TEST_MODEL=/path/to/GLM-5.3-Flash-Q2.gguf \
+  DS4_TEST_SESSION_COUNT=4 DS4_TEST_CONTEXT_SIZE=8192 \
+  DS4_TEST_PROMPT_FILE=/path/to/long.txt DS4_TEST_PROMPT_TOKENS=6000 \
+  DS4_TEST_PROMPT_TOKEN_STEP=256 DS4_TEST_LOGIT_TOLERANCE=0.001 \
   make test-metal-session-batch
 
 # CUDA multi-GPU Flash.
