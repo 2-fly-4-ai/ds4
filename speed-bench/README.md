@@ -343,6 +343,22 @@ On M5 Max in Automatic power mode, the accepted 4096-token wave measured
 balanced runs, 44 measured full-vocabulary outputs (6,814,720 logits) were
 bit-identical; an additional 64-step decode trace was also bit-identical.
 
+For long-context tail work, `--base-tokens` evaluates the expensive shared
+prefix once, saves an in-memory session snapshot, and restores that identical
+state before every alternating run. `--prefix-tokens` is then the timed suffix,
+so a 95K-to-99K A/B does not require eight complete 99K prefills:
+
+```
+./speed-bench/metal_prefill_variant_bench \
+  -m gguf/GLM-5.3-Flash-Q2-Q4K-Attention.gguf \
+  --prompt-file speed-bench/context-corpora/code_100k.txt \
+  --base-tokens 95000 --prefix-tokens 4096 --warmup-tokens 2048 \
+  --ctx 100001 --repeats 2 --candidate-env NAME=VALUE
+```
+
+Snapshot restore is outside the timed interval. Full-vocabulary logits are
+still compared bit-for-bit after every suffix run.
+
 To isolate the default routed-down tail-SIMDgroup cull from the retained pair
 default, use its down-specific rollback as the candidate:
 

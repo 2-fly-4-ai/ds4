@@ -23,6 +23,7 @@ typedef struct {
     const char *model_path;
     const char *prompt_path;
     const char *candidate_env;
+    int base_tokens;
     int prefix_tokens;
     int warmup_tokens;
     int ctx;
@@ -42,7 +43,8 @@ static void usage(FILE *fp, const char *argv0) {
             "  -m, --model PATH       GGUF path (default: ds4flash.gguf)\n"
             "  --prompt-file PATH     token source (default: ds4.c)\n"
             "  --candidate-env SPECS  unset comma-separated names for control; set each to VALUE (default 1) for candidate\n"
-            "  --prefix-tokens N      timed prefill length (default: 8192)\n"
+            "  --base-tokens N        restore an untimed shared prefix before every run (default: 0)\n"
+            "  --prefix-tokens N      timed suffix length (default: 8192)\n"
             "  --warmup-tokens N      untimed tokens per variant (default: 32; min: 32)\n"
             "  --ctx N                session allocation (default: max lengths + 1)\n"
             "  --repeats N            alternating ABBA/BAAB pairs (default: 2)\n",
@@ -78,6 +80,7 @@ static bench_config parse_options(int argc, char **argv) {
         .model_path = "ds4flash.gguf",
         .prompt_path = "ds4.c",
         .candidate_env = NULL,
+        .base_tokens = 0,
         .prefix_tokens = DEFAULT_PREFIX_TOKENS,
         .warmup_tokens = DEFAULT_WARMUP_TOKENS,
         .ctx = 0,
@@ -95,6 +98,9 @@ static bench_config parse_options(int argc, char **argv) {
             cfg.prompt_path = need_arg(&i, argc, argv, arg);
         } else if (!strcmp(arg, "--candidate-env")) {
             cfg.candidate_env = need_arg(&i, argc, argv, arg);
+        } else if (!strcmp(arg, "--base-tokens")) {
+            cfg.base_tokens =
+                parse_int_arg(need_arg(&i, argc, argv, arg), arg, 1);
         } else if (!strcmp(arg, "--prefix-tokens")) {
             cfg.prefix_tokens =
                 parse_int_arg(need_arg(&i, argc, argv, arg), arg, 1);
@@ -123,9 +129,14 @@ static bench_config parse_options(int argc, char **argv) {
         fprintf(stderr, "%s: --candidate-env requires valid comma-separated NAME[=VALUE] specs\n", BENCH_NAME);
         exit(2);
     }
+    if (cfg.base_tokens > INT_MAX - cfg.prefix_tokens) {
+        fprintf(stderr, "%s: base plus prefix token length is too large\n", BENCH_NAME);
+        exit(2);
+    }
+    const int measured_tokens = cfg.base_tokens + cfg.prefix_tokens;
     const int longest =
-        cfg.prefix_tokens > cfg.warmup_tokens
-            ? cfg.prefix_tokens
+        measured_tokens > cfg.warmup_tokens
+            ? measured_tokens
             : cfg.warmup_tokens;
     if (longest == INT_MAX) {
         fprintf(stderr, "%s: requested token length is too large\n", BENCH_NAME);
@@ -320,6 +331,7 @@ int main(int argc, char **argv) {
     };
     ds4_engine *engine = NULL;
     ds4_tokens tokens = {0};
+    ds4_session_snapshot base_snapshot = {0};
     float *reference = NULL;
     float *observed = NULL;
     variant_result results[VARIANT_COUNT] = {0};
@@ -333,9 +345,10 @@ int main(int argc, char **argv) {
     free(text);
     text = NULL;
 
+    const int measured_tokens = cfg.base_tokens + cfg.prefix_tokens;
     const int needed =
-        cfg.prefix_tokens > cfg.warmup_tokens
-            ? cfg.prefix_tokens
+        measured_tokens > cfg.warmup_tokens
+            ? measured_tokens
             : cfg.warmup_tokens;
     if (tokens.len < needed) {
         fprintf(stderr,
@@ -355,11 +368,12 @@ int main(int argc, char **argv) {
     }
 
     fprintf(stderr,
-            "%s: model=%s prompt=%s prefix=%d warmup=%d ctx=%d repeats=%d "
+            "%s: model=%s prompt=%s base=%d prefix=%d warmup=%d ctx=%d repeats=%d "
             "candidate_env=%s\n",
             BENCH_NAME,
             cfg.model_path,
             cfg.prompt_path,
+            cfg.base_tokens,
             cfg.prefix_tokens,
             cfg.warmup_tokens,
             cfg.ctx,
@@ -374,10 +388,42 @@ int main(int argc, char **argv) {
         }
     }
 
+    if (cfg.base_tokens > 0) {
+        ds4_session *base_session = NULL;
+        ds4_tokens base = {
+            .v = tokens.v,
+            .len = cfg.base_tokens,
+            .cap = cfg.base_tokens,
+        };
+        if (select_variant(&cfg, 0) != 0 ||
+            ds4_session_create(&base_session, engine, cfg.ctx) != 0) {
+            fprintf(stderr, "%s: failed to create base-prefix session\n", BENCH_NAME);
+            if (base_session) ds4_session_free(base_session);
+            goto done;
+        }
+        err[0] = '\0';
+        if (ds4_session_sync(base_session, &base, err, sizeof(err)) != 0 ||
+            ds4_session_save_snapshot(base_session, &base_snapshot,
+                                      err, sizeof(err)) != 0) {
+            fprintf(stderr,
+                    "%s: failed to build base-prefix snapshot: %s\n",
+                    BENCH_NAME,
+                    err[0] ? err : "unknown error");
+            ds4_session_free(base_session);
+            goto done;
+        }
+        fprintf(stderr,
+                "%s: restored-run base snapshot tokens=%d bytes=%llu\n",
+                BENCH_NAME,
+                cfg.base_tokens,
+                (unsigned long long)base_snapshot.len);
+        ds4_session_free(base_session);
+    }
+
     ds4_tokens prefix = {
         .v = tokens.v,
-        .len = cfg.prefix_tokens,
-        .cap = cfg.prefix_tokens,
+        .len = measured_tokens,
+        .cap = measured_tokens,
     };
     size_t run = 0;
     for (int repeat = 0; repeat < cfg.repeats; repeat++) {
@@ -396,6 +442,19 @@ int main(int argc, char **argv) {
                 if (session) ds4_session_free(session);
                 goto done;
             }
+            if (cfg.base_tokens > 0) {
+                err[0] = '\0';
+                if (ds4_session_load_snapshot(session, &base_snapshot,
+                                              err, sizeof(err)) != 0) {
+                    fprintf(stderr,
+                            "%s: failed to restore base snapshot for run %zu: %s\n",
+                            BENCH_NAME,
+                            run + 1,
+                            err[0] ? err : "unknown error");
+                    ds4_session_free(session);
+                    goto done;
+                }
+            }
 
             err[0] = '\0';
             const double t0 = now_sec();
@@ -412,13 +471,13 @@ int main(int argc, char **argv) {
                 ds4_session_free(session);
                 goto done;
             }
-            if (ds4_session_pos(session) != cfg.prefix_tokens) {
+            if (ds4_session_pos(session) != measured_tokens) {
                 fprintf(stderr,
                         "%s: run %zu ended at position %d; expected %d\n",
                         BENCH_NAME,
                         run + 1,
                         ds4_session_pos(session),
-                        cfg.prefix_tokens);
+                        measured_tokens);
                 ds4_session_free(session);
                 goto done;
             }
@@ -516,5 +575,6 @@ done:
     free(observed);
     ds4_tokens_free(&tokens);
     if (engine) ds4_engine_close(engine);
+    ds4_session_snapshot_free(&base_snapshot);
     return rc;
 }
