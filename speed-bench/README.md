@@ -324,6 +324,25 @@ make metal-prefill-variant-bench
   --candidate-env DS4_METAL_DISABLE_PRE_M5_MXFP4_MOE_MM_ID_PAIR_TAIL_SIMDGROUP_CULL
 ```
 
+The harness accepts comma-separated `NAME[=VALUE]` candidate specifications.
+For example, this compares the M5 GLM-5.3 4096-token default with its 2048-token
+rollback while alternating ABBA/BAAB order and requiring exact full-vocabulary
+logits:
+
+```
+./speed-bench/metal_prefill_variant_bench \
+  -m gguf/GLM-5.3-Flash-Q2-Q4K-Attention.gguf \
+  --prompt-file speed-bench/context-corpora/code_100k.txt \
+  --prefix-tokens 4096 --warmup-tokens 2048 --ctx 4097 --repeats 4 \
+  --candidate-env DS4_GLM53_PREFILL_CHUNK=2048
+```
+
+On M5 Max in Automatic power mode, the accepted 4096-token wave measured
+470.72 versus 456.46 tok/s at 4K (+3.12%), 404.39 versus 391.80 tok/s at 8K
+(+3.21%), and 385.80 versus 373.75 tok/s at 16K (+3.22%). Across those
+balanced runs, 44 measured full-vocabulary outputs (6,814,720 logits) were
+bit-identical; an additional 64-step decode trace was also bit-identical.
+
 To isolate the default routed-down tail-SIMDgroup cull from the retained pair
 default, use its down-specific rollback as the candidate:
 

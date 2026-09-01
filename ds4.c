@@ -37428,6 +37428,24 @@ static uint32_t glm53_graph_resume_prefill_min_tokens(void) {
 #define DS4_GLM_METAL_INDEXED_PREFILL_SCORE_SCRATCH_MB 256u
 #define DS4_GLM53_INDEX_POOL_SIZE 4u
 #define DS4_GLM53_PREFILL_CHUNK_TOKENS 2048u
+#define DS4_GLM53_M5_PREFILL_CHUNK_TOKENS 4096u
+
+static uint32_t ds4_glm53_prefill_chunk_tokens(void) {
+    /* M5's wider resident wave amortizes GLM graph submission by about 3%
+     * while preserving full-vocabulary and decode logits bit-for-bit. Keep
+     * the smaller workspace everywhere else and retain an explicit rollback. */
+    const uint32_t device_default = ds4_gpu_device_is_m5_apple_silicon() ?
+        DS4_GLM53_M5_PREFILL_CHUNK_TOKENS :
+        DS4_GLM53_PREFILL_CHUNK_TOKENS;
+    const char *value = getenv("DS4_GLM53_PREFILL_CHUNK");
+    if (!value || !value[0]) return device_default;
+    char *end = NULL;
+    const unsigned long parsed = strtoul(value, &end, 10);
+    if (end == value || *end != '\0' || parsed < 256u || parsed > 4096u) {
+        return device_default;
+    }
+    return (uint32_t)parsed;
+}
 
 static uint32_t glm_graph_full_attention_cap(uint32_t ctx_size,
                                              bool     ssd_streaming);
@@ -37712,8 +37730,8 @@ static uint32_t glm_graph_batch_row_cap(
         bool     expanded_kv) {
     if (ds4_model_is_glm53()) {
         uint32_t cap = full_attention_cap;
-        if (cap > DS4_GLM53_PREFILL_CHUNK_TOKENS) {
-            cap = DS4_GLM53_PREFILL_CHUNK_TOKENS;
+        if (cap > ds4_glm53_prefill_chunk_tokens()) {
+            cap = ds4_glm53_prefill_chunk_tokens();
         }
         if (indexed_prefill_cap != 0 && cap > indexed_prefill_cap) {
             cap = indexed_prefill_cap;
@@ -41878,7 +41896,7 @@ static uint32_t glm_graph_indexed_prefill_chunk_tokens(
                 getenv("DS4_GLM53_DISABLE_INDEXED_PREFILL"))) {
             return 0;
         }
-        uint32_t chunk = DS4_GLM53_PREFILL_CHUNK_TOKENS;
+        uint32_t chunk = ds4_glm53_prefill_chunk_tokens();
         if (compact_cap != 0 && chunk > compact_cap) chunk = compact_cap;
         return chunk;
     }
@@ -43519,7 +43537,7 @@ static bool glm53_graph_prefill_workspace_ensure(
         ds4_glm_gpu_graph *g,
         uint32_t rows) {
     if (!g || !g->glm53 || rows == 0 ||
-        rows > DS4_GLM53_PREFILL_CHUNK_TOKENS) {
+        rows > ds4_glm53_prefill_chunk_tokens()) {
         return false;
     }
     if (g->glm53_prefill_cap >= rows) return true;
@@ -48084,7 +48102,7 @@ static bool glm_graph_forward_tokens(
         uint32_t           work_total) {
     if (!g || !model || !weights || !tokens ||
         n_tokens == 0 ||
-        (g->glm53 && n_tokens > DS4_GLM53_PREFILL_CHUNK_TOKENS) ||
+        (g->glm53 && n_tokens > ds4_glm53_prefill_chunk_tokens()) ||
         g->layer_count == 0 ||
         !glm_graph_span_fits_context(g, pos0, n_tokens)) {
         return false;
@@ -51050,8 +51068,8 @@ static bool glm_graph_prefill_range(
         while (done < n_tokens) {
             const uint32_t pos = pos0 + done;
             uint32_t chunk = n_tokens - done;
-            if (chunk > DS4_GLM53_PREFILL_CHUNK_TOKENS) {
-                chunk = DS4_GLM53_PREFILL_CHUNK_TOKENS;
+            if (chunk > ds4_glm53_prefill_chunk_tokens()) {
+                chunk = ds4_glm53_prefill_chunk_tokens();
             }
             if (pos < g->ctx_cap) {
                 const uint32_t dense_left = g->ctx_cap - pos;
@@ -66666,8 +66684,8 @@ static int ds4_session_sync_internal(ds4_session *s, const ds4_tokens *prompt, c
 
                 const uint32_t pos = (uint32_t)s->checkpoint.len;
                 uint32_t chunk = (uint32_t)(prompt->len - i);
-                if (chunk > DS4_GLM53_PREFILL_CHUNK_TOKENS) {
-                    chunk = DS4_GLM53_PREFILL_CHUNK_TOKENS;
+                if (chunk > ds4_glm53_prefill_chunk_tokens()) {
+                    chunk = ds4_glm53_prefill_chunk_tokens();
                 }
                 if (short_resume) chunk = 1;
                 const bool use_indexed =
@@ -68766,7 +68784,7 @@ int ds4_session_eval_chain_greedy(ds4_session *s, int max_tokens,
 static bool glm53_graph_native_session_batch_supported(
         ds4_decode_item *items,
         int count) {
-    if (!items || count < 2 || count > (int)DS4_GLM53_PREFILL_CHUNK_TOKENS ||
+    if (!items || count < 2 || count > (int)ds4_glm53_prefill_chunk_tokens() ||
         DS4_N_ROT != 0 || g_expert_profile.active) {
         return false;
     }

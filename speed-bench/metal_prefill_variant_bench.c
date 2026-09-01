@@ -37,11 +37,11 @@ typedef struct {
 
 static void usage(FILE *fp, const char *argv0) {
     fprintf(fp,
-            "usage: %s --candidate-env NAME [options]\n"
+            "usage: %s --candidate-env NAME[=VALUE][,...] [options]\n"
             "\n"
             "  -m, --model PATH       GGUF path (default: ds4flash.gguf)\n"
             "  --prompt-file PATH     token source (default: ds4.c)\n"
-            "  --candidate-env NAME   unset NAME for control, set NAME=1 for candidate\n"
+            "  --candidate-env SPECS  unset comma-separated names for control; set each to VALUE (default 1) for candidate\n"
             "  --prefix-tokens N      timed prefill length (default: 8192)\n"
             "  --warmup-tokens N      untimed tokens per variant (default: 32; min: 32)\n"
             "  --ctx N                session allocation (default: max lengths + 1)\n"
@@ -114,8 +114,13 @@ static bench_config parse_options(int argc, char **argv) {
     }
 
     if (!cfg.candidate_env || cfg.candidate_env[0] == '\0' ||
-        strchr(cfg.candidate_env, '=') != NULL) {
-        fprintf(stderr, "%s: --candidate-env requires a valid name\n", BENCH_NAME);
+        cfg.candidate_env[0] == ',' ||
+        cfg.candidate_env[strlen(cfg.candidate_env) - 1] == ',' ||
+        strstr(cfg.candidate_env, ",,") != NULL ||
+        strstr(cfg.candidate_env, "==") != NULL ||
+        strstr(cfg.candidate_env, "=,") != NULL ||
+        cfg.candidate_env[strlen(cfg.candidate_env) - 1] == '=') {
+        fprintf(stderr, "%s: --candidate-env requires valid comma-separated NAME[=VALUE] specs\n", BENCH_NAME);
         exit(2);
     }
     const int longest =
@@ -183,19 +188,36 @@ static char *read_text(const char *path) {
 }
 
 static int select_variant(const bench_config *cfg, int variant) {
-    const int env_rc =
-        variant == 0
-            ? unsetenv(cfg->candidate_env)
-            : setenv(cfg->candidate_env, "1", 1);
-    if (env_rc != 0) {
-        fprintf(stderr,
-                "%s: failed to select %s with %s: %s\n",
-                BENCH_NAME,
-                variant == 0 ? "control" : "candidate",
-                cfg->candidate_env,
-                strerror(errno));
+    char *names = strdup(cfg->candidate_env);
+    if (!names) {
+        fprintf(stderr, "%s: candidate environment allocation failed\n", BENCH_NAME);
         return 1;
     }
+    char *save = NULL;
+    for (char *spec = strtok_r(names, ",", &save);
+         spec != NULL;
+         spec = strtok_r(NULL, ",", &save)) {
+        char *value = strchr(spec, '=');
+        if (value) {
+            *value++ = '\0';
+        } else {
+            value = "1";
+        }
+        const int env_rc = variant == 0
+            ? unsetenv(spec)
+            : setenv(spec, value, 1);
+        if (env_rc != 0) {
+            fprintf(stderr,
+                    "%s: failed to select %s with %s: %s\n",
+                    BENCH_NAME,
+                    variant == 0 ? "control" : "candidate",
+                    spec,
+                    strerror(errno));
+            free(names);
+            return 1;
+        }
+    }
+    free(names);
     return 0;
 }
 
@@ -291,7 +313,8 @@ int main(int argc, char **argv) {
         .model_path = cfg.model_path,
         .backend = DS4_BACKEND_METAL,
         .context_size = cfg.ctx,
-        .prefill_chunk = 4096,
+        /* Let each architecture select its supported/default chunk size. */
+        .prefill_chunk = 0,
         .power_percent = 100,
         .warm_weights = true,
     };

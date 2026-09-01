@@ -1059,6 +1059,14 @@ Sessions prefill long prompts in 4096-token chunks by default. Use
 `--prefill-chunk 2048`, for example, to match the strict official-vector
 checkpoint path. Changing the chunk changes the KV checkpoint/logit path, so
 compare it as an explicit run configuration.
+
+Resident GLM-5.3 sessions on M5 Apple Silicon also use a 4096-token internal
+wave; other devices retain the 2048-token GLM default. Set
+`DS4_GLM53_PREFILL_CHUNK=2048` to run the rollback. The wider M5 wave uses
+about 2.8 GiB more prefill workspace with the Q2/Q4K resident model, and was
+accepted only after balanced full-vocabulary and 64-step decode-logit checks
+were bit-exact.
+
 Chunked Metal prefill reuses the same range-capable layer-major graph for each
 chunk, preserving absolute compressor/indexer boundaries while avoiding the old
 per-layer chunk dispatch path.
