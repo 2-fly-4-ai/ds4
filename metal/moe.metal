@@ -7870,7 +7870,7 @@ kernel void kernel_mul_mv_group24_q4_K_sum6_f32(
 // Builds the compact per-expert work map used by batched MoE matmul. DS4 routes
 // each token to a small fixed top-k list, so this turns token-major ids into
 // expert-major slices that the tiled matmul can consume.
-template<short ne20>
+template<short ne20, ushort tile_n>
 kernel void kernel_mul_mm_id_map0(
         constant ds4_metal_args_mul_mm_id_map0 & args,
         device  const char * src2,
@@ -7925,11 +7925,11 @@ kernel void kernel_mul_mm_id_map0(
     tpe_u32[ide] = n_all;
 
     // Reuse the route-id staging memory after the map is complete to build a
-    // compact list of non-empty 32-row matmul tiles. The old dispatch covered
+    // compact list of non-empty matmul tiles. The old dispatch covered
     // every possible token tile for every expert, even though most experts
     // receive only a small fraction of the prompt rows.
     threadgroup uint16_t * tile_counts = (threadgroup uint16_t *) shmem;
-    const uint16_t n_tiles = (uint16_t)((n_all + 31u) / 32u);
+    const uint16_t n_tiles = (uint16_t)((n_all + tile_n - 1u) / tile_n);
     tile_counts[ide] = n_tiles;
     threadgroup_barrier(mem_flags::mem_threadgroup);
 
@@ -7941,26 +7941,28 @@ kernel void kernel_mul_mm_id_map0(
     device uint32_t * work_count = (device uint32_t *) work;
     device uint2 * work_items = (device uint2 *)(work + 8);
     for (uint32_t tile = 0; tile < n_tiles; tile++) {
-        work_items[tile_base + tile] = uint2((uint32_t)ide, tile * 32u);
+        work_items[tile_base + tile] = uint2((uint32_t)ide, tile * tile_n);
     }
     if (ide + 1u == ntg) {
         work_count[0] = tile_base + n_tiles;
     }
 }
 
-typedef decltype(kernel_mul_mm_id_map0<1>) kernel_mul_mm_id_map0_t;
+typedef decltype(kernel_mul_mm_id_map0<1, 32>) kernel_mul_mm_id_map0_t;
+typedef decltype(kernel_mul_mm_id_map0<8, 64>) kernel_mul_mm_id_map0_n64_t;
 
 // Host-visible map builders for the routed-expert counts used by DS4 graph
 // shapes. Some arities are generic leftovers retained for nearby batch sizes.
-template [[host_name("kernel_mul_mm_id_map0_ne20_1" )]] kernel kernel_mul_mm_id_map0_t kernel_mul_mm_id_map0<1>;
-template [[host_name("kernel_mul_mm_id_map0_ne20_2" )]] kernel kernel_mul_mm_id_map0_t kernel_mul_mm_id_map0<2>;
-template [[host_name("kernel_mul_mm_id_map0_ne20_4" )]] kernel kernel_mul_mm_id_map0_t kernel_mul_mm_id_map0<4>;
-template [[host_name("kernel_mul_mm_id_map0_ne20_5" )]] kernel kernel_mul_mm_id_map0_t kernel_mul_mm_id_map0<5>;
-template [[host_name("kernel_mul_mm_id_map0_ne20_6" )]] kernel kernel_mul_mm_id_map0_t kernel_mul_mm_id_map0<6>;
-template [[host_name("kernel_mul_mm_id_map0_ne20_8" )]] kernel kernel_mul_mm_id_map0_t kernel_mul_mm_id_map0<8>;
-template [[host_name("kernel_mul_mm_id_map0_ne20_10")]] kernel kernel_mul_mm_id_map0_t kernel_mul_mm_id_map0<10>;
-template [[host_name("kernel_mul_mm_id_map0_ne20_16")]] kernel kernel_mul_mm_id_map0_t kernel_mul_mm_id_map0<16>;
-template [[host_name("kernel_mul_mm_id_map0_ne20_22")]] kernel kernel_mul_mm_id_map0_t kernel_mul_mm_id_map0<22>;
+template [[host_name("kernel_mul_mm_id_map0_ne20_1" )]] kernel kernel_mul_mm_id_map0_t kernel_mul_mm_id_map0<1, 32>;
+template [[host_name("kernel_mul_mm_id_map0_ne20_2" )]] kernel kernel_mul_mm_id_map0_t kernel_mul_mm_id_map0<2, 32>;
+template [[host_name("kernel_mul_mm_id_map0_ne20_4" )]] kernel kernel_mul_mm_id_map0_t kernel_mul_mm_id_map0<4, 32>;
+template [[host_name("kernel_mul_mm_id_map0_ne20_5" )]] kernel kernel_mul_mm_id_map0_t kernel_mul_mm_id_map0<5, 32>;
+template [[host_name("kernel_mul_mm_id_map0_ne20_6" )]] kernel kernel_mul_mm_id_map0_t kernel_mul_mm_id_map0<6, 32>;
+template [[host_name("kernel_mul_mm_id_map0_ne20_8" )]] kernel kernel_mul_mm_id_map0_t kernel_mul_mm_id_map0<8, 32>;
+template [[host_name("kernel_mul_mm_id_map0_ne20_10")]] kernel kernel_mul_mm_id_map0_t kernel_mul_mm_id_map0<10, 32>;
+template [[host_name("kernel_mul_mm_id_map0_ne20_16")]] kernel kernel_mul_mm_id_map0_t kernel_mul_mm_id_map0<16, 32>;
+template [[host_name("kernel_mul_mm_id_map0_ne20_22")]] kernel kernel_mul_mm_id_map0_t kernel_mul_mm_id_map0<22, 32>;
+template [[host_name("kernel_mul_mm_id_map0_ne20_8_n64")]] kernel kernel_mul_mm_id_map0_n64_t kernel_mul_mm_id_map0<8, 64>;
 
 // Token-centric map builder for the common six-route MXFP4 prefill shape.
 // Each selected route reserves one expert-local row instead of making every
@@ -9114,7 +9116,7 @@ kernel void kernel_attn_out_low_mpp_direct_rhs(
 // Routed-expert grouped matmul on the Metal4 TensorOps/MPP pipeline. The
 // barrier after mm.run prevents the next K iteration from replacing staged
 // tiles while the cooperative matmul still reads them.
-template<typename S0, typename S0_4x4, typename S0_8x8, typename S1, typename S1_2x4, typename S1_8x8, typename block_q, short nl, void (*dequantize_func)(device const block_q *, short, thread S0_4x4 &), typename T0, typename T0_4x4, typename T1, typename T1_2x4>
+template<typename S0, typename S0_4x4, typename S0_8x8, typename S1, typename S1_2x4, typename S1_8x8, typename block_q, short nl, void (*dequantize_func)(device const block_q *, short, thread S0_4x4 &), typename T0, typename T0_4x4, typename T1, typename T1_2x4, short tile_n>
 kernel void kernel_mul_mm_id_mpp(
         constant ds4_metal_args_mul_mm_id & args,
         device const char * src0,
@@ -9133,7 +9135,7 @@ kernel void kernel_mul_mm_id_mpp(
     threadgroup float *sc = (threadgroup float *)shmem;
 
     constexpr int NR0 = 64;
-    constexpr int NR1 = 32;
+    constexpr int NR1 = tile_n;
     constexpr int NK  = 32;
     constexpr int NL0 = NK/16;
     constexpr int NL1 = NK/8;
@@ -9174,15 +9176,25 @@ kernel void kernel_mul_mm_id_mpp(
     }
 
     const short lr0 = ((short)tiitg/NL0) < nr0 ? ((short)tiitg/NL0) : nr0 - 1;
-    const short lr1 = ((short)tiitg/NL1) < nr1 ? ((short)tiitg/NL1) : nr1 - 1;
+    const short row_b = (short)tiitg/NL1;
 
     const short il0 = (tiitg % NL0);
     short il = il0;
 
-    const int id = ids_i32[im*args.ne21 + r1 + lr1];
-
-    const short i11 = (id % args.ne20) % args.ne11;
-    const short i12 = (id / args.ne20);
+    device const T1 *y_rows[2];
+    #pragma unroll
+    for (short b = 0; b < NR1/32; ++b) {
+        const short row = row_b + 32*b;
+        const short lr1 = row < nr1 ? row : nr1 - 1;
+        const int id = ids_i32[im*args.ne21 + r1 + lr1];
+        const short i11 = (id % args.ne20) % args.ne11;
+        const short i12 = id / args.ne20;
+        y_rows[b] = (device const T1 *)(src1
+            + args.nb13*0
+            + args.nb12*i12
+            + args.nb11*i11
+            + args.nb10*(8*(tiitg % NL1)));
+    }
     const short i13 = 0;
 
     const uint64_t offset0 =
@@ -9190,14 +9202,6 @@ kernel void kernel_mul_mm_id_mpp(
     const short    offset1 = il0/nl;
 
     device const block_q * x = (device const block_q *)(src0 + args.nb01*(r0 + lr0) + offset0) + offset1;
-
-    const short iy = 8*(tiitg % NL1);
-
-    device const T1 * y = (device const T1 *)(src1
-        + args.nb13*i13
-        + args.nb12*i12
-        + args.nb11*i11
-        + args.nb10*iy);
 
     auto tA = tensor(sa, dextents<int32_t, 2>(NK, NR0));
     /* The staged B tile stores element (n, k) at sb[n*NK + k]: dim0 is K
@@ -9251,29 +9255,31 @@ kernel void kernel_mul_mm_id_mpp(
             }
         }
 
-        if (FC_mul_mm_bc_inp) {
-            for (short i = 0; i < 8; ++i) {
-                const short sx = (tiitg%NL1);
-                const short sy = (tiitg/NL1)/8;
-                const short lx = i;
+        #pragma unroll
+        for (short b = 0; b < NR1/32; ++b) {
+            const short iy = 8*(tiitg % NL1);
+            if (FC_mul_mm_bc_inp) {
+                for (short i = 0; i < 8; ++i) {
+                    const short sx = tiitg%NL1;
+                    const short sy = (tiitg/NL1)/8 + 4*b;
+                    const short lx = i;
+                    const short ly = (tiitg/NL1)%8;
+                    sb[NK*(8*sy + ly) + 8*sx + lx] =
+                        loop_k + iy + i < args.ne00 ?
+                            (S1)(*((device T1 *)y_rows[b] + i)) : 0;
+                }
+            } else {
+                const short sx = tiitg%NL1;
+                const short sy = (tiitg/NL1)/8 + 4*b;
                 const short ly = (tiitg/NL1)%8;
-
-                *(sb + NK*(8*sy + ly) + 8*sx + lx) =
-                    loop_k + iy + i < args.ne00 ? (S1) *((device T1 *) y + i) : 0;
+                *(threadgroup S1_2x4 *)(sb + NK*(8*sy + ly) + 8*sx) =
+                    (S1_2x4)(*((device T1_2x4 *)y_rows[b]));
             }
-        } else {
-            const short sx = (tiitg%NL1);
-            const short sy = (tiitg/NL1)/8;
-            const short ly = (tiitg/NL1)%8;
-
-            *(threadgroup S1_2x4 *)(sb + NK*(8*sy + ly) + 8*sx) =
-                (S1_2x4)(*((device T1_2x4 *) y));
+            y_rows[b] += NK;
         }
 
         il = (il + 2 < nl) ? il + 2 : il % 2;
         x  = (il < 2) ? x + (2 + nl - 1)/nl : x;
-
-        y += NK;
 
         threadgroup_barrier(mem_flags::mem_threadgroup);
 
@@ -9317,12 +9323,16 @@ kernel void kernel_mul_mm_id_mpp(
 
 
 
-typedef decltype(kernel_mul_mm_id_mpp<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_q2_K, QK_NL, dequantize_q2_K, float, float4x4, float, float2x4>) mul_mm_id_mpp_t;
-typedef decltype(kernel_mul_mm_id_mpp<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_q2_K, QK_NL, dequantize_q2_K, half, half4x4, half, half2x4>) mul_mm_id_mpp_f16_rhs_t;
+typedef decltype(kernel_mul_mm_id_mpp<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_q2_K, QK_NL, dequantize_q2_K, float, float4x4, float, float2x4, 32>) mul_mm_id_mpp_t;
+typedef decltype(kernel_mul_mm_id_mpp<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_q2_K, QK_NL, dequantize_q2_K, half, half4x4, half, half2x4, 32>) mul_mm_id_mpp_f16_rhs_t;
+typedef decltype(kernel_mul_mm_id_mpp<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_q2_K, QK_NL, dequantize_q2_K, float, float4x4, float, float2x4, 64>) mul_mm_id_mpp_n64_t;
+typedef decltype(kernel_mul_mm_id_mpp<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_q2_K, QK_NL, dequantize_q2_K, half, half4x4, half, half2x4, 64>) mul_mm_id_mpp_n64_f16_rhs_t;
 
-template [[host_name("kernel_mul_mm_id_iq2_xxs_f32_mpp")]] kernel mul_mm_id_mpp_t kernel_mul_mm_id_mpp<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_iq2_xxs, QK_NL, dequantize_iq2_xxs, float, float4x4, float, float2x4>;
-template [[host_name("kernel_mul_mm_id_q2_K_f16_mpp")]]    kernel mul_mm_id_mpp_f16_rhs_t kernel_mul_mm_id_mpp<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_q2_K, QK_NL, dequantize_q2_K, half, half4x4, half, half2x4>;
-template [[host_name("kernel_mul_mm_id_iq2_xxs_f16_mpp")]] kernel mul_mm_id_mpp_f16_rhs_t kernel_mul_mm_id_mpp<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_iq2_xxs, QK_NL, dequantize_iq2_xxs, half, half4x4, half, half2x4>;
+template [[host_name("kernel_mul_mm_id_iq2_xxs_f32_mpp")]] kernel mul_mm_id_mpp_t kernel_mul_mm_id_mpp<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_iq2_xxs, QK_NL, dequantize_iq2_xxs, float, float4x4, float, float2x4, 32>;
+template [[host_name("kernel_mul_mm_id_q2_K_f16_mpp")]]    kernel mul_mm_id_mpp_f16_rhs_t kernel_mul_mm_id_mpp<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_q2_K, QK_NL, dequantize_q2_K, half, half4x4, half, half2x4, 32>;
+template [[host_name("kernel_mul_mm_id_iq2_xxs_f16_mpp")]] kernel mul_mm_id_mpp_f16_rhs_t kernel_mul_mm_id_mpp<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_iq2_xxs, QK_NL, dequantize_iq2_xxs, half, half4x4, half, half2x4, 32>;
+template [[host_name("kernel_mul_mm_id_iq2_xxs_f32_mpp_n64")]] kernel mul_mm_id_mpp_n64_t kernel_mul_mm_id_mpp<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_iq2_xxs, QK_NL, dequantize_iq2_xxs, float, float4x4, float, float2x4, 64>;
+template [[host_name("kernel_mul_mm_id_q2_K_f16_mpp_n64")]] kernel mul_mm_id_mpp_n64_f16_rhs_t kernel_mul_mm_id_mpp<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_q2_K, QK_NL, dequantize_q2_K, half, half4x4, half, half2x4, 64>;
 
 typedef decltype(kernel_attn_out_low_mpp_direct_rhs<
         block_q8_0, 2, dequantize_q8_0_pairs, 64>)

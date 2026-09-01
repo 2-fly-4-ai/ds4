@@ -343,6 +343,26 @@ On M5 Max in Automatic power mode, the accepted 4096-token wave measured
 balanced runs, 44 measured full-vocabulary outputs (6,814,720 logits) were
 bit-identical; an additional 64-step decode trace was also bit-identical.
 
+M5 GLM-5.3 resident top-8 MoE prefills use a 64-row expert work map and
+TensorOps tile for 4096-row waves. Shorter waves retain the 32-row tile because
+the wider shape wastes work on sparsely populated experts. Compare the default
+against its rollback with:
+
+```
+./speed-bench/metal_prefill_variant_bench \
+  -m gguf/GLM-5.3-Flash-Q2-Q4K-Attention.gguf \
+  --prompt-file speed-bench/context-corpora/code_100k.txt \
+  --prefix-tokens 4096 --warmup-tokens 2048 --ctx 4097 --repeats 4 \
+  --candidate-env DS4_METAL_DISABLE_M5_GLM_MOE_MPP_N64
+```
+
+On M5 Max in Automatic power mode, the 64-row default measured 430.67 tok/s
+versus 418.65 tok/s for the 32-row rollback (+2.87%). Independent opt-in A/B
+runs measured +2.72% on 4K code, +2.74% on 4K prose, and +3.42% over an 8K
+prompt processed as two 4K waves. All 76 measured outputs (11,770,880 logits)
+were bit-identical. Forced crossover tests measured -15.31% at 512 tokens and
++0.11% at 2K, which is why the default begins only at a full 4096-row wave.
+
 For long-context tail work, `--base-tokens` evaluates the expensive shared
 prefix once, saves an in-memory session snapshot, and restores that identical
 state before every alternating run. `--prefix-tokens` is then the timed suffix,

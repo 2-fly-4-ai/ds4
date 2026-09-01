@@ -5648,7 +5648,8 @@ static int ds4_gpu_encode_mul_mm_id_mapped_tile(
         NSUInteger                  src1_off,
         id<MTLBuffer>               dst,
         NSUInteger                  dst_off,
-        NSUInteger                  threadgroup_bytes);
+        NSUInteger                  threadgroup_bytes,
+        NSUInteger                  work_tile_n);
 static int ds4_gpu_encode_mul_mm_id_addr_mapped_tile(
         id<MTLCommandBuffer>        cb,
         id<MTLComputePipelineState> mm_pipeline,
@@ -32825,18 +32826,18 @@ static int ds4_gpu_encode_mul_mm_id_mapped_tile(
         NSUInteger                  src1_off,
         id<MTLBuffer>               dst,
         NSUInteger                  dst_off,
-        NSUInteger                  threadgroup_bytes) {
+        NSUInteger                  threadgroup_bytes,
+        NSUInteger                  work_tile_n) {
     if (!cb || !mm_pipeline || !mm_args || !src0 || !src1 || !dst ||
         !g_moe_id_map_buffer[g_ds4_stream] ||
         mm_args->ne00 <= 0 || mm_args->ne0 <= 0 ||
-        mm_args->ne20 <= 0 || mm_args->ne21 <= 0 || mm_args->ne02 <= 0) {
+        mm_args->ne20 <= 0 || mm_args->ne21 <= 0 || mm_args->ne02 <= 0 ||
+        (work_tile_n != 32u && work_tile_n != 64u)) {
         return 0;
     }
-    /*
-     * The routed MoE grouped matmul uses the legacy 32-token expert-major tile.
-     * The removed TensorOps variant was not semantically stable on evals, so keep
-     * this encoder tied to the tested simdgroup kernel shape.
-     */
+    /* The work map and cooperative kernel must use the same expert-row tile.
+     * Most paths retain the established 32-row contract; the guarded M5 GLM
+     * large-prefill path passes 64. */
     const bool use_resource_hints =
         getenv("DS4_METAL_MOE_MM_ID_USE_RESOURCES") != NULL &&
         getenv("DS4_METAL_DISABLE_MOE_MM_ID_USE_RESOURCES") == NULL;
@@ -32850,7 +32851,8 @@ static int ds4_gpu_encode_mul_mm_id_mapped_tile(
     const uint64_t pair_rows =
         (uint64_t)(uint32_t)mm_args->ne20 * (uint32_t)mm_args->ne21;
     const uint64_t work_cap =
-        (pair_rows + 31u * (uint32_t)mm_args->ne02 + 31u) / 32u;
+        (pair_rows + (work_tile_n - 1u) * (uint32_t)mm_args->ne02 +
+         work_tile_n - 1u) / work_tile_n;
     const NSUInteger work_item_bytes = 2u * sizeof(uint32_t);
     if (work_cap > NSUIntegerMax ||
         work_offset > NSUIntegerMax - 8u ||
@@ -33027,7 +33029,8 @@ static int ds4_gpu_encode_mul_mm_id_mapped(
                                                   src1_off,
                                                   dst,
                                                   dst_off,
-                                                  8192u);
+                                                  8192u,
+                                                  32u);
 }
 
 static int ds4_gpu_encode_attn_out_low_mpp(
@@ -38525,7 +38528,8 @@ static int ds4_gpu_glm_routed_moe_batch_grouped_tensor(
                                                        ds4_gpu_tensor_offset(x),
                                                        g_moe_gate_scratch_buffer[g_ds4_stream],
                                                        0,
-                                                       mm_id_threadgroup_bytes);
+                                                       mm_id_threadgroup_bytes,
+                                                       32u);
         }
         DS4_METAL_PROFILE_GLM_GROUPED_MOE_STAGE("gate");
         if (ok) {
@@ -38538,7 +38542,8 @@ static int ds4_gpu_glm_routed_moe_batch_grouped_tensor(
                                                        ds4_gpu_tensor_offset(x),
                                                        g_moe_gate_scratch_buffer[g_ds4_stream],
                                                        (NSUInteger)gate_scratch_bytes,
-                                                       mm_id_threadgroup_bytes);
+                                                       mm_id_threadgroup_bytes,
+                                                       32u);
         }
         DS4_METAL_PROFILE_GLM_GROUPED_MOE_STAGE("up");
         if (ok) {
@@ -38570,7 +38575,8 @@ static int ds4_gpu_glm_routed_moe_batch_grouped_tensor(
                                                        ds4_gpu_tensor_offset(mid),
                                                        down_dst,
                                                        down_dst_off,
-                                                       mm_id_threadgroup_bytes);
+                                                       mm_id_threadgroup_bytes,
+                                                       32u);
         }
         DS4_METAL_PROFILE_GLM_GROUPED_MOE_STAGE("down");
         if (ok && n_expert > 1) {
@@ -42908,6 +42914,25 @@ int ds4_gpu_routed_moe_batch_tensor(
             getenv("DS4_METAL_DISABLE_MOE_MM_ID_PAIR_SWIGLU") == NULL &&
             getenv("DS4_METAL_MOE_WRITE_CLAMPED_ACT") == NULL &&
             getenv("DS4_METAL_GRAPH_DUMP_PREFIX") == NULL;
+        /* GLM top-8 routing spreads 8*n_tokens rows across 256 experts. At
+         * 4K, a 64-row expert tile amortizes the work-map and weight staging
+         * without the severe padding seen at shorter prompts. Keep an
+         * explicit force switch for crossover testing and a single rollback
+         * for field diagnostics. */
+        const bool force_m5_glm_mpp_n64 =
+            getenv("DS4_METAL_ENABLE_M5_GLM_MOE_MPP_N64") != NULL;
+        const bool use_m5_glm_mpp_n64 =
+            use_mm_id &&
+            ds4_gpu_device_is_m5_apple_silicon() &&
+            n_expert == 8u &&
+            n_tokens >= (force_m5_glm_mpp_n64 ? 64u : 4096u) &&
+            gate_type == DS4_METAL_TENSOR_IQ2_XXS &&
+            down_type == DS4_METAL_TENSOR_Q2_K &&
+            request_mid_f16 &&
+            !g_ssd_streaming_mode &&
+            g_tp_split_world == 1 &&
+            getenv("DS4_METAL_DISABLE_M5_GLM_MOE_MPP_N64") == NULL &&
+            getenv("DS4_METAL_GRAPH_DUMP_PREFIX") == NULL;
         /* The established resident MXFP4 specializations were originally
          * promoted only for >=2K-token prefills. Extend the same exact kernels
          * to the 32..2047 range behind one aggregate rollback so the sparse
@@ -43021,6 +43046,8 @@ int ds4_gpu_routed_moe_batch_tensor(
             down_mm_args.tp_expert_base = tp_expert_base_host;
 
             map_pipeline = ds4_gpu_get_pipeline(
+                use_m5_glm_mpp_n64 ?
+                    "kernel_mul_mm_id_map0_ne20_8_n64" :
                 use_mxfp4_mm_id_map_scatter ?
                     "kernel_mul_mm_id_map_scatter_work_ne20_6" :
                     ds4_gpu_mul_mm_id_map0_name(n_expert));
@@ -43041,7 +43068,10 @@ int ds4_gpu_routed_moe_batch_tensor(
             const int mpp_mask = ds4_gpu_routed_mm_mpp_mask();
             if (mpp_mask && gate_type == DS4_METAL_TENSOR_IQ2_XXS) {
                 id<MTLComputePipelineState> mpp =
-                    ds4_gpu_get_mul_mm_id_pipeline("kernel_mul_mm_id_iq2_xxs_f32_mpp", false);
+                    ds4_gpu_get_mul_mm_id_pipeline(
+                        use_m5_glm_mpp_n64 ?
+                            "kernel_mul_mm_id_iq2_xxs_f32_mpp_n64" :
+                            "kernel_mul_mm_id_iq2_xxs_f32_mpp", false);
                 if (mpp) {
                     if (mpp_mask & 1) gate_mm_pipeline = mpp;
                     if (mpp_mask & 2) up_mm_pipeline = mpp;
@@ -43051,7 +43081,9 @@ int ds4_gpu_routed_moe_batch_tensor(
                 (down_type == DS4_METAL_TENSOR_Q2_K || down_type == DS4_METAL_TENSOR_IQ2_XXS)) {
                 id<MTLComputePipelineState> mpp = ds4_gpu_get_mul_mm_id_pipeline(
                     down_type == DS4_METAL_TENSOR_Q2_K ?
-                        "kernel_mul_mm_id_q2_K_f16_mpp" :
+                        (use_m5_glm_mpp_n64 ?
+                            "kernel_mul_mm_id_q2_K_f16_mpp_n64" :
+                            "kernel_mul_mm_id_q2_K_f16_mpp") :
                         "kernel_mul_mm_id_iq2_xxs_f16_mpp", false);
                 if (mpp) down_mm_pipeline = mpp;
             }
@@ -43485,7 +43517,8 @@ int ds4_gpu_routed_moe_batch_tensor(
                                                            ds4_gpu_tensor_offset(x),
                                                            gatebuf,
                                                            ds4_gpu_tensor_offset(gate),
-                                                           8192u);
+                                                           use_m5_glm_mpp_n64 ? 16384u : 8192u,
+                                                           use_m5_glm_mpp_n64 ? 64u : 32u);
                 DS4_METAL_PROFILE_MOE_STAGE("gate");
             }
             if (ok && !use_mm_id_pair_swiglu) {
@@ -43498,7 +43531,8 @@ int ds4_gpu_routed_moe_batch_tensor(
                                                    ds4_gpu_tensor_offset(x),
                                                    upbuf,
                                                    ds4_gpu_tensor_offset(up),
-                                                   8192u);
+                                                   use_m5_glm_mpp_n64 ? 16384u : 8192u,
+                                                   use_m5_glm_mpp_n64 ? 64u : 32u);
                 DS4_METAL_PROFILE_MOE_STAGE("up");
             }
         } else if (use_tiny_pair_swiglu) {
@@ -43762,7 +43796,8 @@ int ds4_gpu_routed_moe_batch_tensor(
                                                        ds4_gpu_tensor_offset(mid),
                                                        down_dst,
                                                        down_dst_off,
-                                                       8192u);
+                                                       use_m5_glm_mpp_n64 ? 16384u : 8192u,
+                                                       use_m5_glm_mpp_n64 ? 64u : 32u);
             } else {
                 ok = ds4_gpu_encode_mul_mv_id(cb,
                                                      down_mv_pipeline,
