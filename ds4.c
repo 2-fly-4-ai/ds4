@@ -17678,17 +17678,37 @@ static uint64_t metal_graph_q8_0_row_bytes(uint64_t in_dim) {
  * Metal Release Graph Allocation.
  * ========================================================================= */
 
-/* Prompt-lookup speculative drafting (DS4_PROMPT_LOOKUP_DRAFT=1): greedy decode
- * drafts the continuation from the session's own token history and verifies it
- * with the target model in one batched pass, reusing the MTP speculative
- * verify/rollback machinery with the context as a zero-cost drafter. */
+/* Prompt-lookup speculative drafting: on M5 Metal DeepSeek-4 and GLM-5.3 it is available
+ * automatically to the frontends' guarded greedy routers.  The legacy env flag
+ * remains an explicit force-enable for experiments on other configurations;
+ * setting it to 0 (or DS4_PROMPT_LOOKUP_DISABLE=1) is a rollback switch. */
 static bool prompt_lookup_draft_enabled(void) {
     static int cached = -1;
     if (cached < 0) {
+        const char *disable = getenv("DS4_PROMPT_LOOKUP_DISABLE");
+        if (disable && disable[0] && disable[0] != '0') {
+            cached = 0;
+            return false;
+        }
         const char *e = getenv("DS4_PROMPT_LOOKUP_DRAFT");
-        cached = (e && e[0] && e[0] != '0') ? 1 : 0;
+        if (e) {
+            cached = (e[0] && e[0] != '0') ? 1 : 0;
+        } else {
+#if defined(__APPLE__)
+            cached = ((g_ds4_shape.family == DS4_MODEL_FAMILY_DEEPSEEK4 ||
+                       g_ds4_shape.family == DS4_MODEL_FAMILY_GLM_DSA) &&
+                      ds4_gpu_device_is_m5_apple_silicon()) ? 1 : 0;
+#else
+            cached = 0;
+#endif
+        }
     }
     return cached == 1;
+}
+
+static bool prompt_lookup_glm_enabled(void) {
+    const char *e = getenv("DS4_GLM_PROMPT_LOOKUP");
+    return !e || (e[0] && e[0] != '0');
 }
 
 /* Allocate the Metal graph state for a chosen raw-cache capacity.  The model
@@ -43299,7 +43319,6 @@ static void glm_graph_free(ds4_glm_gpu_graph *g) {
     g->mtp_k_rope_cache = NULL;
     g->mtp_concat = NULL;
     g->mtp_selected = NULL;
-    g->mtp_kda_backup = NULL;
     g->mtp_kda_outofplace = false;
     g->mtp_selected_host = NULL;
     g->mtp_logits_host = NULL;
@@ -44676,16 +44695,18 @@ static bool glm_graph_forward_output_head(
  * 643 MiB output-weight pass for row zero.  This path projects the
  * two host-visible mHC rows together so the small-batch matvec can share the
  * output weights. */
-static bool glm53_graph_forward_output_head_rows(
+static bool glm53_graph_forward_output_head_rows_impl(
         ds4_glm_gpu_graph *g,
         const ds4_model   *model,
         const ds4_weights *weights,
         const float       *hc_rows,
         uint32_t           rows,
         float             *logits_first,
-        float             *logits_last) {
+        float             *logits_last,
+        float             *logits_all) {
     if (!g || !g->glm53 || !model || !weights || !hc_rows || rows < 2u ||
-        !logits_first || !logits_last || !g->batch_hc_cur || !g->batch_cur ||
+        (!logits_all && (!logits_first || !logits_last)) ||
+        !g->batch_hc_cur || !g->batch_cur ||
         !g->batch_ffn_norm ||
         !glm53_graph_session_batch_logits_ensure(g, rows)) {
         return false;
@@ -44739,7 +44760,12 @@ static bool glm53_graph_forward_output_head_rows(
     if (ok) ok = ds4_gpu_end_commands() != 0;
     else (void)ds4_gpu_synchronize();
     const uint64_t logits_bytes = (uint64_t)DS4_N_VOCAB * sizeof(float);
-    if (ok) {
+    if (ok && logits_all) {
+        ok = ds4_gpu_tensor_read(g->session_batch_logits,
+                                 0,
+                                 logits_all,
+                                 (uint64_t)rows * logits_bytes) != 0;
+    } else if (ok) {
         ok = ds4_gpu_tensor_read(g->session_batch_logits,
                                  0,
                                  logits_first,
@@ -44750,6 +44776,30 @@ static bool glm53_graph_forward_output_head_rows(
                                  logits_bytes) != 0;
     }
     return ok;
+}
+
+static bool glm53_graph_forward_output_head_rows(
+        ds4_glm_gpu_graph *g,
+        const ds4_model   *model,
+        const ds4_weights *weights,
+        const float       *hc_rows,
+        uint32_t           rows,
+        float             *logits_first,
+        float             *logits_last) {
+    return glm53_graph_forward_output_head_rows_impl(
+        g, model, weights, hc_rows, rows,
+        logits_first, logits_last, NULL);
+}
+
+static bool glm53_graph_forward_output_head_rows_all(
+        ds4_glm_gpu_graph *g,
+        const ds4_model   *model,
+        const ds4_weights *weights,
+        const float       *hc_rows,
+        uint32_t           rows,
+        float             *logits_all) {
+    return glm53_graph_forward_output_head_rows_impl(
+        g, model, weights, hc_rows, rows, NULL, NULL, logits_all);
 }
 
 static bool glm_graph_profile_stage(
@@ -54889,6 +54939,10 @@ struct ds4_session {
     uint64_t pl_committed;
     uint64_t pl_no_match;
     uint64_t pl_free_miss;
+    uint64_t pl_gate_skips;
+    uint64_t pl_gate_partials;
+    uint64_t pl_gate_ambiguous;
+    uint32_t pl_gate_skip_remaining;
     double pl_scan_sec;
 };
 
@@ -65592,7 +65646,8 @@ void ds4_session_free(ds4_session *s) {
         fprintf(stderr,
                 "ds4: prompt-lookup summary: attempts=%llu no_match=%llu first_miss=%llu "
                 "verify_passes=%llu drafted=%llu committed=%llu accept=%.1f%% "
-                "tokens/pass=%.2f scan=%.2f ms total\n",
+                "tokens/pass=%.2f scan=%.2f ms total gate_skips=%llu "
+                "gate_partials=%llu gate_ambiguous=%llu\n",
                 (unsigned long long)attempts,
                 (unsigned long long)s->pl_no_match,
                 (unsigned long long)s->pl_free_miss,
@@ -65601,7 +65656,10 @@ void ds4_session_free(ds4_session *s) {
                 (unsigned long long)s->pl_committed,
                 s->pl_drafted ? 100.0 * (double)s->pl_committed / (double)s->pl_drafted : 0.0,
                 s->pl_passes ? (double)s->pl_committed / (double)s->pl_passes : 0.0,
-                s->pl_scan_sec * 1000.0);
+                s->pl_scan_sec * 1000.0,
+                (unsigned long long)s->pl_gate_skips,
+                (unsigned long long)s->pl_gate_partials,
+                (unsigned long long)s->pl_gate_ambiguous);
     }
     ds4_dist_session_free(s->distributed);
     if (ds4_session_is_cpu(s)) {
@@ -75891,6 +75949,8 @@ static int ds4_session_eval_speculative_argmax_impl(
  * a backward memcmp scan of the token history (sub-millisecond even at very
  * long contexts; the CPU is idle during decode). */
 #define DS4_PL_NGRAM 4
+#define DS4_PL_GATE_NGRAM 24
+#define DS4_PL_GATE_CONSENSUS 4
 /* Array bound; the effective depth defaults to 7 so the fused verify pass
  * (anchor + drafts = 8 positions) stays on the small-batch mat-vec kernels,
  * which cover 2..8 tokens (metal/dense.metal); batch 9+ falls onto the full
@@ -75912,30 +75972,339 @@ static int prompt_lookup_max_draft(void) {
     return cached;
 }
 
+static bool prompt_lookup_gate_enabled(void) {
+    static int cached = -1;
+    if (cached < 0) {
+        const char *e = getenv("DS4_PROMPT_LOOKUP_GATE");
+        cached = e ? (e[0] && e[0] != '0' ? 1 : 0) : 1;
+    }
+    return cached == 1;
+}
+
+static uint32_t prompt_lookup_gate_backoff(const char *name, uint32_t fallback) {
+    const char *e = getenv(name);
+    if (!e || !e[0]) return fallback;
+    char *end = NULL;
+    errno = 0;
+    unsigned long v = strtoul(e, &end, 10);
+    if (end == e || *end != '\0' || errno != 0 || v > UINT32_MAX) return fallback;
+    return (uint32_t)v;
+}
+
+static int prompt_lookup_gate_min_match(void) {
+    uint32_t v = prompt_lookup_gate_backoff(
+        "DS4_PROMPT_LOOKUP_GATE_MIN_MATCH", DS4_PL_GATE_NGRAM);
+    if (v < DS4_PL_NGRAM) v = DS4_PL_NGRAM;
+    if (v > 64) v = 64;
+    return (int)v;
+}
+
 /* The matched n-gram ends with `pending` (the sampled-but-not-yet-evaluated
  * anchor token), so drafting happens before the anchor's forward pass and the
  * anchor can join the verify batch. */
 static int prompt_lookup_propose(const token_vec *ckpt, int pending,
-                                 int draft_cap, int *drafts) {
-    const int n = DS4_PL_NGRAM;
+                                 int draft_cap, int min_match,
+                                 bool require_consensus, bool *ambiguous,
+                                 int *drafts) {
+    const int n = min_match > DS4_PL_NGRAM ? min_match : DS4_PL_NGRAM;
     const int len = ckpt->len;
+    if (ambiguous) *ambiguous = false;
     if (draft_cap <= 0 || len < n) return 0;
     if (draft_cap > DS4_PL_MAX_DRAFT) draft_cap = DS4_PL_MAX_DRAFT;
     const int *v = ckpt->v;
-    int suffix[DS4_PL_NGRAM];
-    memcpy(suffix, v + len - (n - 1), (size_t)(n - 1) * sizeof(suffix[0]));
-    suffix[n - 1] = pending;
+    const int *suffix = v + len - (n - 1);
+    int chosen_follow = -1;
+    int chosen_count = 0;
     for (int j = len - n; j >= 0; j--) {
-        if (memcmp(v + j, suffix, (size_t)n * sizeof(v[0])) != 0) continue;
+        if (memcmp(v + j, suffix, (size_t)(n - 1) * sizeof(v[0])) != 0 ||
+            v[j + n - 1] != pending) continue;
         const int follow = j + n;
-        int count = len - follow;
+        const int available = len - follow;
+        int count = available;
         if (count > draft_cap) count = draft_cap;
         if (count <= 0) continue;
-        memcpy(drafts, v + follow, (size_t)count * sizeof(v[0]));
-        return count;
+        if (!require_consensus) {
+            memcpy(drafts, v + follow, (size_t)count * sizeof(v[0]));
+            return count;
+        }
+        if (available < DS4_PL_GATE_CONSENSUS) continue;
+        if (chosen_follow < 0) {
+            chosen_follow = follow;
+            chosen_count = count;
+            continue;
+        }
+        if (memcmp(v + chosen_follow, v + follow,
+                   DS4_PL_GATE_CONSENSUS * sizeof(v[0])) != 0) {
+            if (ambiguous) *ambiguous = true;
+            return 0;
+        }
+    }
+    if (chosen_follow >= 0) {
+        memcpy(drafts, v + chosen_follow,
+               (size_t)chosen_count * sizeof(v[0]));
+        return chosen_count;
     }
     return 0;
 }
+
+int ds4_session_prompt_lookup_candidate(ds4_session *s, int pending,
+                                        int min_match) {
+    if (!s || pending < 0) return 0;
+    if (s->pl_gate_skip_remaining > 0) {
+        s->pl_gate_skip_remaining--;
+        s->pl_gate_skips++;
+        return 0;
+    }
+    if (min_match <= 0) min_match = prompt_lookup_gate_min_match();
+    int drafts[DS4_PL_MAX_DRAFT];
+    bool ambiguous = false;
+    return prompt_lookup_propose(&s->checkpoint, pending,
+                                 prompt_lookup_max_draft(), min_match,
+                                 true, &ambiguous, drafts);
+}
+
+bool ds4_session_prompt_lookup_supported(const ds4_session *s) {
+#ifdef DS4_NO_GPU
+    (void)s;
+    return false;
+#else
+    if (!s || s->distributed || ds4_session_is_cpu(s) ||
+        !prompt_lookup_draft_enabled()) {
+        return false;
+    }
+    if (ds4_session_is_glm(s)) {
+        return prompt_lookup_glm_enabled() &&
+               s->glm_graph_ready && s->glm_graph.glm53 &&
+               !s->glm_graph.ssd_streaming && s->engine &&
+               !s->engine->tp.active;
+    }
+    return s->graph.spec_logits != NULL;
+#endif
+}
+
+bool ds4_engine_prompt_lookup_supported(const ds4_engine *e) {
+#ifdef DS4_NO_GPU
+    (void)e;
+    return false;
+#else
+    return e && e->backend == DS4_BACKEND_METAL && e->metal_ready &&
+           prompt_lookup_draft_enabled() &&
+           (g_ds4_shape.family != DS4_MODEL_FAMILY_GLM_DSA ||
+            prompt_lookup_glm_enabled());
+#endif
+}
+
+#ifndef DS4_NO_GPU
+/* GLM-5.3 owns a separate DSA/KDA graph, so it cannot use the DeepSeek
+ * spec_logits verifier below.  Verify a small context-derived block with
+ * GLM's native batched DSA/KDA path and KDA shadow state.  Prompt lookup
+ * supplies the proposal for free; the next-token/MTP head is never run. */
+static int ds4_session_eval_glm_prompt_lookup(
+        ds4_session *s, int first_token, int max_tokens, int eos_token,
+        float temperature, int top_k, float top_p, float min_p, uint64_t *rng,
+        bool exact_sampling, int *accepted, int accepted_cap,
+        char *err, size_t errlen) {
+    if (!s || !accepted || max_tokens <= 0 || accepted_cap <= 0) return 0;
+    if (exact_sampling && (!rng || temperature <= 0.0f)) {
+        if (errlen) snprintf(err, errlen, "invalid sampled prompt-lookup request");
+        return -1;
+    }
+
+    int drafts[DS4_PL_MAX_DRAFT];
+    int draft_n = 0;
+    bool ambiguous = false;
+    bool gate_skipped = false;
+    const bool gate = prompt_lookup_gate_enabled();
+    if (gate && s->pl_gate_skip_remaining > 0) {
+        s->pl_gate_skip_remaining--;
+        s->pl_gate_skips++;
+        gate_skipped = true;
+    }
+    if (!gate_skipped && max_tokens >= 2 && accepted_cap >= 2 &&
+        s->checkpoint.len + 2 <= s->ctx_size && first_token != eos_token) {
+        int draft_cap = prompt_lookup_max_draft();
+        /* GLM's batch kernels peak earlier than DeepSeek's verifier: measured
+         * depth 3/4 beats 5/7 on M5 Max.  Preserve the shared env override. */
+        if (getenv("DS4_PROMPT_LOOKUP_MAX") == NULL && draft_cap > 4) {
+            draft_cap = 4;
+        }
+        if (draft_cap > max_tokens - 1) draft_cap = max_tokens - 1;
+        if (draft_cap > accepted_cap - 1) draft_cap = accepted_cap - 1;
+        const int room = s->ctx_size - s->checkpoint.len;
+        if (draft_cap > room - 2) draft_cap = room - 2;
+        const double scan_t0 = now_sec();
+        draft_n = prompt_lookup_propose(
+            &s->checkpoint, first_token, draft_cap,
+            gate ? prompt_lookup_gate_min_match() : DS4_PL_NGRAM,
+            gate, &ambiguous, drafts);
+        s->pl_scan_sec += now_sec() - scan_t0;
+        if (ambiguous) s->pl_gate_ambiguous++;
+        for (int i = 0; i < draft_n; i++) {
+            if (drafts[i] == eos_token) {
+                draft_n = i + 1;
+                break;
+            }
+        }
+    }
+    if (draft_n <= 0) {
+        s->pl_no_match++;
+        if (ds4_session_eval(s, first_token, err, errlen) != 0) return -1;
+        accepted[0] = first_token;
+        return 1;
+    }
+
+    const bool pl_log = getenv("DS4_PROMPT_LOOKUP_LOG") != NULL;
+    const double verify_t0 = pl_log ? now_sec() : 0.0;
+    ds4_engine *e = s->engine;
+    ds4_glm_gpu_graph *g = &s->glm_graph;
+    const uint32_t pos = (uint32_t)s->checkpoint.len;
+    const uint32_t n_verify = (uint32_t)draft_n + 1u;
+    const uint64_t hc_row_values =
+        (uint64_t)DS4_N_EMBD * DS4_N_HC;
+    int toks[DS4_PL_MAX_DRAFT + 1];
+    toks[0] = first_token;
+    memcpy(toks + 1, drafts, (size_t)draft_n * sizeof(drafts[0]));
+    float *hc_rows = xmalloc((size_t)n_verify * hc_row_values * sizeof(float));
+    float *row_logits = xmalloc((size_t)n_verify * DS4_N_VOCAB * sizeof(float));
+
+    bool kda_saved = glm_graph_mtp_ensure(g);
+    const bool kda_shadow = kda_saved && glm53_graph_has_kda_shadows(g);
+    if (kda_saved && !kda_shadow) {
+        kda_saved = glm53_graph_copy_kda_state(g, true);
+    }
+    bool verified = false;
+    if (kda_saved) {
+        g->mtp_kda_outofplace = kda_shadow;
+        if (!glm53_graph_use_indexed_prefill(g) &&
+            glm_graph_span_fits_full_attention(g, pos, n_verify)) {
+            verified = glm_graph_forward_tokens(
+                g, &e->model, &e->weights, toks, NULL, NULL, 0,
+                pos, n_verify, hc_rows, NULL,
+                NULL, NULL, pos, 0, n_verify);
+        } else {
+            verified = glm_graph_forward_indexed_tokens(
+                g, &e->model, &e->weights, toks, NULL, NULL, 0,
+                pos, n_verify, hc_rows, NULL,
+                NULL, NULL, pos, 0, n_verify);
+        }
+        g->mtp_kda_outofplace = false;
+    }
+    if (verified) {
+        verified = glm53_graph_forward_output_head_rows_all(
+            g, &e->model, &e->weights, hc_rows, n_verify, row_logits);
+    }
+    if (!verified) {
+        if (kda_saved && !kda_shadow) {
+            (void)glm53_graph_copy_kda_state(g, false);
+        }
+        free(row_logits);
+        free(hc_rows);
+        if (errlen) snprintf(err, errlen, "GLM prompt-lookup verify failed");
+        s->checkpoint_valid = false;
+        return -1;
+    }
+
+    int commit_total = 1;
+    int replacement = -1;
+    for (int i = 0; i < draft_n; i++) {
+        const float *logits = row_logits + (size_t)i * DS4_N_VOCAB;
+        const int target_token = exact_sampling ?
+            sample_top_p_min_p(logits, DS4_N_VOCAB, temperature,
+                               top_k, top_p, min_p, rng, s->sample_probs) :
+            glm_session_logits_argmax(logits);
+        if (target_token != drafts[i]) {
+            if (exact_sampling) replacement = target_token;
+            break;
+        }
+        commit_total++;
+    }
+    const int matched_drafts = commit_total - 1;
+    const bool full_accept = commit_total == (int)n_verify;
+    int returned_total = commit_total;
+
+    bool commit_ok = true;
+    if (full_accept) {
+        if (kda_shadow) glm53_graph_swap_kda_shadows(g);
+        for (int i = 0; i < commit_total; i++) {
+            token_vec_push(&s->checkpoint, toks[i]);
+            accepted[i] = toks[i];
+        }
+        ds4_session_glm_note_dense_cache(s, pos, n_verify);
+        memcpy(s->logits,
+               row_logits + (size_t)(n_verify - 1u) * DS4_N_VOCAB,
+               (size_t)DS4_N_VOCAB * sizeof(float));
+    } else {
+        /* The verifier wrote KDA state only to shadows.  Re-run a rare partial
+         * prefix through exact one-token decode so the committed frontier has
+         * the same numerics and recurrent state as ordinary GLM generation.
+         * Exact sampling also appends the target-sampled replacement token;
+         * drawing directly from each target row consumes the same one RNG
+         * value per output token as ordinary sampling. */
+        if (!kda_shadow) {
+            commit_ok = glm53_graph_copy_kda_state(g, false);
+        }
+        for (int i = 0; commit_ok && i < commit_total; i++) {
+            commit_ok = glm_graph_forward_token(
+                g, &e->model, &e->weights, toks[i], NULL,
+                pos + (uint32_t)i, NULL, s->logits, false);
+            if (commit_ok) {
+                token_vec_push(&s->checkpoint, toks[i]);
+                accepted[i] = toks[i];
+                ds4_session_glm_note_dense_cache(
+                    s, pos + (uint32_t)i, 1);
+            }
+        }
+        if (commit_ok && exact_sampling && replacement >= 0 &&
+            returned_total < accepted_cap) {
+            commit_ok = glm_graph_forward_token(
+                g, &e->model, &e->weights, replacement, NULL,
+                pos + (uint32_t)returned_total, NULL, s->logits, false);
+            if (commit_ok) {
+                token_vec_push(&s->checkpoint, replacement);
+                accepted[returned_total] = replacement;
+                ds4_session_glm_note_dense_cache(
+                    s, pos + (uint32_t)returned_total, 1);
+                returned_total++;
+            }
+        }
+    }
+    free(row_logits);
+    free(hc_rows);
+    if (!commit_ok) {
+        if (errlen) snprintf(err, errlen, "GLM prompt-lookup commit failed");
+        s->checkpoint_valid = false;
+        return -1;
+    }
+    s->checkpoint_valid = true;
+    s->glm_mtp_have = 0;
+    s->glm_mtp_rollback_valid = false;
+
+    s->pl_passes++;
+    s->pl_drafted += (uint64_t)draft_n;
+    s->pl_committed += (uint64_t)matched_drafts;
+    if (!full_accept) {
+        if (matched_drafts == 0) s->pl_free_miss++;
+        if (gate) {
+            s->pl_gate_partials++;
+            s->pl_gate_skip_remaining = prompt_lookup_gate_backoff(
+                matched_drafts == 0 ? "DS4_PROMPT_LOOKUP_GATE_MISS_BACKOFF" :
+                                      "DS4_PROMPT_LOOKUP_GATE_PARTIAL_BACKOFF",
+                matched_drafts == 0 ? 64 : 8);
+        }
+    }
+    if (pl_log) {
+        fprintf(stderr,
+                "ds4: GLM prompt-lookup%s drafted=%d matched=%llu returned=%d "
+                "replacement=%d verify=%.3f ms\n",
+                exact_sampling ? " sampled" : "",
+                draft_n,
+                (unsigned long long)matched_drafts,
+                returned_total, replacement,
+                (now_sec() - verify_t0) * 1000.0);
+    }
+    return returned_total;
+}
+#endif
 
 /* Greedy prompt-lookup speculative eval.  Same contract and acceptance rule as
  * ds4_session_eval_speculative_argmax, with the session's own token history as
@@ -75962,6 +76331,13 @@ int ds4_session_eval_prompt_lookup_argmax(ds4_session *s, int first_token,
 #else
     ds4_engine *e = s->engine;
 
+    if (ds4_session_is_glm(s)) {
+        return ds4_session_eval_glm_prompt_lookup(
+            s, first_token, max_tokens, eos_token,
+            0.0f, 0, 1.0f, 0.0f, NULL, false,
+            accepted, accepted_cap, err, errlen);
+    }
+
     /*
      * Fused one-pass cycle: unlike the MTP drafter, prompt lookup needs only the
      * token history, so it can draft BEFORE the anchor token's forward pass and
@@ -75978,10 +76354,22 @@ int ds4_session_eval_prompt_lookup_argmax(ds4_session *s, int first_token,
 
     int drafts[DS4_PL_MAX_DRAFT];
     int draft_n = 0;
-    if (draft_cap > 0 && s->graph.spec_logits && first_token != eos_token) {
+    const bool gate = prompt_lookup_gate_enabled();
+    bool gate_ambiguous = false;
+    bool gate_skipped = false;
+    if (gate && s->pl_gate_skip_remaining > 0) {
+        s->pl_gate_skip_remaining--;
+        s->pl_gate_skips++;
+        gate_skipped = true;
+    }
+    if (!gate_skipped && draft_cap > 0 && s->graph.spec_logits && first_token != eos_token) {
         const double scan_t0 = now_sec();
-        draft_n = prompt_lookup_propose(&s->checkpoint, first_token, draft_cap, drafts);
+        draft_n = prompt_lookup_propose(&s->checkpoint, first_token, draft_cap,
+                                        gate ? prompt_lookup_gate_min_match() : DS4_PL_NGRAM,
+                                        gate, &gate_ambiguous,
+                                        drafts);
         s->pl_scan_sec += now_sec() - scan_t0;
+        if (gate_ambiguous) s->pl_gate_ambiguous++;
         /* Never propose past an EOS: tokens after it must not enter the
          * checkpoint even if the target would agree with them. */
         for (int i = 0; i < draft_n; i++) {
@@ -76041,6 +76429,10 @@ int ds4_session_eval_prompt_lookup_argmax(ds4_session *s, int first_token,
             ok = spec_frontier_restore(&frontier, s);
             if (ok && commit_total == 1) {
                 s->pl_free_miss++;
+                if (gate) {
+                    s->pl_gate_skip_remaining = prompt_lookup_gate_backoff(
+                        "DS4_PROMPT_LOOKUP_GATE_MISS_BACKOFF", 64);
+                }
                 spec_frontier_free(&frontier);
                 free(row_logits);
                 if (ds4_session_eval(s, first_token, err, errlen) != 0) return -1;
@@ -76075,6 +76467,14 @@ int ds4_session_eval_prompt_lookup_argmax(ds4_session *s, int first_token,
             s->pl_passes++;
             s->pl_drafted += (uint64_t)draft_n;
             s->pl_committed += (uint64_t)(commit_total - 1);
+            if (gate && commit_total < n_verify) {
+                const uint32_t committed = (uint32_t)(commit_total - 1);
+                s->pl_gate_partials++;
+                s->pl_gate_skip_remaining = prompt_lookup_gate_backoff(
+                    committed < 4 ? "DS4_PROMPT_LOOKUP_GATE_WEAK_BACKOFF" :
+                                    "DS4_PROMPT_LOOKUP_GATE_PARTIAL_BACKOFF",
+                    committed < 4 ? 32 : 8);
+            }
             if (pl_log) {
                 fprintf(stderr,
                         "ds4: prompt-lookup fused drafted=%d committed=%d verify=%.3f ms\n",
@@ -76098,6 +76498,39 @@ int ds4_session_eval_prompt_lookup_argmax(ds4_session *s, int first_token,
     snprintf(err, errlen, "prompt-lookup verifier failed");
     s->checkpoint_valid = false;
     return -1;
+#endif
+}
+
+int ds4_session_eval_prompt_lookup_sampled(
+        ds4_session *s, int first_token, int max_tokens, int eos_token,
+        float temperature, int top_k, float top_p, float min_p, uint64_t *rng,
+        int *accepted, int accepted_cap, char *err, size_t errlen) {
+    if (!s || !accepted || max_tokens <= 0 || accepted_cap <= 0) return 0;
+    if (temperature <= 0.0f) {
+        return ds4_session_eval_prompt_lookup_argmax(
+            s, first_token, max_tokens, eos_token,
+            accepted, accepted_cap, err, errlen);
+    }
+    if (s->distributed || ds4_session_is_cpu(s)) {
+        if (ds4_session_eval(s, first_token, err, errlen) != 0) return -1;
+        accepted[0] = first_token;
+        return 1;
+    }
+#ifdef DS4_NO_GPU
+    (void)eos_token; (void)top_k; (void)top_p; (void)min_p; (void)rng;
+    if (ds4_session_eval(s, first_token, err, errlen) != 0) return -1;
+    accepted[0] = first_token;
+    return 1;
+#else
+    if (!ds4_session_is_glm(s)) {
+        if (ds4_session_eval(s, first_token, err, errlen) != 0) return -1;
+        accepted[0] = first_token;
+        return 1;
+    }
+    return ds4_session_eval_glm_prompt_lookup(
+        s, first_token, max_tokens, eos_token,
+        temperature, top_k, top_p, min_p, rng, true,
+        accepted, accepted_cap, err, errlen);
 #endif
 }
 

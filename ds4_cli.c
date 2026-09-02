@@ -33,31 +33,6 @@ static bool cli_env_flag_enabled(const char *name, bool defval) {
     return strcmp(v, "0") != 0;
 }
 
-static bool cli_splitkv_spec_requested(void) {
-    if (cli_env_flag_enabled("DS4_CUDA_NO_SPLITKV_SPEC", false)) return false;
-    return cli_env_flag_enabled("DS4_CUDA_SPLITKV_SPEC", false);
-}
-
-static bool cli_greedy_fast_attention_requested(void) {
-    if (!cli_env_flag_enabled("DS4_CUDA_NO_GREEDY_SPLITKV", false) &&
-        cli_env_flag_enabled("DS4_CUDA_GREEDY_SPLITKV", false))
-    {
-        return true;
-    }
-    if (!cli_env_flag_enabled("DS4_CUDA_NO_GREEDY_VEC4", false) &&
-        cli_env_flag_enabled("DS4_CUDA_GREEDY_VEC4", false))
-    {
-        return true;
-    }
-    return false;
-}
-
-static bool cli_greedy_argmax_requested(bool speculative_requested) {
-    if (cli_greedy_fast_attention_requested()) return true;
-    if (speculative_requested) return false;
-    return cli_env_flag_enabled("DS4_CUDA_GREEDY_TOP1", true);
-}
-
 typedef struct {
     const char *prompt;
     const char *system;
@@ -498,6 +473,66 @@ static void print_generated_token(void *ud, int token) {
     free(text);
 }
 
+static bool cli_prompt_lookup_hybrid_enabled(ds4_session *session,
+                                             ds4_engine *engine,
+                                             float temperature) {
+    const char *sample_env = getenv("DS4_GLM_PROMPT_LOOKUP_SAMPLING");
+    const bool sampled_enabled = sample_env && sample_env[0] ?
+        strcmp(sample_env, "0") != 0 : temperature <= 1.0f;
+    const bool sampled = temperature > 0.0f && sampled_enabled &&
+        ds4_engine_is_glm_dsa(engine);
+    return (temperature <= 0.0f || sampled) &&
+           ds4_engine_mtp_draft_tokens(engine) <= 1 &&
+           ds4_session_prompt_lookup_supported(session) &&
+           cli_env_flag_enabled("DS4_PROMPT_LOOKUP_HYBRID", true) &&
+           cli_env_flag_enabled("DS4_PROMPT_LOOKUP_GATE", true);
+}
+
+typedef struct {
+    ds4_engine *engine;
+    ds4_session *session;
+    token_printer *printer;
+    ds4_tokens *transcript;
+    ds4_think_mode think_mode;
+    int *generated;
+    int limit;
+    bool hit_stop;
+    bool hit_limit;
+    bool interrupted;
+    bool prompt_lookup_switch;
+    int prompt_lookup_pending;
+} cli_greedy_chain_ctx;
+
+static bool cli_greedy_chain_on_token(void *ud, int token) {
+    cli_greedy_chain_ctx *c = ud;
+    if (cli_interrupt_requested()) {
+        c->interrupted = true;
+        return false;
+    }
+    /* Ask the chain for one extra token so the last visible token enters KV,
+     * but never print or checkpoint that extra prediction. */
+    if (*c->generated >= c->limit) {
+        c->hit_limit = true;
+        return false;
+    }
+    if (ds4_token_is_stop_for_think_mode(c->engine, token, c->think_mode)) {
+        c->hit_stop = true;
+        return false;
+    }
+    if (ds4_session_prompt_lookup_candidate(c->session, token, 0) > 0) {
+        /* The chain may have encoded ahead of the callback frontier.  Preserve
+         * the exact uncommitted prediction as the verifier's first token. */
+        c->prompt_lookup_switch = true;
+        c->prompt_lookup_pending = token;
+        return false;
+    }
+
+    if (c->transcript) ds4_tokens_push(c->transcript, token);
+    print_generated_token(c->printer, token);
+    (*c->generated)++;
+    return true;
+}
+
 static void build_prompt(ds4_engine *engine, const cli_generation_options *gen, ds4_tokens *out) {
     if (gen->raw_prompt) {
         ds4_tokenize_text(engine, gen->prompt ? gen->prompt : "", out);
@@ -576,20 +611,65 @@ static int run_sampled_generation(ds4_engine *engine, const cli_config *cfg, con
     uint64_t rng = cfg->gen.seed ? cfg->gen.seed :
         ((uint64_t)time(NULL) ^ ((uint64_t)getpid() << 32) ^ (uint64_t)clock());
     int generated = 0;
-    const bool speculative_argmax = cfg->gen.temperature <= 0.0f &&
-        ((ds4_engine_mtp_draft_tokens(engine) > 1 &&
-          getenv("DS4_MTP_SPEC_DISABLE") == NULL) ||
-         cli_splitkv_spec_requested());
-    const bool greedy_argmax = cfg->gen.temperature <= 0.0f &&
-        cli_greedy_argmax_requested(speculative_argmax);
-    bool have_greedy_next = false;
-    int greedy_next = -1;
+    const bool prompt_lookup_hybrid =
+        cli_prompt_lookup_hybrid_enabled(session, engine, cfg->gen.temperature);
+    bool prompt_lookup_active = false;
+    int prompt_lookup_pending = -1;
+    bool generation_finished = false;
     const double t_decode0 = cli_now_sec();
-    while (generated < max_tokens && !cli_interrupt_requested()) {
+
+cli_hybrid_chain_again:
+    prompt_lookup_active = prompt_lookup_hybrid &&
+        ds4_engine_is_glm_dsa(engine) &&
+        !ds4_think_mode_enabled(think_mode) &&
+        cli_env_flag_enabled("DS4_GLM_PROMPT_LOOKUP", true);
+    prompt_lookup_pending = -1;
+    if (!generation_finished && cfg->gen.temperature <= 0.0f &&
+        prompt_lookup_hybrid &&
+        generated < max_tokens &&
+        ds4_session_chain_greedy_supported(session)) {
+        cli_greedy_chain_ctx chain = {
+            .engine = engine,
+            .session = session,
+            .printer = &printer,
+            .transcript = NULL,
+            .think_mode = think_mode,
+            .generated = &generated,
+            .limit = max_tokens,
+            .prompt_lookup_pending = -1,
+        };
+        bool chain_completed = false;
+        cli_dist_busy_set(cfg, true);
+        int chain_tokens = ds4_session_eval_chain_greedy(
+            session, max_tokens - generated + 1,
+            cli_greedy_chain_on_token, &chain,
+            &chain_completed, err, sizeof(err));
+        cli_dist_busy_set(cfg, false);
+        if (chain_tokens < 0) {
+            fprintf(stderr, "ds4: decode failed: %s\n", err);
+            ds4_session_free(session);
+            return 1;
+        }
+        if (chain.prompt_lookup_switch) {
+            prompt_lookup_active = true;
+            prompt_lookup_pending = chain.prompt_lookup_pending;
+        } else if (chain.hit_stop || chain.hit_limit || chain.interrupted) {
+            generation_finished = true;
+        } else {
+            fprintf(stderr,
+                    "ds4: greedy Metal chain ended unexpectedly (%d tokens, completed=%d)\n",
+                    chain_tokens, chain_completed ? 1 : 0);
+            ds4_session_free(session);
+            return 1;
+        }
+    }
+
+    while (!generation_finished && generated < max_tokens &&
+           !cli_interrupt_requested()) {
         int token;
-        if (greedy_argmax && have_greedy_next) {
-            token = greedy_next;
-            have_greedy_next = false;
+        if (prompt_lookup_pending >= 0) {
+            token = prompt_lookup_pending;
+            prompt_lookup_pending = -1;
         } else {
             token = ds4_session_sample(session, cfg->gen.temperature, 0,
                                        cfg->gen.top_p, cfg->gen.min_p, &rng);
@@ -613,17 +693,20 @@ static int run_sampled_generation(ds4_engine *engine, const cli_config *cfg, con
                 ds4_session_free(session);
                 return 1;
             }
-        } else if (cfg->gen.temperature <= 0.0f &&
-                   getenv("DS4_PROMPT_LOOKUP_DRAFT") != NULL) {
+        } else if (prompt_lookup_active) {
             cli_dist_busy_set(cfg, true);
-            ntok = ds4_session_eval_prompt_lookup_argmax(session,
-                                                         token,
-                                                         max_tokens - generated,
-                                                         ds4_token_eos(engine),
-                                                         toks,
-                                                         (int)(sizeof(toks) / sizeof(toks[0])),
-                                                         err,
-                                                         sizeof(err));
+            ntok = cfg->gen.temperature <= 0.0f ?
+                ds4_session_eval_prompt_lookup_argmax(
+                    session, token, max_tokens - generated,
+                    ds4_token_eos(engine), toks,
+                    (int)(sizeof(toks) / sizeof(toks[0])),
+                    err, sizeof(err)) :
+                ds4_session_eval_prompt_lookup_sampled(
+                    session, token, max_tokens - generated,
+                    ds4_token_eos(engine), cfg->gen.temperature, 0,
+                    cfg->gen.top_p, cfg->gen.min_p, &rng, toks,
+                    (int)(sizeof(toks) / sizeof(toks[0])),
+                    err, sizeof(err));
             cli_dist_busy_set(cfg, false);
             if (ntok < 0) {
                 fprintf(stderr, "ds4: decode failed: %s\n", err);
@@ -667,6 +750,9 @@ static int run_sampled_generation(ds4_engine *engine, const cli_config *cfg, con
             if (generated >= max_tokens) break;
         }
         if (stop) break;
+        if (prompt_lookup_active && ntok == 1 && generated < max_tokens) {
+            goto cli_hybrid_chain_again;
+        }
     }
     const double t_decode1 = cli_now_sec();
     generation_done(&printer);
@@ -1242,7 +1328,7 @@ static int run_generation(ds4_engine *engine, const cli_config *cfg) {
             getenv("DS4_CLI_FORCE_SESSION") != NULL ||
             cfg->gen.temperature > 0.0f ||
             ds4_engine_mtp_draft_tokens(engine) > 1 ||
-            getenv("DS4_PROMPT_LOOKUP_DRAFT") != NULL) {
+            ds4_engine_prompt_lookup_supported(engine)) {
             /* TP leaders always drive the session path: the sync/eval
              * mirroring that keeps the worker in lockstep lives there.
              * The env override exists so TP-vs-single-node validation
@@ -1570,20 +1656,66 @@ static int run_chat_turn(ds4_engine *engine, cli_config *cfg, repl_chat *chat,
     uint64_t rng = cfg->gen.seed ? cfg->gen.seed :
         ((uint64_t)time(NULL) ^ ((uint64_t)getpid() << 32) ^ (uint64_t)clock());
     int generated = 0;
-    const bool speculative_argmax = cfg->gen.temperature <= 0.0f &&
-        ((ds4_engine_mtp_draft_tokens(engine) > 1 &&
-          getenv("DS4_MTP_SPEC_DISABLE") == NULL) ||
-         cli_splitkv_spec_requested());
-    const bool greedy_argmax = cfg->gen.temperature <= 0.0f &&
-        cli_greedy_argmax_requested(speculative_argmax);
-    bool have_greedy_next = false;
-    int greedy_next = -1;
+    const bool prompt_lookup_hybrid =
+        cli_prompt_lookup_hybrid_enabled(chat->session, engine,
+                                         cfg->gen.temperature);
+    bool prompt_lookup_active = false;
+    int prompt_lookup_pending = -1;
+    bool generation_finished = false;
     const double t_decode0 = cli_now_sec();
-    while (generated < max_tokens && !cli_interrupt_requested()) {
+
+repl_hybrid_chain_again:
+    prompt_lookup_active = prompt_lookup_hybrid &&
+        ds4_engine_is_glm_dsa(engine) &&
+        !ds4_think_mode_enabled(think_mode) &&
+        cli_env_flag_enabled("DS4_GLM_PROMPT_LOOKUP", true);
+    prompt_lookup_pending = -1;
+    if (!generation_finished && cfg->gen.temperature <= 0.0f &&
+        prompt_lookup_hybrid &&
+        generated < max_tokens &&
+        ds4_session_chain_greedy_supported(chat->session)) {
+        cli_greedy_chain_ctx chain = {
+            .engine = engine,
+            .session = chat->session,
+            .printer = &printer,
+            .transcript = &chat->transcript,
+            .think_mode = think_mode,
+            .generated = &generated,
+            .limit = max_tokens,
+            .prompt_lookup_pending = -1,
+        };
+        bool chain_completed = false;
+        cli_dist_busy_set(cfg, true);
+        int chain_tokens = ds4_session_eval_chain_greedy(
+            chat->session, max_tokens - generated + 1,
+            cli_greedy_chain_on_token, &chain,
+            &chain_completed, err, sizeof(err));
+        cli_dist_busy_set(cfg, false);
+        if (chain_tokens < 0) {
+            fprintf(stderr, "ds4: decode failed: %s\n", err);
+            ds4_session_invalidate(chat->session);
+            return 1;
+        }
+        if (chain.prompt_lookup_switch) {
+            prompt_lookup_active = true;
+            prompt_lookup_pending = chain.prompt_lookup_pending;
+        } else if (chain.hit_stop || chain.hit_limit || chain.interrupted) {
+            generation_finished = true;
+        } else {
+            fprintf(stderr,
+                    "ds4: greedy Metal chain ended unexpectedly (%d tokens, completed=%d)\n",
+                    chain_tokens, chain_completed ? 1 : 0);
+            ds4_session_invalidate(chat->session);
+            return 1;
+        }
+    }
+
+    while (!generation_finished && generated < max_tokens &&
+           !cli_interrupt_requested()) {
         int token;
-        if (greedy_argmax && have_greedy_next) {
-            token = greedy_next;
-            have_greedy_next = false;
+        if (prompt_lookup_pending >= 0) {
+            token = prompt_lookup_pending;
+            prompt_lookup_pending = -1;
         } else {
             token = ds4_session_sample(chat->session,
                                        cfg->gen.temperature,
@@ -1608,6 +1740,26 @@ static int run_chat_turn(ds4_engine *engine, cli_config *cfg, repl_chat *chat,
             cli_dist_busy_set(cfg, false);
             if (ntok < 0) {
                 fprintf(stderr, "ds4: decode failed: %s\n", err);
+                return 1;
+            }
+        } else if (prompt_lookup_active) {
+            cli_dist_busy_set(cfg, true);
+            ntok = cfg->gen.temperature <= 0.0f ?
+                ds4_session_eval_prompt_lookup_argmax(
+                    chat->session, token, max_tokens - generated,
+                    ds4_token_eos(engine), toks,
+                    (int)(sizeof(toks) / sizeof(toks[0])),
+                    err, sizeof(err)) :
+                ds4_session_eval_prompt_lookup_sampled(
+                    chat->session, token, max_tokens - generated,
+                    ds4_token_eos(engine), cfg->gen.temperature, 0,
+                    cfg->gen.top_p, cfg->gen.min_p, &rng, toks,
+                    (int)(sizeof(toks) / sizeof(toks[0])),
+                    err, sizeof(err));
+            cli_dist_busy_set(cfg, false);
+            if (ntok < 0) {
+                fprintf(stderr, "ds4: decode failed: %s\n", err);
+                ds4_session_invalidate(chat->session);
                 return 1;
             }
         } else {
@@ -1647,6 +1799,9 @@ static int run_chat_turn(ds4_engine *engine, cli_config *cfg, repl_chat *chat,
             if (generated >= max_tokens) break;
         }
         if (stop) break;
+        if (prompt_lookup_active && ntok == 1 && generated < max_tokens) {
+            goto repl_hybrid_chain_again;
+        }
     }
     const double t_decode1 = cli_now_sec();
     generation_done(&printer);

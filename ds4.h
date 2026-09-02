@@ -552,13 +552,34 @@ int ds4_session_eval_speculative(ds4_session *s, int first_token,
  * (keep, or roll back and replay). Only called from ds4_tp_worker_run. */
 int ds4_session_tp_spec_cycle(ds4_session *s, const int *drafts, int draft_n,
                               char *err, size_t errlen);
-/* Greedy prompt-lookup speculative eval (DS4_PROMPT_LOOKUP_DRAFT=1): same
- * contract as ds4_session_eval_speculative_argmax, drafting the continuation
- * from the session's own token history instead of an MTP head. */
+/* Greedy prompt-lookup speculative eval: same contract as
+ * ds4_session_eval_speculative_argmax, drafting the continuation from the
+ * session's own token history instead of an MTP head. */
 int ds4_session_eval_prompt_lookup_argmax(ds4_session *s, int first_token,
                                           int max_tokens, int eos_token,
                                           int *accepted, int accepted_cap,
                                           char *err, size_t errlen);
+/* Exact sampled prompt-lookup evaluation. The prompt continuation is a
+ * deterministic proposal, but every verifier row is sampled with the target
+ * distribution and the request's ordinary sampler settings. GLM-5.3 Metal is
+ * currently the only accelerated implementation; other paths commit only the
+ * already-sampled first token. */
+int ds4_session_eval_prompt_lookup_sampled(
+        ds4_session *s, int first_token, int max_tokens, int eos_token,
+        float temperature, int top_k, float top_p, float min_p, uint64_t *rng,
+        int *accepted, int accepted_cap, char *err, size_t errlen);
+/* Cheap CPU-only probe used by the guarded frontend router: reports how many
+ * prompt-lookup draft tokens are available for `pending` without evaluating
+ * the model. A positive result has continuation consensus; min_match <= 0
+ * selects the gate's configured threshold. */
+int ds4_session_prompt_lookup_candidate(ds4_session *s, int pending,
+                                        int min_match);
+/* True when this session has the verifier state needed by the guarded
+ * prompt-lookup router. */
+bool ds4_session_prompt_lookup_supported(const ds4_session *s);
+/* True when a newly-created session for this engine will support the guarded
+ * prompt-lookup router.  Used by frontends to select a session decode path. */
+bool ds4_engine_prompt_lookup_supported(const ds4_engine *e);
 void ds4_session_invalidate(ds4_session *s);
 /* Save/restore the compact GLM-5.3 recurrent state at a hot API prompt
  * boundary. Other backends return false and keep their existing rewind path. */

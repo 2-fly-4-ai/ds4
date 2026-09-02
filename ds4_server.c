@@ -11101,8 +11101,36 @@ static bool server_greedy_chain_request_shape_eligible(
            room > max_tokens;
 }
 
+/* Sampled prompt lookup uses the classic per-token protocol loop, not the
+ * greedy Metal chain. Keep the same conservative request-shape exclusions and
+ * additionally reject ignore_eos: verifier-row sampling currently represents
+ * the ordinary target distribution, including EOS. */
+static bool server_sampled_prompt_lookup_request_shape_eligible(
+        const server *s, const request *r, int max_tokens, int room) {
+    return s && r &&
+           !s->batched_mode &&
+           !r->has_tools &&
+           r->stops.len == 0 &&
+           !ds4_think_mode_enabled(r->think_mode) &&
+           !r->ignore_eos &&
+           r->temperature > 0.0f &&
+           max_tokens >= 2 &&
+           room > max_tokens;
+}
+
+static bool server_glm_prompt_lookup_sampling_enabled(float temperature) {
+    if (temperature <= 0.0f) return false;
+    const char *env = getenv("DS4_GLM_PROMPT_LOOKUP_SAMPLING");
+    if (env && env[0]) return env[0] != '0';
+    /* Measured through temperature 1.0. Higher-temperature drafts are much
+     * less likely to survive four target samples; leave those on the ordinary
+     * path unless an explicit experiment opts in. */
+    return temperature <= 1.0f;
+}
+
 typedef struct {
     server *srv;
+    ds4_session *session;
     job *request_job;
     req_kind kind;
     ds4_think_mode think_mode;
@@ -11133,6 +11161,9 @@ typedef struct {
     bool hit_limit;
     bool cancelled;
     bool shutdown;
+    bool prompt_lookup_hybrid;
+    bool prompt_lookup_switch;
+    int prompt_lookup_pending;
 } server_greedy_chain_ctx;
 
 static bool server_greedy_chain_on_token(void *ud, int token) {
@@ -11154,6 +11185,15 @@ static bool server_greedy_chain_on_token(void *ud, int token) {
     if (ds4_token_is_stop_for_think_mode(c->srv->engine, token,
                                          c->think_mode)) {
         c->hit_stop = true;
+        return false;
+    }
+    if (c->prompt_lookup_hybrid &&
+        ds4_session_prompt_lookup_candidate(c->session, token, 0) > 0) {
+        /* Leave this predicted token uncommitted and unexposed. Preserve it
+         * explicitly as the first verification anchor: the chained graph may
+         * have advanced its output buffer beyond the callback frontier. */
+        c->prompt_lookup_switch = true;
+        c->prompt_lookup_pending = token;
         return false;
     }
 
@@ -12789,13 +12829,39 @@ decode_again:
 
     server_generation_enter(s);
     bool greedy_chain_handled = false;
-    if (getenv("DS4_PROMPT_LOOKUP_DRAFT") == NULL &&
-        server_greedy_chain_request_shape_eligible(s, &j->req,
-                                                    max_tokens, room) &&
+    int prompt_lookup_pending = -1;
+    bool prompt_lookup_active = false;
+hybrid_chain_again:
+    greedy_chain_handled = false;
+    prompt_lookup_pending = -1;
+    prompt_lookup_active = false;
+    const char *hybrid_env = getenv("DS4_PROMPT_LOOKUP_HYBRID");
+    const char *gate_env = getenv("DS4_PROMPT_LOOKUP_GATE");
+    const bool prompt_lookup_hybrid =
+        ds4_session_prompt_lookup_supported(slot->session) &&
+        ds4_engine_mtp_draft_tokens(s->engine) <= 1 &&
+        (!hybrid_env || (hybrid_env[0] && hybrid_env[0] != '0')) &&
+        (!gate_env || (gate_env[0] && gate_env[0] != '0'));
+    const char *glm_pl_env = getenv("DS4_GLM_PROMPT_LOOKUP");
+    const bool glm_pl_sampling =
+        server_glm_prompt_lookup_sampling_enabled(j->req.temperature);
+    if (prompt_lookup_hybrid && ds4_engine_is_glm53(s->engine) &&
+        !ds4_think_mode_enabled(j->req.think_mode) &&
+        (server_greedy_chain_request_shape_eligible(s, &j->req,
+                                                    max_tokens, room) ||
+         (glm_pl_sampling &&
+          server_sampled_prompt_lookup_request_shape_eligible(
+              s, &j->req, max_tokens, room))) &&
+        (!glm_pl_env || (glm_pl_env[0] && glm_pl_env[0] != '0'))) {
+        prompt_lookup_active = true;
+    }
+    if (server_greedy_chain_request_shape_eligible(s, &j->req,
+                                                   max_tokens, room) &&
         ds4_session_chain_greedy_supported(slot->session))
     {
         server_greedy_chain_ctx chain = {
             .srv = s,
+            .session = slot->session,
             .request_job = j,
             .kind = j->req.kind,
             .think_mode = j->req.think_mode,
@@ -12822,6 +12888,7 @@ decode_again:
             .last_stream_flush_t = &last_stream_flush_t,
             .last_decode_log_t = &last_decode_log_t,
             .last_decode_log_completion = &last_decode_log_completion,
+            .prompt_lookup_hybrid = prompt_lookup_hybrid,
         };
         bool chain_completed = false;
         server_log(DS4_LOG_GENERATION,
@@ -12834,9 +12901,18 @@ decode_again:
             server_greedy_chain_on_token, &chain,
             &chain_completed, err, sizeof(err));
         pthread_mutex_unlock(&s->inference_mu);
-        greedy_chain_handled = true;
+        greedy_chain_handled = !chain.prompt_lookup_switch;
+        if (chain.prompt_lookup_switch) {
+            prompt_lookup_pending = chain.prompt_lookup_pending;
+            prompt_lookup_active = true;
+        }
         if (chain_tokens < 0) {
             finish = "error";
+        } else if (chain.prompt_lookup_switch) {
+            server_log(DS4_LOG_GENERATION,
+                       "ds4-server: %s ctx=%s greedy Metal chain switching to prompt lookup after %d tokens",
+                       j->req.kind == REQ_CHAT ? "chat" : "completion",
+                       ctx_span, completion);
         } else if (chain.hit_stop) {
             finish = "stop";
         } else if (chain.shutdown) {
@@ -12884,11 +12960,17 @@ decode_again:
             temperature = 0.0f;
         }
         const int eos_token = ds4_token_eos(s->engine);
-        int token = j->req.ignore_eos ?
-            ds4_session_argmax_ignoring_eos(slot->session,
-                                            j->req.think_mode) :
-            ds4_session_sample(slot->session, temperature, top_k,
-                               top_p, min_p, &rng);
+        int token;
+        if (prompt_lookup_pending >= 0) {
+            token = prompt_lookup_pending;
+            prompt_lookup_pending = -1;
+        } else {
+            token = j->req.ignore_eos ?
+                ds4_session_argmax_ignoring_eos(slot->session,
+                                                j->req.think_mode) :
+                ds4_session_sample(slot->session, temperature, top_k,
+                                   top_p, min_p, &rng);
+        }
         if (token < 0) {
             finish = "error";
             snprintf(err, sizeof(err), "failed to select a non-EOS token");
@@ -12924,20 +13006,23 @@ decode_again:
                 finish = "error";
                 break;
             }
-        } else if (temperature <= 0.0f &&
-                   getenv("DS4_PROMPT_LOOKUP_DRAFT") != NULL) {
+        } else if (prompt_lookup_active) {
             /* Prompt-lookup drafting covers greedy decode spans, which includes
              * forced-greedy tool-call payloads on otherwise sampled requests.
              * Committed tokens flow through the same per-token stop/stream
              * handling below, like the MTP batch path. */
-            ntok = ds4_session_eval_prompt_lookup_argmax(slot->session,
-                                                         token,
-                                                         max_tokens - completion,
-                                                         ds4_token_eos(s->engine),
-                                                         toks,
-                                                         (int)(sizeof(toks) / sizeof(toks[0])),
-                                                         err,
-                                                         sizeof(err));
+            ntok = temperature <= 0.0f ?
+                ds4_session_eval_prompt_lookup_argmax(
+                    slot->session, token, max_tokens - completion,
+                    ds4_token_eos(s->engine), toks,
+                    (int)(sizeof(toks) / sizeof(toks[0])),
+                    err, sizeof(err)) :
+                ds4_session_eval_prompt_lookup_sampled(
+                    slot->session, token, max_tokens - completion,
+                    ds4_token_eos(s->engine), temperature, top_k,
+                    top_p, min_p, &rng, toks,
+                    (int)(sizeof(toks) / sizeof(toks[0])),
+                    err, sizeof(err));
             if (ntok < 0) {
                 finish = "error";
                 break;
@@ -13152,6 +13237,10 @@ decode_again:
             }
         }
         if (stop_decode) break;
+        if (prompt_lookup_active && ntok == 1 && completion < max_tokens &&
+            ds4_session_pos(slot->session) < ds4_session_ctx(slot->session)) {
+            goto hybrid_chain_again;
+        }
     }
     server_generation_leave(s);
 
@@ -15064,6 +15153,34 @@ static void test_mixed_prefill_quantum_option(void) {
     TEST_ASSERT(server_prefill_quantum_for(&s, true) == 128);
 }
 
+static void test_prompt_lookup_hybrid_candidate_gate(void) {
+    int unique[55];
+    int n = 0;
+    for (int i = 0; i < 24; i++) unique[n++] = 1000 + i;
+    for (int i = 0; i < 7; i++) unique[n++] = 2000 + i;
+    unique[n++] = 4000;
+    for (int i = 0; i < 23; i++) unique[n++] = 1000 + i;
+    TEST_ASSERT(n == (int)(sizeof(unique) / sizeof(unique[0])));
+    ds4_session *s = ds4_session_new_test_checkpoint(unique, n);
+    TEST_ASSERT(ds4_session_prompt_lookup_candidate(s, 1023, 24) == 7);
+    TEST_ASSERT(ds4_session_prompt_lookup_candidate(s, 1023, 25) == 0);
+    ds4_session_free_test_checkpoint(s);
+
+    int ambiguous[87];
+    n = 0;
+    for (int i = 0; i < 24; i++) ambiguous[n++] = 1000 + i;
+    for (int i = 0; i < 7; i++) ambiguous[n++] = 2000 + i;
+    ambiguous[n++] = 4000;
+    for (int i = 0; i < 24; i++) ambiguous[n++] = 1000 + i;
+    for (int i = 0; i < 7; i++) ambiguous[n++] = 3000 + i;
+    ambiguous[n++] = 4001;
+    for (int i = 0; i < 23; i++) ambiguous[n++] = 1000 + i;
+    TEST_ASSERT(n == (int)(sizeof(ambiguous) / sizeof(ambiguous[0])));
+    s = ds4_session_new_test_checkpoint(ambiguous, n);
+    TEST_ASSERT(ds4_session_prompt_lookup_candidate(s, 1023, 24) == 0);
+    ds4_session_free_test_checkpoint(s);
+}
+
 /* Reuse-aware slot routing: the probe must recognize every way a request
  * can reuse a slot's live state, and the router must steer requests that can
  * reuse nothing away from resident checkpoints. */
@@ -16796,6 +16913,21 @@ static void test_greedy_chain_request_shape_guards_protocol_features(void) {
 
     TEST_ASSERT(!server_greedy_chain_request_shape_eligible(&s, &r, 1, 128));
     TEST_ASSERT(!server_greedy_chain_request_shape_eligible(&s, &r, 64, 64));
+
+    r.temperature = 0.7f;
+    TEST_ASSERT(server_sampled_prompt_lookup_request_shape_eligible(
+        &s, &r, 64, 128));
+    r.ignore_eos = true;
+    TEST_ASSERT(!server_sampled_prompt_lookup_request_shape_eligible(
+        &s, &r, 64, 128));
+    r.ignore_eos = false;
+    r.has_tools = true;
+    TEST_ASSERT(!server_sampled_prompt_lookup_request_shape_eligible(
+        &s, &r, 64, 128));
+    r.has_tools = false;
+    r.think_mode = DS4_THINK_HIGH;
+    TEST_ASSERT(!server_sampled_prompt_lookup_request_shape_eligible(
+        &s, &r, 64, 128));
 }
 
 static void test_server_stream_batch_preserves_first_token_and_time_cap(void) {
@@ -20382,6 +20514,7 @@ static void test_responses_inline_image_content(void) {
 static void ds4_server_unit_tests_run(void) {
     test_batched_prefill_round_robin();
     test_mixed_prefill_quantum_option();
+    test_prompt_lookup_hybrid_candidate_gate();
     test_kv_rewind_reuse_target();
     test_multimodal_prefill_resume_frontier();
     test_batched_live_continuation_slot_binding();

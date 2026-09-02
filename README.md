@@ -316,6 +316,20 @@ sampling distribution.
 ./ds4-agent -m gguf/GLM-5.3-Flash-Q2.gguf --mtp --ctx 50000
 ```
 
+On M5 Apple Silicon, resident single-GPU GLM 5.3 also enables guarded
+prompt-lookup speculation automatically for greedy generation and ordinary
+sampling through temperature 1.0. It drafts repeated continuations from the
+session history and verifies up to four tokens with the native GLM DSA/KDA
+graph, without running the embedded MTP head. At positive temperature every
+verifier row uses the request's normal temperature, top-k, top-p, min-p, and
+RNG; the first sampled disagreement is replayed as the replacement token, so
+the target sampling behavior is preserved. Thinking, tools, stop strings, SSD
+streaming, tensor parallelism, native MTP, and temperatures above 1.0 keep
+their existing paths. Set `DS4_GLM_PROMPT_LOOKUP_SAMPLING=0` to disable sampled
+lookup, or `=1` to opt an experimental temperature above 1.0 in. Set
+`DS4_GLM_PROMPT_LOOKUP=0` to disable this optimization for GLM entirely, or
+`DS4_PROMPT_LOOKUP_DISABLE=1` for the global rollback.
+
 For a small multi-user server on one M5 Max, four 8192-token sessions fit the
 tested Q2 layout. Native decode batching supports both the dense prefix and the
 long-context compact sparse-attention path; unsupported configurations use the
