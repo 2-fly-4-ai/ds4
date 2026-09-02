@@ -76123,10 +76123,12 @@ static int ds4_session_eval_glm_prompt_lookup(
     if (!gate_skipped && max_tokens >= 2 && accepted_cap >= 2 &&
         s->checkpoint.len + 2 <= s->ctx_size && first_token != eos_token) {
         int draft_cap = prompt_lookup_max_draft();
-        /* GLM's batch kernels peak earlier than DeepSeek's verifier: measured
-         * depth 3/4 beats 5/7 on M5 Max.  Preserve the shared env override. */
-        if (getenv("DS4_PROMPT_LOOKUP_MAX") == NULL && draft_cap > 4) {
-            draft_cap = 4;
+        /* GLM's batch kernels peak earlier than DeepSeek's verifier.  On an
+         * M5 Max, three drafts (four verifier rows) sustain about 8% more
+         * sampled lookup throughput than four drafts, with neutral no-match
+         * cost.  Preserve the shared env override for other hardware. */
+        if (getenv("DS4_PROMPT_LOOKUP_MAX") == NULL && draft_cap > 3) {
+            draft_cap = 3;
         }
         if (draft_cap > max_tokens - 1) draft_cap = max_tokens - 1;
         if (draft_cap > accepted_cap - 1) draft_cap = accepted_cap - 1;

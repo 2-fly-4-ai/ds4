@@ -32,6 +32,27 @@ miss: 564 tokens were drafted, 556 matched (98.6%), with five partial passes.
 Prefill is unchanged; all reported values are decode throughput. The lookup
 scan remained sub-millisecond in aggregate, including the 8,793-token prompt.
 
+## M5 verifier-depth retune
+
+Profiling showed that roughly 92% of a successful sampled verification pass is
+the GLM transformer forward itself; allocation, KDA shadow save/commit, and
+freeing are negligible, while the output head and sampling decision account
+for only a few milliseconds. The useful low-risk tuning knob is therefore the
+number of verifier rows, not host-side buffer pooling.
+
+For a 512-token repeated-line generation at temperature 0.7, two matched runs
+per depth measured 64.62 and 64.92 t/s with three drafts, versus 59.98 and
+59.60 t/s with four drafts. The averages are 64.77 versus 59.79 t/s, an 8.3%
+gain, and all four output hashes are identical. GLM now defaults to three
+drafts on the automatic path; `DS4_PROMPT_LOOKUP_MAX` still overrides it.
+
+Two additional seeded checks after the retune:
+
+| Workload | Plain | Depth-3 lookup | Change | Seeded output |
+|---|---:|---:|---:|---|
+| Repeated C fixture, 256 tokens, temperature 0.7 | 38.37 t/s | 64.14 t/s | +67.2% | identical |
+| Novel prose, 256 tokens, temperature 0.7 | 39.05 t/s | 38.97 t/s | -0.2% | identical |
+
 ## Routing and rollback
 
 Sampled prompt lookup is automatic on supported resident single-GPU GLM-5.3
