@@ -240,6 +240,7 @@ static id<MTLComputePipelineState> g_glm_qk_lowrank_glm52_pipeline;
 static id<MTLComputePipelineState> g_glm_qk_lowrank_glm52_sg_pipeline;
 static id<MTLComputePipelineState> g_glm_qk_lowrank_batch_pipeline;
 static id<MTLComputePipelineState> g_glm_qk_lowrank_batch_glm52_t4_pipeline;
+static id<MTLComputePipelineState> g_glm_qk_lowrank_batch_glm53_q8_mma_pipeline;
 static id<MTLComputePipelineState> g_glm_value_project_q8_0_pipeline;
 static id<MTLComputePipelineState> g_glm_value_project_q8_0_batch_heads_pipeline;
 static id<MTLComputePipelineState> g_glm_value_project_q8_0_batch_heads_mma_pipeline;
@@ -8795,6 +8796,8 @@ int ds4_gpu_init(void) {
             ds4_gpu_get_pipeline("kernel_glm_qk_lowrank_q8_0_batch");
         g_glm_qk_lowrank_batch_glm52_t4_pipeline =
             ds4_gpu_get_pipeline("kernel_glm_qk_lowrank_q8_0_batch_glm52_t4");
+        g_glm_qk_lowrank_batch_glm53_q8_mma_pipeline =
+            ds4_gpu_get_pipeline("kernel_glm_qk_lowrank_q8_0_batch_mma");
         g_glm_value_project_q8_0_pipeline =
             ds4_gpu_get_pipeline("kernel_glm_value_project_q8_0");
         g_glm_value_project_q8_0_batch_heads_pipeline =
@@ -8913,6 +8916,7 @@ int ds4_gpu_init(void) {
             !g_glm_qk_lowrank_glm52_sg_pipeline ||
             !g_glm_qk_lowrank_batch_pipeline ||
             !g_glm_qk_lowrank_batch_glm52_t4_pipeline ||
+            !g_glm_qk_lowrank_batch_glm53_q8_mma_pipeline ||
             !g_glm_value_project_q8_0_pipeline ||
             !g_glm_value_project_q8_0_batch_heads_pipeline ||
             !g_glm_value_project_q8_0_batch_heads_mma_pipeline ||
@@ -10761,6 +10765,7 @@ void ds4_gpu_cleanup(void) {
         g_glm_qk_lowrank_glm52_sg_pipeline = nil;
         g_glm_qk_lowrank_batch_pipeline = nil;
         g_glm_qk_lowrank_batch_glm52_t4_pipeline = nil;
+        g_glm_qk_lowrank_batch_glm53_q8_mma_pipeline = nil;
         g_glm_value_project_q8_0_pipeline = nil;
         g_glm_value_project_q8_0_batch_heads_pipeline = nil;
         g_glm_value_project_q8_0_batch_heads_mma_pipeline = nil;
@@ -36243,7 +36248,34 @@ int ds4_gpu_glm_qk_lowrank_typed_batch_tensor(
             qk_dim == 256u &&
             row_bytes == 204u &&
             weight_type == DS4_METAL_TENSOR_Q8_0;
+        /* GLM-5.3 keeps K_b in Q8_0 even in the Q2/Q4K checkpoints. Reuse
+         * each dequantized tile across 32 prompt rows only on the measured M5
+         * shape; the scalar-row kernel remains the universal fallback. */
+        const int use_glm53_q8_mma =
+            ds4_gpu_device_is_m5_apple_silicon() &&
+            ds4_gpu_mpp_available() &&
+            getenv("DS4_METAL_DISABLE_M5_GLM53_QKLOW_MMA") == NULL &&
+            n_tokens >= 32u &&
+            n_head == 64u &&
+            kv_lora_dim == 512u &&
+            qk_nope == 256u &&
+            qk_dim == 256u &&
+            row_bytes == 272u &&
+            weight_type == DS4_METAL_TENSOR_Q8_0;
+        if (getenv("DS4_METAL_GLM_QKLOW_DEBUG")) {
+            static int printed_batch = 0;
+            if (!printed_batch) {
+                printed_batch = 1;
+                fprintf(stderr, "ds4: qk_lowrank batch path: glm52_t4=%d glm53_q8_mma=%d tokens=%u n_head=%u kv=%u nope=%u dim=%u rb=%llu type=%u\n",
+                        use_glm52_t4, use_glm53_q8_mma,
+                        n_tokens, n_head, kv_lora_dim, qk_nope, qk_dim,
+                        (unsigned long long)row_bytes, weight_type);
+            }
+        }
         id<MTLComputePipelineState> pipeline =
+            use_glm53_q8_mma ?
+                ds4_gpu_hot_pipeline(g_glm_qk_lowrank_batch_glm53_q8_mma_pipeline,
+                                     "kernel_glm_qk_lowrank_q8_0_batch_mma") :
             use_glm52_t4 ?
                 ds4_gpu_hot_pipeline(g_glm_qk_lowrank_batch_glm52_t4_pipeline,
                                      "kernel_glm_qk_lowrank_q8_0_batch_glm52_t4") :
@@ -36275,7 +36307,14 @@ int ds4_gpu_glm_qk_lowrank_typed_batch_tensor(
         [enc setBuffer:weightbuf offset:(NSUInteger)weight_inner atIndex:1];
         [enc setBuffer:qbuf offset:ds4_gpu_tensor_offset(q) atIndex:2];
         [enc setBuffer:outbuf offset:ds4_gpu_tensor_offset(qk_low) atIndex:3];
-        if (use_glm52_t4) {
+        if (use_glm53_q8_mma) {
+            [enc setThreadgroupMemoryLength:12288u atIndex:0];
+            const NSUInteger token_tile = 32u;
+            [enc dispatchThreadgroups:MTLSizeMake(((NSUInteger)n_tokens + token_tile - 1u) / token_tile,
+                                                  ((NSUInteger)kv_lora_dim + 63u) / 64u,
+                                                  (NSUInteger)head_count)
+                 threadsPerThreadgroup:MTLSizeMake(128u, 1, 1)];
+        } else if (use_glm52_t4) {
             [enc setThreadgroupMemoryLength:4u * 192u * sizeof(float) atIndex:0];
             [enc dispatchThreadgroups:MTLSizeMake((NSUInteger)head_count,
                                                   ((NSUInteger)n_tokens + 3u) / 4u,

@@ -370,6 +370,25 @@ prompt processed as two 4K waves. All 76 measured outputs (11,770,880 logits)
 were bit-identical. Forced crossover tests measured -15.31% at 512 tokens and
 +0.11% at 2K, which is why the default begins only at a full 4096-row wave.
 
+M5 GLM-5.3 Q8_0 QK-low prefill also uses a 64-output by 32-token full-F32 MMA
+tile. It reuses each dequantized K_b tile across 32 prompt rows and is selected
+only for the exact 64-head, 512-wide latent, 256-wide QK-low shape at 32 or
+more tokens. Compare it with its same-binary rollback using:
+
+```
+./speed-bench/metal_prefill_variant_bench \
+  -m gguf/GLM-5.3-Flash-Q2-Q4K-Attention-SharedDownQ4K.gguf \
+  --prompt-file ds4.c --prefix-tokens 4096 --warmup-tokens 256 \
+  --repeats 2 \
+  --candidate-env DS4_METAL_DISABLE_M5_GLM53_QKLOW_MMA
+```
+
+Final-source M5 Max results were 603.68 tok/s for the optimized default versus
+555.81 tok/s for rollback (+8.61%) at 4K, with 1,239,040 logits bit-identical.
+Layer profiling reduced QK-low from 58.252 ms to 6.070 ms (9.60x). See
+`M5-GLM53-QKLOW-MMA-PREFILL.md` for the context/workload matrix and rejected
+attention experiments.
+
 For long-context tail work, `--base-tokens` evaluates the expensive shared
 prefix once, saves an in-memory session snapshot, and restores that identical
 state before every alternating run. `--prefix-tokens` is then the timed suffix,

@@ -2513,6 +2513,167 @@ kernel void kernel_glm_qk_lowrank_q8_0_batch(
     }
 }
 
+/* GLM 5.3 prefill QK-low projection.  The generic batch kernel assigns one
+ * workgroup to each (head, token) pair, so every prompt token rereads and
+ * dequantizes the same Q8_0 K_b matrix.  This full-F32 MMA tile dequantizes a
+ * 64x32 weight tile once and reuses it across 32 tokens.  Full-F32 staging is
+ * intentional: unlike a half tile, it preserves the original full-vocabulary
+ * logits bit-for-bit on the M5 path. */
+kernel void kernel_glm_qk_lowrank_q8_0_batch_mma(
+        constant ds4_metal_args_glm_qk_lowrank_batch & args,
+        device const char *weight,
+        device const char *q,
+        device char *qk_low,
+        threadgroup char *shmem [[threadgroup(0)]],
+        uint3 tgpig [[threadgroup_position_in_grid]],
+        ushort tid [[thread_index_in_threadgroup]],
+        ushort sg [[simdgroup_index_in_threadgroup]]) {
+    constexpr uint NR0 = 64u;
+    constexpr uint NR1 = 32u;
+    constexpr uint NK = 32u;
+    constexpr uint NL0 = 2u;
+    constexpr uint NL1 = 4u;
+
+    const uint token0 = tgpig.x * NR1;
+    const uint value0 = tgpig.y * NR0;
+    const uint head = tgpig.z + args.head_base;
+    if (head >= args.n_head || token0 >= args.n_tokens ||
+        value0 >= args.kv_lora_dim ||
+        args.n_head != 64u || args.kv_lora_dim != 512u ||
+        args.qk_nope != 256u || args.qk_dim != 256u ||
+        args.row_bytes != 272u || args.weight_type != DS4_METAL_GGUF_Q8_0) {
+        return;
+    }
+
+    threadgroup float *sa = (threadgroup float *)shmem;
+    threadgroup float *sb = (threadgroup float *)(shmem + 8192u);
+
+    const uint nr0 = min(NR0, args.kv_lora_dim - value0);
+    const uint nr1 = min((uint)NR1, args.n_tokens - token0);
+    const uint lr0 = min((uint)tid / NL0, nr0 - 1u);
+    const uint lr1 = min((uint)tid / NL1, nr1 - 1u);
+    const uint il0 = (uint)tid & 1u;
+    const uint iy = 8u * ((uint)tid & (NL1 - 1u));
+
+    const uint64_t q_token_stride =
+        (uint64_t)args.n_head * args.qk_dim * sizeof(float);
+    const uint64_t low_token_stride =
+        (uint64_t)args.n_head * args.kv_lora_dim * sizeof(float);
+    const uint64_t head_q_base =
+        (uint64_t)head * args.qk_dim * sizeof(float);
+    const uint64_t head_out_base =
+        (uint64_t)head * args.kv_lora_dim * sizeof(float);
+
+    simdgroup_float8x8 ma[4];
+    simdgroup_float8x8 mb[2];
+    simdgroup_float8x8 mc[8];
+    for (uint i = 0; i < 8u; i++) {
+        mc[i] = make_filled_simdgroup_matrix<float, 8>(0.0f);
+    }
+
+    for (uint loop_k = 0; loop_k < args.qk_nope; loop_k += NK) {
+        const uint value = value0 + lr0;
+        device const char *row =
+            weight + ((uint64_t)head * args.kv_lora_dim + value) * args.row_bytes;
+        device const char *block_base = row + (uint64_t)(loop_k >> 5u) * 34u;
+        const float d = (float)(*((device const half *)block_base));
+        device const int8_t *qs = (device const int8_t *)(block_base + 2u);
+
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+
+        for (uint i = 0; i < 16u; i++) {
+            const uint sx = 2u * il0 + i / 8u;
+            const uint sy = ((uint)tid / NL0) / 8u;
+            const uint lx = ((uint)tid / NL0) & 7u;
+            const uint ly = i & 7u;
+            const uint ib = 8u * sx + sy;
+            const float v = value < args.kv_lora_dim ?
+                d * (float)qs[16u * il0 + i] : 0.0f;
+            *(sa + 64u * ib + 8u * ly + lx) = v;
+        }
+
+        const uint token = token0 + lr1;
+        device const float *y =
+            (device const float *)(q +
+                (uint64_t)token * q_token_stride +
+                head_q_base +
+                (uint64_t)(loop_k + iy) * sizeof(float));
+        for (uint i = 0; i < 8u; i++) {
+            const uint k = loop_k + iy + i;
+            const uint sx = (uint)tid & (NL1 - 1u);
+            const uint sy = ((uint)tid / NL1) / 8u;
+            const uint lx = i;
+            const uint ly = ((uint)tid / NL1) & 7u;
+            const uint ib = 4u * sx + sy;
+            const float v = (token < args.n_tokens && k < args.qk_nope) ?
+                y[i] : 0.0f;
+            *(sb + 64u * ib + 8u * ly + lx) = v;
+        }
+
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        threadgroup const float *lsma = sa + 4u * 64u * ((uint)sg & 1u);
+        threadgroup const float *lsmb = sb + 2u * 64u * ((uint)sg >> 1);
+        for (uint ik = 0; ik < NK / 8u; ik++) {
+            simdgroup_barrier(mem_flags::mem_none);
+            for (uint i = 0; i < 4u; i++) {
+                simdgroup_load(ma[i], lsma + 64u * i, 8u, 0, false);
+            }
+            simdgroup_barrier(mem_flags::mem_none);
+            for (uint i = 0; i < 2u; i++) {
+                simdgroup_load(mb[i], lsmb + 64u * i, 8u, 0, false);
+            }
+            simdgroup_barrier(mem_flags::mem_none);
+            for (uint i = 0; i < 8u; i++) {
+                simdgroup_multiply_accumulate(mc[i], mb[i / 4u], ma[i & 3u], mc[i]);
+            }
+            lsma += 8u * 64u;
+            lsmb += 4u * 64u;
+        }
+    }
+
+    if (nr0 == NR0 && nr1 == NR1) {
+        device float *dst =
+            (device float *)(qk_low +
+                (uint64_t)(token0 + 16u * ((uint)sg >> 1)) * low_token_stride +
+                head_out_base +
+                (uint64_t)(value0 + 32u * ((uint)sg & 1u)) * sizeof(float));
+        for (uint i = 0; i < 8u; i++) {
+            simdgroup_store(mc[i],
+                            dst + 8u * (i & 3u) +
+                                  8u * (low_token_stride / sizeof(float)) * (i / 4u),
+                            low_token_stride / sizeof(float),
+                            0,
+                            false);
+        }
+    } else {
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        threadgroup float *tmp = (threadgroup float *)shmem;
+        for (uint i = 0; i < 8u; i++) {
+            simdgroup_store(mc[i],
+                            tmp + 32u * ((uint)sg & 1u) +
+                                  16u * ((uint)sg >> 1) * NR0 +
+                                  8u * (i & 3u) + 8u * NR0 * (i / 4u),
+                            NR0,
+                            0,
+                            false);
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        if (sg == 0) {
+            for (uint t = tid; t < nr1; t += 32u) {
+                device float *dst =
+                    (device float *)(qk_low +
+                        (uint64_t)(token0 + t) * low_token_stride +
+                        head_out_base +
+                        (uint64_t)value0 * sizeof(float));
+                threadgroup const float *src = tmp + t * NR0;
+                for (uint v = 0; v < nr0; v++) {
+                    dst[v] = src[v];
+                }
+            }
+        }
+    }
+}
+
 kernel void kernel_glm_qk_lowrank_q8_0_batch_glm52_t4(
         constant ds4_metal_args_glm_qk_lowrank_batch & args,
         device const char *weight,
