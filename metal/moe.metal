@@ -8246,6 +8246,7 @@ template [[host_name("kernel_mul_mm_id_map0_ne20_8" )]] kernel kernel_mul_mm_id_
 template [[host_name("kernel_mul_mm_id_map0_ne20_10")]] kernel kernel_mul_mm_id_map0_t kernel_mul_mm_id_map0<10, 32>;
 template [[host_name("kernel_mul_mm_id_map0_ne20_16")]] kernel kernel_mul_mm_id_map0_t kernel_mul_mm_id_map0<16, 32>;
 template [[host_name("kernel_mul_mm_id_map0_ne20_22")]] kernel kernel_mul_mm_id_map0_t kernel_mul_mm_id_map0<22, 32>;
+template [[host_name("kernel_mul_mm_id_map0_ne20_6_n64")]] kernel kernel_mul_mm_id_map0_n64_t kernel_mul_mm_id_map0<6, 64>;
 template [[host_name("kernel_mul_mm_id_map0_ne20_8_n64")]] kernel kernel_mul_mm_id_map0_n64_t kernel_mul_mm_id_map0<8, 64>;
 
 // Token-centric map builder for the common six-route MXFP4 prefill shape.
@@ -9823,10 +9824,239 @@ kernel void kernel_mul_mm_id_mpp_split16(
     }
 }
 
+// N64 extension of split16. Each two-SIMDgroup pair owns two independent
+// 16-row accumulators. Both row banks reuse the same dequantized expert-weight
+// tile, while A and the complete 64-row B tile remain double-buffered. This
+// trades accumulator registers for half as many work items and half as many
+// IQ2/Q2 weight dequantizations once prefill supplies enough expert rows.
+template<typename S0, typename S0_4x4, typename S0_8x8, typename S1, typename S1_2x4, typename S1_8x8, typename block_q, short nl, void (*dequantize_func)(device const block_q *, short, thread S0_4x4 &), typename T0, typename T0_4x4, typename T1, typename T1_2x4>
+kernel void kernel_mul_mm_id_mpp_split16_n64(
+        constant ds4_metal_args_mul_mm_id & args,
+        device const char * src0,
+        device const char * src1,
+        device const char * htpe,
+        device const char * hids,
+        device       char * dst,
+        device const char * work,
+        threadgroup  char * shmem [[threadgroup(0)]],
+        uint3  tgpig[[threadgroup_position_in_grid]],
+        ushort tiitg[[thread_index_in_threadgroup]],
+        ushort tiisg[[thread_index_in_simdgroup]],
+        ushort sgitg[[simdgroup_index_in_threadgroup]]) {
+    threadgroup S0 * sa = (threadgroup S0 *)(shmem);
+    threadgroup S1 * sb = (threadgroup S1 *)(shmem + 8192);
+    threadgroup float *sc = (threadgroup float *)shmem;
+
+    constexpr int NR0 = 64;
+    constexpr int NR1 = 64;
+    constexpr int NK  = 32;
+    constexpr int NL0 = NK/16;
+    constexpr int NL1 = NK/8;
+
+    device const uint32_t *work_count = (device const uint32_t *)work;
+    const uint32_t work_index = tgpig.x;
+    if (work_index >= work_count[0]) {
+        return;
+    }
+    device const uint2 *work_items = (device const uint2 *)(work + 8);
+    const uint2 item = work_items[work_index];
+    const int im = (int)item.x;
+    const int r0 = tgpig.y*NR0;
+    const int r1 = (int)item.y;
+
+    device const uint32_t * tpe_u32 = (device const uint32_t *) (htpe);
+    device const int32_t  * ids_i32 = (device const int32_t  *) (hids);
+
+    const int32_t neh1 = tpe_u32[im];
+
+    if (r1 >= neh1) {
+        return;
+    }
+
+    const short nr0 = (args.ne0 - r0 < NR0) ? (args.ne0 - r0) : NR0;
+    const short nr1 = (    neh1 - r1 < NR1) ? (    neh1 - r1) : NR1;
+
+    const short h = sgitg/2;
+    const bool mma_active0 = 16*h < nr1;
+    const bool mma_active1 = 32 + 16*h < nr1;
+
+    if (!ds4_tp_owns_expert(im, args.ne02, args.tp_rank, args.tp_world)) {
+        for (short j = sgitg; j < nr1; j += 4) {
+            const int idj = ids_i32[im*args.ne21 + r1 + j];
+            const short ide = idj % args.ne20;
+            const short idt = idj / args.ne20;
+            device float *D = (device float *)dst + r0 + ide*args.ne0 +
+                              idt*args.ne1*args.ne0;
+            for (int i = tiisg; i < nr0; i += 32) D[i] = 0.0f;
+        }
+        return;
+    }
+
+    const short lr0 = ((short)tiitg/NL0) < nr0 ? ((short)tiitg/NL0) : nr0 - 1;
+    const short row_b = (short)tiitg/NL1;
+    const short il0 = (tiitg % NL0);
+
+    device const T1 * y_rows[2];
+    #pragma unroll
+    for (short b = 0; b < 2; ++b) {
+        const short row = row_b + 32*b;
+        const short lr1 = row < nr1 ? row : nr1 - 1;
+        const int id = ids_i32[im*args.ne21 + r1 + lr1];
+        const short i11 = (id % args.ne20) % args.ne11;
+        const short i12 = id / args.ne20;
+        y_rows[b] = (device const T1 *)(src1
+            + args.nb13*0
+            + args.nb12*i12
+            + args.nb11*i11
+            + args.nb10*(8*(tiitg % NL1)));
+    }
+
+    const uint64_t offset0 =
+        (uint64_t)(im - args.tp_expert_base)*args.nb02;
+    const short offset1 = il0/nl;
+    device const block_q * x_base =
+        (device const block_q *)(src0 + args.nb01*(r0 + lr0) + offset0) + offset1;
+
+    auto tA0 = tensor(sa, dextents<int32_t, 2>(NK, NR0));
+    auto tA1 = tensor(sa + NR0*NK, dextents<int32_t, 2>(NK, NR0));
+    auto tB00 = tensor(sb + h*16*NK, dextents<int32_t, 2>(NK, 16));
+    auto tB01 = tensor(sb + 32*NK + h*16*NK, dextents<int32_t, 2>(NK, 16));
+    auto tB10 = tensor(sb + NR1*NK + h*16*NK, dextents<int32_t, 2>(NK, 16));
+    auto tB11 = tensor(sb + NR1*NK + 32*NK + h*16*NK, dextents<int32_t, 2>(NK, 16));
+
+    matmul2d<
+        matmul2d_descriptor(16, NR0, NK, false, true, false,
+            matmul2d_descriptor::mode::multiply_accumulate),
+        execution_simdgroups<2>> mm;
+
+    auto cT0 = mm.template get_destination_cooperative_tensor<decltype(tB00), decltype(tA0), float>();
+    auto cT1 = mm.template get_destination_cooperative_tensor<decltype(tB01), decltype(tA0), float>();
+
+    if (mma_active0) {
+        #pragma unroll
+        for (uint16_t i = 0; i < cT0.get_capacity(); ++i) {
+            if (cT0.is_valid_element(i)) cT0[i] = 0.0f;
+        }
+    }
+    if (mma_active1) {
+        #pragma unroll
+        for (uint16_t i = 0; i < cT1.get_capacity(); ++i) {
+            if (cT1.is_valid_element(i)) cT1[i] = 0.0f;
+        }
+    }
+
+    auto stage_tile = [&](const int loop_k,
+                          threadgroup S0 * sa_buf,
+                          threadgroup S1 * sb_buf) {
+        const int chunk = loop_k / 16 + il0;
+        const short il = (short)(chunk % nl);
+        device const block_q * xb = x_base + (chunk / nl);
+
+        if (is_same<T0_4x4, block_q>::value && FC_mul_mm_bc_inp) {
+            for (short i = 0; i < 16; i++) {
+                const short sx = 2*il0 + i/8;
+                const short sy = (tiitg/NL0)/8;
+                const short lx = i%8;
+                const short ly = (tiitg/NL0)%8;
+                *(sa_buf + NK*(8*sy + ly) + 8*sx + lx) =
+                    loop_k + 16*il + i < args.ne00 ? *((device T0 *) xb + i) : 0;
+            }
+        } else {
+            S0_4x4 temp_a;
+            dequantize_func(xb, il, temp_a);
+            FOR_UNROLL (short i = 0; i < 16; i++) {
+                const short sx = 2*il0 + i/8;
+                const short sy = (tiitg/NL0)/8;
+                const short lx = i%8;
+                const short ly = (tiitg/NL0)%8;
+                *(sa_buf + NK*(8*sy + ly) + 8*sx + lx) = temp_a[i/4][i%4];
+            }
+        }
+
+        #pragma unroll
+        for (short b = 0; b < 2; ++b) {
+            device const T1 * yb = y_rows[b] + loop_k;
+            if (FC_mul_mm_bc_inp) {
+                for (short i = 0; i < 8; ++i) {
+                    const short sx = tiitg%NL1;
+                    const short sy = (tiitg/NL1)/8 + 4*b;
+                    const short lx = i;
+                    const short ly = (tiitg/NL1)%8;
+                    *(sb_buf + NK*(8*sy + ly) + 8*sx + lx) =
+                        loop_k + 8*(tiitg % NL1) + i < args.ne00 ?
+                            (S1)(*((device T1 *)yb + i)) : 0;
+                }
+            } else {
+                const short sx = tiitg%NL1;
+                const short sy = (tiitg/NL1)/8 + 4*b;
+                const short ly = (tiitg/NL1)%8;
+                *(threadgroup S1_2x4 *)(sb_buf + NK*(8*sy + ly) + 8*sx) =
+                    (S1_2x4)(*((device T1_2x4 *)yb));
+            }
+        }
+    };
+
+    stage_tile(0, sa, sb);
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    uint buf_sel = 0;
+    for (int loop_k = 0; loop_k < args.ne00; loop_k += NK) {
+        auto sA = (buf_sel ? tA1 : tA0).slice(0, 0);
+        if (mma_active0) {
+            auto sB0 = (buf_sel ? tB10 : tB00).slice(0, 0);
+            mm.run(sB0, sA, cT0);
+        }
+        if (mma_active1) {
+            auto sB1 = (buf_sel ? tB11 : tB01).slice(0, 0);
+            mm.run(sB1, sA, cT1);
+        }
+
+        const int next_k = loop_k + NK;
+        if (next_k < args.ne00) {
+            buf_sel ^= 1u;
+            stage_tile(next_k,
+                       buf_sel ? (sa + NR0*NK) : sa,
+                       buf_sel ? (sb + NR1*NK) : sb);
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    if (mma_active0) {
+        auto tC0 = tensor(sc + h*16*NR0, dextents<int32_t, 2>(NR0, 16));
+        cT0.store(tC0);
+    }
+    if (mma_active1) {
+        auto tC1 = tensor(sc + (32 + h*16)*NR0, dextents<int32_t, 2>(NR0, 16));
+        cT1.store(tC1);
+    }
+
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+
+    for (short j = tiitg/32; j < nr1; j += 4) {
+        const int idj = ids_i32[im*args.ne21 + r1 + j];
+        const short ide = idj % args.ne20;
+        const short idt = idj / args.ne20;
+        device float *D = (device float *)dst + r0 + ide*args.ne0 +
+                          idt*args.ne1*args.ne0;
+        device float4 *D4 = (device float4 *)D;
+        threadgroup float *C = sc + j*NR0;
+        threadgroup float4 *C4 = (threadgroup float4 *)C;
+
+        int i = tiisg;
+        for (; i < nr0/4; i += 32) *(D4 + i) = *(C4 + i);
+        i = 4*(nr0/4) + tiisg;
+        for (; i < nr0; i += 32) *(D + i) = *(C + i);
+    }
+}
+
 
 
 typedef decltype(kernel_mul_mm_id_mpp_split16<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_q2_K, QK_NL, dequantize_q2_K, float, float4x4, float, float2x4>) mul_mm_id_mpp_split16_t;
 typedef decltype(kernel_mul_mm_id_mpp_split16<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_q2_K, QK_NL, dequantize_q2_K, half, half4x4, half, half2x4>) mul_mm_id_mpp_split16_f16_rhs_t;
+typedef decltype(kernel_mul_mm_id_mpp_split16_n64<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_q2_K, QK_NL, dequantize_q2_K, float, float4x4, float, float2x4>) mul_mm_id_mpp_split16_n64_t;
+typedef decltype(kernel_mul_mm_id_mpp_split16_n64<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_q2_K, QK_NL, dequantize_q2_K, half, half4x4, half, half2x4>) mul_mm_id_mpp_split16_n64_f16_rhs_t;
 typedef decltype(kernel_mul_mm_id_mpp<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_q2_K, QK_NL, dequantize_q2_K, float, float4x4, float, float2x4, 32>) mul_mm_id_mpp_t;
 typedef decltype(kernel_mul_mm_id_mpp<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_q2_K, QK_NL, dequantize_q2_K, half, half4x4, half, half2x4, 32>) mul_mm_id_mpp_f16_rhs_t;
 typedef decltype(kernel_mul_mm_id_mpp<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_q2_K, QK_NL, dequantize_q2_K, float, float4x4, float, float2x4, 64>) mul_mm_id_mpp_n64_t;
@@ -9835,6 +10065,10 @@ typedef decltype(kernel_mul_mm_id_mpp<half, half4x4, simdgroup_half8x8, half, ha
 template [[host_name("kernel_mul_mm_id_iq2_xxs_f32_mpp_split16")]] kernel mul_mm_id_mpp_split16_t kernel_mul_mm_id_mpp_split16<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_iq2_xxs, QK_NL, dequantize_iq2_xxs_half_lut, float, float4x4, float, float2x4>;
 template [[host_name("kernel_mul_mm_id_q2_K_f16_mpp_split16")]]    kernel mul_mm_id_mpp_split16_f16_rhs_t kernel_mul_mm_id_mpp_split16<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_q2_K, QK_NL, dequantize_q2_K, half, half4x4, half, half2x4>;
 template [[host_name("kernel_mul_mm_id_iq2_xxs_f16_mpp_split16")]] kernel mul_mm_id_mpp_split16_f16_rhs_t kernel_mul_mm_id_mpp_split16<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_iq2_xxs, QK_NL, dequantize_iq2_xxs_half_lut, half, half4x4, half, half2x4>;
+
+template [[host_name("kernel_mul_mm_id_iq2_xxs_f32_mpp_split16_n64")]] kernel mul_mm_id_mpp_split16_n64_t kernel_mul_mm_id_mpp_split16_n64<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_iq2_xxs, QK_NL, dequantize_iq2_xxs_half_lut, float, float4x4, float, float2x4>;
+template [[host_name("kernel_mul_mm_id_q2_K_f16_mpp_split16_n64")]] kernel mul_mm_id_mpp_split16_n64_f16_rhs_t kernel_mul_mm_id_mpp_split16_n64<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_q2_K, QK_NL, dequantize_q2_K, half, half4x4, half, half2x4>;
+template [[host_name("kernel_mul_mm_id_iq2_xxs_f16_mpp_split16_n64")]] kernel mul_mm_id_mpp_split16_n64_f16_rhs_t kernel_mul_mm_id_mpp_split16_n64<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_iq2_xxs, QK_NL, dequantize_iq2_xxs_half_lut, half, half4x4, half, half2x4>;
 
 template [[host_name("kernel_mul_mm_id_iq2_xxs_f32_mpp")]] kernel mul_mm_id_mpp_t kernel_mul_mm_id_mpp<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_iq2_xxs, QK_NL, dequantize_iq2_xxs, float, float4x4, float, float2x4, 32>;
 template [[host_name("kernel_mul_mm_id_q2_K_f16_mpp")]]    kernel mul_mm_id_mpp_f16_rhs_t kernel_mul_mm_id_mpp<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_q2_K, QK_NL, dequantize_q2_K, half, half4x4, half, half2x4, 32>;

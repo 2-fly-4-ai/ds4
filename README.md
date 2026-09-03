@@ -1150,6 +1150,15 @@ about 2.8 GiB more prefill workspace with the Q2/Q4K resident model, and was
 accepted only after balanced full-vocabulary and 64-step decode-logit checks
 were bit-exact.
 
+Resident M5 prefill with IQ2_XXS gate/up experts and Q2_K or IQ2_XXS down
+experts uses a split cooperative routed-MoE kernel. Batches below 1024 rows use
+the 32-row specialization. At 1024 rows and above, a 64-row specialization
+reuses each dequantized expert-weight tile across two row banks. Set
+`DS4_METAL_DISABLE_M5_IQ2_SPLIT_MPP_N64=1` to keep the 32-row specialization
+at all prefill sizes, or `DS4_METAL_DISABLE_M5_IQ2_SPLIT_MPP=1` to restore the
+older pre-split routed-MoE path. SSD streaming, tensor parallelism, quality
+mode, non-M5 devices, and other quant layouts retain their existing kernels.
+
 Chunked Metal prefill reuses the same range-capable layer-major graph for each
 chunk, preserving absolute compressor/indexer boundaries while avoiding the old
 per-layer chunk dispatch path.

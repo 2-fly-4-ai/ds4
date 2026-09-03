@@ -43298,14 +43298,40 @@ int ds4_gpu_routed_moe_batch_tensor(
             g_tp_split_world == 1 &&
             getenv("DS4_METAL_DISABLE_M5_GLM_MOE_MPP_N64") == NULL &&
             getenv("DS4_METAL_GRAPH_DUMP_PREFIX") == NULL;
+        /* At 1K+ rows, reuse each staged expert-weight tile across two
+         * independent 16-row accumulators per cooperative pair. Balanced M5
+         * full-model tests put the crossover above 512 and at or below 1024
+         * rows for both top-6 DeepSeek and top-8 GLM routing. Keep split-N32
+         * below that point, where the second N64 row bank is usually sparse.
+         * The two switches allow a force-below-threshold diagnostic and an
+         * N64-only same-binary rollback without disabling split-N32. */
+        const bool force_m5_iq2_split_mpp_n64 =
+            getenv("DS4_METAL_ENABLE_M5_IQ2_SPLIT_MPP_N64") != NULL;
+        const bool disable_m5_iq2_split_mpp_n64 =
+            getenv("DS4_METAL_DISABLE_M5_IQ2_SPLIT_MPP_N64") != NULL;
+        const bool use_m5_iq2_split_mpp_n64 =
+            use_mm_id &&
+            !use_m5_glm_mpp_n64 &&
+            ds4_gpu_device_is_m5_apple_silicon() &&
+            (n_expert == 6u || n_expert == 8u) &&
+            n_tokens >= (force_m5_iq2_split_mpp_n64 ? 64u : 1024u) &&
+            gate_type == DS4_METAL_TENSOR_IQ2_XXS &&
+            (down_type == DS4_METAL_TENSOR_Q2_K ||
+             down_type == DS4_METAL_TENSOR_IQ2_XXS) &&
+            request_mid_f16 &&
+            !g_ssd_streaming_mode &&
+            g_tp_split_world == 1 &&
+            ds4_gpu_routed_mm_mpp_mask() != 0 &&
+            !disable_m5_iq2_split_mpp_n64 &&
+            getenv("DS4_METAL_DISABLE_M5_IQ2_SPLIT_MPP") == NULL &&
+            getenv("DS4_METAL_GRAPH_DUMP_PREFIX") == NULL;
         /* PR #864's cooperative split-16 tile is useful for the established
-         * N32 IQ2/Q2 routed-MoE path, but it is not a replacement for GLM's
-         * larger N64 specialization. Keep both in the same metallib so the
-         * environment switch below is a true same-binary rollback: the old
-         * N32 kernel also keeps its original IQ2 dequantization arithmetic. */
+         * N32 IQ2/Q2 routed-MoE path. Keep it and both older kernels in the
+         * same metallib so rollback comparisons use an identical executable. */
         const bool use_m5_iq2_split_mpp =
             use_mm_id &&
             !use_m5_glm_mpp_n64 &&
+            !use_m5_iq2_split_mpp_n64 &&
             ds4_gpu_device_is_m5_apple_silicon() &&
             n_tokens >= 32u &&
             gate_type == DS4_METAL_TENSOR_IQ2_XXS &&
@@ -43318,9 +43344,10 @@ int ds4_gpu_routed_moe_batch_tensor(
             getenv("DS4_METAL_DISABLE_M5_IQ2_SPLIT_MPP") == NULL &&
             getenv("DS4_METAL_GRAPH_DUMP_PREFIX") == NULL;
         const NSUInteger routed_mpp_smem =
-            use_m5_glm_mpp_n64 ? 16384u :
+            (use_m5_glm_mpp_n64 || use_m5_iq2_split_mpp_n64) ? 16384u :
             use_m5_iq2_split_mpp ? 12288u : 8192u;
-        const uint32_t routed_mpp_rows = use_m5_glm_mpp_n64 ? 64u : 32u;
+        const uint32_t routed_mpp_rows =
+            (use_m5_glm_mpp_n64 || use_m5_iq2_split_mpp_n64) ? 64u : 32u;
         /* The established resident MXFP4 specializations were originally
          * promoted only for >=2K-token prefills. Extend the same exact kernels
          * to the 32..2047 range behind one aggregate rollback so the sparse
@@ -43434,8 +43461,11 @@ int ds4_gpu_routed_moe_batch_tensor(
             down_mm_args.tp_expert_base = tp_expert_base_host;
 
             map_pipeline = ds4_gpu_get_pipeline(
-                use_m5_glm_mpp_n64 ?
-                    "kernel_mul_mm_id_map0_ne20_8_n64" :
+                use_m5_iq2_split_mpp_n64 ?
+                    (n_expert == 8u ?
+                        "kernel_mul_mm_id_map0_ne20_8_n64" :
+                        "kernel_mul_mm_id_map0_ne20_6_n64") :
+                use_m5_glm_mpp_n64 ? "kernel_mul_mm_id_map0_ne20_8_n64" :
                 use_mxfp4_mm_id_map_scatter ?
                     "kernel_mul_mm_id_map_scatter_work_ne20_6" :
                     ds4_gpu_mul_mm_id_map0_name(n_expert));
@@ -43459,6 +43489,8 @@ int ds4_gpu_routed_moe_batch_tensor(
                     ds4_gpu_get_mul_mm_id_pipeline(
                         use_m5_glm_mpp_n64 ?
                             "kernel_mul_mm_id_iq2_xxs_f32_mpp_n64" :
+                        use_m5_iq2_split_mpp_n64 ?
+                            "kernel_mul_mm_id_iq2_xxs_f32_mpp_split16_n64" :
                         use_m5_iq2_split_mpp ?
                             "kernel_mul_mm_id_iq2_xxs_f32_mpp_split16" :
                             "kernel_mul_mm_id_iq2_xxs_f32_mpp", false);
@@ -43473,10 +43505,14 @@ int ds4_gpu_routed_moe_batch_tensor(
                     down_type == DS4_METAL_TENSOR_Q2_K ?
                         (use_m5_glm_mpp_n64 ?
                             "kernel_mul_mm_id_q2_K_f16_mpp_n64" :
+                         use_m5_iq2_split_mpp_n64 ?
+                            "kernel_mul_mm_id_q2_K_f16_mpp_split16_n64" :
                          use_m5_iq2_split_mpp ?
                             "kernel_mul_mm_id_q2_K_f16_mpp_split16" :
                             "kernel_mul_mm_id_q2_K_f16_mpp") :
-                        (use_m5_iq2_split_mpp ?
+                        (use_m5_iq2_split_mpp_n64 ?
+                            "kernel_mul_mm_id_iq2_xxs_f16_mpp_split16_n64" :
+                         use_m5_iq2_split_mpp ?
                             "kernel_mul_mm_id_iq2_xxs_f16_mpp_split16" :
                             "kernel_mul_mm_id_iq2_xxs_f16_mpp"), false);
                 if (mpp) down_mm_pipeline = mpp;
@@ -43718,6 +43754,7 @@ int ds4_gpu_routed_moe_batch_tensor(
             use_iq2_batch_selected_addr ? "iq2_batch_stream_addr" :
             use_mm_id_pair_swiglu ? "mm_id_pair_swiglu" :
             use_m5_glm_mpp_n64 ? "mm_id_mpp_n64" :
+            use_m5_iq2_split_mpp_n64 ? "mm_id_mpp_split16_n64" :
             use_m5_iq2_split_mpp ? "mm_id_mpp_split16" :
             use_mm_id ? "mm_id" :
             use_tiny_pair_swiglu ? "tiny_pair_swiglu" :
