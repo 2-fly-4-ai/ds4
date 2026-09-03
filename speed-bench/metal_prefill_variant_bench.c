@@ -335,6 +335,10 @@ int main(int argc, char **argv) {
     float *reference = NULL;
     float *observed = NULL;
     variant_result results[VARIANT_COUNT] = {0};
+    double base_prefill_seconds = 0.0;
+    double snapshot_save_seconds = 0.0;
+    double snapshot_restore_seconds = 0.0;
+    size_t snapshot_restore_count = 0;
     char err[256] = {0};
     bool have_reference = false;
     size_t exact_runs = 0;
@@ -402,9 +406,8 @@ int main(int argc, char **argv) {
             goto done;
         }
         err[0] = '\0';
-        if (ds4_session_sync(base_session, &base, err, sizeof(err)) != 0 ||
-            ds4_session_save_snapshot(base_session, &base_snapshot,
-                                      err, sizeof(err)) != 0) {
+        const double base_prefill_t0 = now_sec();
+        if (ds4_session_sync(base_session, &base, err, sizeof(err)) != 0) {
             fprintf(stderr,
                     "%s: failed to build base-prefix snapshot: %s\n",
                     BENCH_NAME,
@@ -412,11 +415,26 @@ int main(int argc, char **argv) {
             ds4_session_free(base_session);
             goto done;
         }
+        base_prefill_seconds = now_sec() - base_prefill_t0;
+        const double snapshot_save_t0 = now_sec();
+        if (ds4_session_save_snapshot(base_session, &base_snapshot,
+                                      err, sizeof(err)) != 0) {
+            fprintf(stderr,
+                    "%s: failed to save base-prefix snapshot: %s\n",
+                    BENCH_NAME,
+                    err[0] ? err : "unknown error");
+            ds4_session_free(base_session);
+            goto done;
+        }
+        snapshot_save_seconds = now_sec() - snapshot_save_t0;
         fprintf(stderr,
-                "%s: restored-run base snapshot tokens=%d bytes=%llu\n",
+                "%s: restored-run base snapshot tokens=%d bytes=%llu "
+                "prefill_ms=%.3f save_ms=%.3f\n",
                 BENCH_NAME,
                 cfg.base_tokens,
-                (unsigned long long)base_snapshot.len);
+                (unsigned long long)base_snapshot.len,
+                base_prefill_seconds * 1000.0,
+                snapshot_save_seconds * 1000.0);
         ds4_session_free(base_session);
     }
 
@@ -444,6 +462,7 @@ int main(int argc, char **argv) {
             }
             if (cfg.base_tokens > 0) {
                 err[0] = '\0';
+                const double snapshot_restore_t0 = now_sec();
                 if (ds4_session_load_snapshot(session, &base_snapshot,
                                               err, sizeof(err)) != 0) {
                     fprintf(stderr,
@@ -454,6 +473,8 @@ int main(int argc, char **argv) {
                     ds4_session_free(session);
                     goto done;
                 }
+                snapshot_restore_seconds += now_sec() - snapshot_restore_t0;
+                snapshot_restore_count++;
             }
 
             err[0] = '\0';
@@ -566,6 +587,16 @@ int main(int argc, char **argv) {
                exact_runs,
                exact_runs * (size_t)vocab,
                vocab);
+    }
+    if (snapshot_restore_count > 0) {
+        printf("snapshot_timing base_prefill_ms=%.3f save_ms=%.3f restore_avg_ms=%.3f "
+               "restores=%zu bytes=%llu\n",
+               base_prefill_seconds * 1000.0,
+               snapshot_save_seconds * 1000.0,
+               snapshot_restore_seconds * 1000.0 /
+                   (double)snapshot_restore_count,
+               snapshot_restore_count,
+               (unsigned long long)base_snapshot.len);
     }
     rc = 0;
 

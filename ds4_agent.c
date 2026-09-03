@@ -911,6 +911,45 @@ static ds4_think_mode effective_think_mode(const agent_config *cfg) {
     return ds4_think_mode_for_context(cfg->gen.think_mode, cfg->gen.ctx_size);
 }
 
+static bool agent_env_flag_enabled(const char *name, bool fallback) {
+    const char *e = getenv(name);
+    if (!e) return fallback;
+    return e[0] && e[0] != '0';
+}
+
+/* Keep the agent's generation routers aligned with the CLI and server.  The
+ * DeepSeek verifier is greedy-only; GLM additionally has exact sampled
+ * verification through temperature 1.0.  GLM thinking remains on its existing
+ * path because the sampled frontend contract deliberately excludes it.  The
+ * agent's native tool parser can consume verified blocks: it rewinds unused
+ * suffix tokens whenever parsing changes sampling mode or reaches a tool-call
+ * boundary, just as it already does for native MTP blocks. */
+static bool agent_prompt_lookup_mode_eligible(bool glm, float temperature,
+                                              ds4_think_mode think_mode) {
+    if (temperature <= 0.0f)
+        return !glm || !ds4_think_mode_enabled(think_mode);
+    if (!glm || ds4_think_mode_enabled(think_mode)) return false;
+
+    const char *sample_env = getenv("DS4_GLM_PROMPT_LOOKUP_SAMPLING");
+    if (sample_env && sample_env[0]) return sample_env[0] != '0';
+    return temperature <= 1.0f;
+}
+
+static bool agent_prompt_lookup_enabled(ds4_session *session,
+                                        ds4_engine *engine,
+                                        float temperature,
+                                        ds4_think_mode think_mode) {
+    return session && engine &&
+           agent_prompt_lookup_mode_eligible(ds4_engine_is_glm_dsa(engine),
+                                             temperature, think_mode) &&
+           ds4_engine_mtp_draft_tokens(engine) <= 1 &&
+           ds4_session_prompt_lookup_supported(session) &&
+           agent_env_flag_enabled("DS4_PROMPT_LOOKUP_HYBRID", true) &&
+           agent_env_flag_enabled("DS4_PROMPT_LOOKUP_GATE", true) &&
+           (!ds4_engine_is_glm_dsa(engine) ||
+            agent_env_flag_enabled("DS4_GLM_PROMPT_LOOKUP", true));
+}
+
 /* ============================================================================
  * System Prompt Rendering And Worker Output Queues
  * ============================================================================
@@ -7256,6 +7295,29 @@ static void test_agent_steering_command(void) {
     AGENT_TEST_ASSERT(!agent_slash_command_known("/steering"));
 }
 
+static void test_agent_prompt_lookup_mode_policy(void) {
+    unsetenv("DS4_GLM_PROMPT_LOOKUP_SAMPLING");
+    AGENT_TEST_ASSERT(agent_prompt_lookup_mode_eligible(
+        false, 0.0f, DS4_THINK_HIGH));
+    AGENT_TEST_ASSERT(!agent_prompt_lookup_mode_eligible(
+        false, 0.7f, DS4_THINK_NONE));
+    AGENT_TEST_ASSERT(agent_prompt_lookup_mode_eligible(
+        true, 0.0f, DS4_THINK_NONE));
+    AGENT_TEST_ASSERT(!agent_prompt_lookup_mode_eligible(
+        true, 0.0f, DS4_THINK_HIGH));
+    AGENT_TEST_ASSERT(agent_prompt_lookup_mode_eligible(
+        true, 0.7f, DS4_THINK_NONE));
+    AGENT_TEST_ASSERT(!agent_prompt_lookup_mode_eligible(
+        true, 1.1f, DS4_THINK_NONE));
+    setenv("DS4_GLM_PROMPT_LOOKUP_SAMPLING", "1", 1);
+    AGENT_TEST_ASSERT(agent_prompt_lookup_mode_eligible(
+        true, 1.1f, DS4_THINK_NONE));
+    setenv("DS4_GLM_PROMPT_LOOKUP_SAMPLING", "0", 1);
+    AGENT_TEST_ASSERT(!agent_prompt_lookup_mode_eligible(
+        true, 0.7f, DS4_THINK_NONE));
+    unsetenv("DS4_GLM_PROMPT_LOOKUP_SAMPLING");
+}
+
 static void test_agent_terminal_wrap_output_is_deferred(void);
 
 static void ds4_agent_unit_tests_run(void) {
@@ -7264,6 +7326,7 @@ static void ds4_agent_unit_tests_run(void) {
     test_agent_cache_rejects_impossible_lengths();
     test_agent_tp_cache_payload_rebuild_policy();
     test_agent_steering_command();
+    test_agent_prompt_lookup_mode_policy();
     test_agent_read_default_lines_follow_context();
     test_agent_glm_template_policy();
     test_agent_edit_upto_prompt_is_opt_in();
@@ -9114,6 +9177,16 @@ static int worker_run_turn(agent_worker *w, const char *user_text) {
         int room = ds4_session_ctx(w->session) - ds4_session_pos(w->session);
         if (room <= 1) max_tokens = 0;
         else if (max_tokens > room - 1) max_tokens = room - 1;
+        const bool prompt_lookup_enabled = agent_prompt_lookup_enabled(
+            w->session, w->engine, cfg->gen.temperature, think_mode);
+        agent_trace(w,
+                    "decode route tool_round=%d prompt_lookup=%s mtp_draft=%d "
+                    "temperature=%.3f think=%s",
+                    tool_round,
+                    prompt_lookup_enabled ? "on" : "off",
+                    ds4_engine_mtp_draft_tokens(w->engine),
+                    cfg->gen.temperature,
+                    ds4_think_mode_name(think_mode));
 
         bool use_color = isatty(STDOUT_FILENO) != 0;
         agent_token_renderer renderer = {
@@ -9179,6 +9252,26 @@ static int worker_run_turn(agent_worker *w, const char *user_text) {
                     greedy_sampling ? 0.0f : cfg->gen.min_p,
                     &rng, toks, (int)(sizeof(toks) / sizeof(toks[0])),
                     err, sizeof(err));
+                if (ntok < 0) {
+                    agent_dsml_parser_free(&dsml);
+                    agent_set_error(w, err);
+                    return 1;
+                }
+            } else if (prompt_lookup_enabled) {
+                const float lookup_temperature =
+                    greedy_sampling ? 0.0f : cfg->gen.temperature;
+                ntok = lookup_temperature <= 0.0f ?
+                    ds4_session_eval_prompt_lookup_argmax(
+                        w->session, token, max_tokens - generated,
+                        ds4_token_eos(w->engine), toks,
+                        (int)(sizeof(toks) / sizeof(toks[0])),
+                        err, sizeof(err)) :
+                    ds4_session_eval_prompt_lookup_sampled(
+                        w->session, token, max_tokens - generated,
+                        ds4_token_eos(w->engine), lookup_temperature, 0,
+                        cfg->gen.top_p, cfg->gen.min_p, &rng,
+                        toks, (int)(sizeof(toks) / sizeof(toks[0])),
+                        err, sizeof(err));
                 if (ntok < 0) {
                     agent_dsml_parser_free(&dsml);
                     agent_set_error(w, err);
@@ -9464,6 +9557,14 @@ static int worker_run_raw_prompt(agent_worker *w, const char *user_text) {
     int room = ds4_session_ctx(w->session) - ds4_session_pos(w->session);
     if (room <= 1) max_tokens = 0;
     else if (max_tokens > room - 1) max_tokens = room - 1;
+    const bool prompt_lookup_enabled = agent_prompt_lookup_enabled(
+        w->session, w->engine, cfg->gen.temperature, DS4_THINK_NONE);
+    agent_trace(w,
+                "raw decode route prompt_lookup=%s mtp_draft=%d "
+                "temperature=%.3f",
+                prompt_lookup_enabled ? "on" : "off",
+                ds4_engine_mtp_draft_tokens(w->engine),
+                cfg->gen.temperature);
 
     uint64_t rng = cfg->gen.seed ? cfg->gen.seed :
         ((uint64_t)time(NULL) ^ ((uint64_t)getpid() << 32) ^ (uint64_t)clock());
@@ -9501,6 +9602,25 @@ static int worker_run_raw_prompt(agent_worker *w, const char *user_text) {
                 err, sizeof(err));
             if (ntok < 0) {
                 agent_set_error(w, err[0] ? err : "raw decode failed");
+                ds4_tokens_free(&prompt);
+                return 1;
+            }
+        } else if (prompt_lookup_enabled) {
+            ntok = cfg->gen.temperature <= 0.0f ?
+                ds4_session_eval_prompt_lookup_argmax(
+                    w->session, token, max_tokens - generated,
+                    ds4_token_eos(w->engine), toks,
+                    (int)(sizeof(toks) / sizeof(toks[0])),
+                    err, sizeof(err)) :
+                ds4_session_eval_prompt_lookup_sampled(
+                    w->session, token, max_tokens - generated,
+                    ds4_token_eos(w->engine), cfg->gen.temperature, 0,
+                    cfg->gen.top_p, cfg->gen.min_p, &rng,
+                    toks, (int)(sizeof(toks) / sizeof(toks[0])),
+                    err, sizeof(err));
+            if (ntok < 0) {
+                agent_set_error(w, err[0] ? err :
+                                "raw prompt-lookup decode failed");
                 ds4_tokens_free(&prompt);
                 return 1;
             }

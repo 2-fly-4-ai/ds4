@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="720" viewBox="0 0 1100 720">
+<rect width="100%" height="100%" fill="#0b1020"/>
+<style>text{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;fill:#dbe5ff}.grid{stroke:#28324d;stroke-width:1}.axis{stroke:#8fa3c7;stroke-width:1.4}.ds{stroke:#5ac8fa;color:#5ac8fa}.gl{stroke:#ff9f43;color:#ff9f43}.thin{fill:none;stroke-width:1.2;opacity:.28}.main{fill:none;stroke-width:4}.dot{stroke:none}</style>
+<text x="90" y="38" font-size="24" font-weight="700">M5 Max Automatic — DS4 vs GLM 5.3 through 100K</text>
+<text x="90" y="65" font-size="14" fill="#9fb0cf">Three matched corpora; decode is final 64-token block; prefill is cumulative median wall time</text>
+<text x="90" y="83" font-size="16" font-weight="600">Sustained decode (t/s)</text>
+<line class="grid" x1="90" y1="335.0" x2="1040" y2="335.0"/><text x="78" y="340.0" text-anchor="end" font-size="12">20</text>
+<line class="grid" x1="90" y1="295.0" x2="1040" y2="295.0"/><text x="78" y="300.0" text-anchor="end" font-size="12">25</text>
+<line class="grid" x1="90" y1="255.0" x2="1040" y2="255.0"/><text x="78" y="260.0" text-anchor="end" font-size="12">30</text>
+<line class="grid" x1="90" y1="215.0" x2="1040" y2="215.0"/><text x="78" y="220.0" text-anchor="end" font-size="12">35</text>
+<line class="grid" x1="90" y1="175.0" x2="1040" y2="175.0"/><text x="78" y="180.0" text-anchor="end" font-size="12">40</text>
+<line class="grid" x1="90" y1="135.0" x2="1040" y2="135.0"/><text x="78" y="140.0" text-anchor="end" font-size="12">45</text>
+<line class="grid" x1="90" y1="95.0" x2="1040" y2="95.0"/><text x="78" y="100.0" text-anchor="end" font-size="12">50</text>
+<line class="axis" x1="90" y1="335" x2="1040" y2="335"/><line class="axis" x1="90" y1="95" x2="90" y2="335"/>
+<text x="90" y="398" font-size="16" font-weight="600">Cumulative prefill wall time (seconds)</text>
+<line class="grid" x1="90" y1="650.0" x2="1040" y2="650.0"/><text x="78" y="655.0" text-anchor="end" font-size="12">0</text>
+<line class="grid" x1="90" y1="615.7" x2="1040" y2="615.7"/><text x="78" y="620.7" text-anchor="end" font-size="12">50</text>
+<line class="grid" x1="90" y1="581.4" x2="1040" y2="581.4"/><text x="78" y="586.4" text-anchor="end" font-size="12">100</text>
+<line class="grid" x1="90" y1="547.1" x2="1040" y2="547.1"/><text x="78" y="552.1" text-anchor="end" font-size="12">150</text>
+<line class="grid" x1="90" y1="512.9" x2="1040" y2="512.9"/><text x="78" y="517.9" text-anchor="end" font-size="12">200</text>
+<line class="grid" x1="90" y1="478.6" x2="1040" y2="478.6"/><text x="78" y="483.6" text-anchor="end" font-size="12">250</text>
+<line class="grid" x1="90" y1="444.3" x2="1040" y2="444.3"/><text x="78" y="449.3" text-anchor="end" font-size="12">300</text>
+<line class="grid" x1="90" y1="410.0" x2="1040" y2="410.0"/><text x="78" y="415.0" text-anchor="end" font-size="12">350</text>
+<line class="axis" x1="90" y1="650" x2="1040" y2="650"/><line class="axis" x1="90" y1="410" x2="90" y2="650"/>
+<path class="ds thin" d="M 90.0 129.5 L 248.3 162.9 L 406.7 164.0 L 565.0 175.1 L 723.3 186.5 L 881.7 251.9 L 1040.0 281.6"/>
+<path class="ds thin" d="M 90.0 172.9 L 248.3 246.8 L 406.7 211.6 L 565.0 240.2 L 723.3 273.0 L 881.7 265.3 L 1040.0 294.6"/>
+<path class="ds thin" d="M 90.0 196.8 L 248.3 218.4 L 406.7 219.2 L 565.0 221.6 L 723.3 238.1 L 881.7 276.3 L 1040.0 292.8"/>
+<path class="ds main" d="M 90.0 172.9 L 248.3 218.4 L 406.7 211.6 L 565.0 221.6 L 723.3 238.1 L 881.7 265.3 L 1040.0 292.8"/>
+<circle class="ds dot" fill="currentColor" cx="90.0" cy="172.9" r="4"/>
+<circle class="ds dot" fill="currentColor" cx="248.3" cy="218.4" r="4"/>
+<circle class="ds dot" fill="currentColor" cx="406.7" cy="211.6" r="4"/>
+<circle class="ds dot" fill="currentColor" cx="565.0" cy="221.6" r="4"/>
+<circle class="ds dot" fill="currentColor" cx="723.3" cy="238.1" r="4"/>
+<circle class="ds dot" fill="currentColor" cx="881.7" cy="265.3" r="4"/>
+<circle class="ds dot" fill="currentColor" cx="1040.0" cy="292.8" r="4"/>
+<path class="gl thin" d="M 90.0 263.2 L 248.3 266.2 L 406.7 265.4 L 565.0 269.2 L 723.3 274.8 L 881.7 292.5 L 1040.0 319.8"/>
+<path class="gl thin" d="M 90.0 256.2 L 248.3 260.3 L 406.7 262.8 L 565.0 266.0 L 723.3 307.1 L 881.7 293.7 L 1040.0 319.7"/>
+<path class="gl thin" d="M 90.0 245.6 L 248.3 251.4 L 406.7 238.0 L 565.0 282.7 L 723.3 267.7 L 881.7 288.8 L 1040.0 294.8"/>
+<path class="gl main" d="M 90.0 256.2 L 248.3 260.3 L 406.7 262.8 L 565.0 269.2 L 723.3 274.8 L 881.7 292.5 L 1040.0 319.7"/>
+<circle class="gl dot" fill="currentColor" cx="90.0" cy="256.2" r="4"/>
+<circle class="gl dot" fill="currentColor" cx="248.3" cy="260.3" r="4"/>
+<circle class="gl dot" fill="currentColor" cx="406.7" cy="262.8" r="4"/>
+<circle class="gl dot" fill="currentColor" cx="565.0" cy="269.2" r="4"/>
+<circle class="gl dot" fill="currentColor" cx="723.3" cy="274.8" r="4"/>
+<circle class="gl dot" fill="currentColor" cx="881.7" cy="292.5" r="4"/>
+<circle class="gl dot" fill="currentColor" cx="1040.0" cy="319.7" r="4"/>
+<path class="ds main" d="M 90.0 647.7 L 248.3 645.1 L 406.7 640.0 L 565.0 629.9 L 723.3 607.2 L 881.7 553.4 L 1040.0 483.6"/>
+<circle class="ds dot" fill="currentColor" cx="90.0" cy="647.7" r="4"/>
+<circle class="ds dot" fill="currentColor" cx="248.3" cy="645.1" r="4"/>
+<circle class="ds dot" fill="currentColor" cx="406.7" cy="640.0" r="4"/>
+<circle class="ds dot" fill="currentColor" cx="565.0" cy="629.9" r="4"/>
+<circle class="ds dot" fill="currentColor" cx="723.3" cy="607.2" r="4"/>
+<circle class="ds dot" fill="currentColor" cx="881.7" cy="553.4" r="4"/>
+<circle class="ds dot" fill="currentColor" cx="1040.0" cy="483.6" r="4"/>
+<path class="gl main" d="M 90.0 646.8 L 248.3 643.1 L 406.7 635.5 L 565.0 620.5 L 723.3 588.1 L 881.7 517.9 L 1040.0 425.9"/>
+<circle class="gl dot" fill="currentColor" cx="90.0" cy="646.8" r="4"/>
+<circle class="gl dot" fill="currentColor" cx="248.3" cy="643.1" r="4"/>
+<circle class="gl dot" fill="currentColor" cx="406.7" cy="635.5" r="4"/>
+<circle class="gl dot" fill="currentColor" cx="565.0" cy="620.5" r="4"/>
+<circle class="gl dot" fill="currentColor" cx="723.3" cy="588.1" r="4"/>
+<circle class="gl dot" fill="currentColor" cx="881.7" cy="517.9" r="4"/>
+<circle class="gl dot" fill="currentColor" cx="1040.0" cy="425.9" r="4"/>
+<text x="90.0" y="675" text-anchor="middle" font-size="12">2K</text>
+<text x="248.3" y="675" text-anchor="middle" font-size="12">4K</text>
+<text x="406.7" y="675" text-anchor="middle" font-size="12">8K</text>
+<text x="565.0" y="675" text-anchor="middle" font-size="12">16K</text>
+<text x="723.3" y="675" text-anchor="middle" font-size="12">32K</text>
+<text x="881.7" y="675" text-anchor="middle" font-size="12">64K</text>
+<text x="1040.0" y="675" text-anchor="middle" font-size="12">100K</text>
+<line x1="775" y1="35" x2="815" y2="35" class="ds main"/><text x="825" y="40" font-size="14">DS4 median</text>
+<line x1="920" y1="35" x2="960" y2="35" class="gl main"/><text x="970" y="40" font-size="14">GLM median</text>
+<text x="90" y="704" font-size="12" fill="#8999b8">Thin lines in the decode panel are the individual prose, code, and structured workloads.</text>
+</svg>

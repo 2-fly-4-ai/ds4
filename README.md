@@ -319,16 +319,53 @@ sampling distribution.
 On M5 Apple Silicon, resident single-GPU GLM 5.3 also enables guarded
 prompt-lookup speculation automatically for greedy generation and ordinary
 sampling through temperature 1.0. It drafts repeated continuations from the
-session history and verifies up to four tokens with the native GLM DSA/KDA
-graph, without running the embedded MTP head. At positive temperature every
+session history and starts by verifying up to four tokens with the native GLM
+DSA/KDA graph, without running the embedded MTP head. On M5 Metal, eight
+consecutive fully accepted verifier passes promote the block to as many as 16
+tokens; any no-match or partial acceptance immediately returns it to the
+four-token schedule. At positive temperature every
 verifier row uses the request's normal temperature, top-k, top-p, min-p, and
 RNG; the first sampled disagreement is replayed as the replacement token, so
-the target sampling behavior is preserved. Thinking, tools, stop strings, SSD
-streaming, tensor parallelism, native MTP, and temperatures above 1.0 keep
-their existing paths. Set `DS4_GLM_PROMPT_LOOKUP_SAMPLING=0` to disable sampled
-lookup, or `=1` to opt an experimental temperature above 1.0 in. Set
+the target sampling behavior is preserved. The API server, one-shot and chat
+CLI, and `ds4-agent` ordinary/raw generation routes all select the shared
+optimization when their request shape is eligible. The agent's native tool
+parser supports verified blocks and rewinds an unused suffix at parser-mode or
+tool-call boundaries. GLM thinking, API requests carrying tools or stop
+strings, SSD streaming, tensor parallelism, native MTP, and temperatures above
+1.0 keep their existing paths. Set `DS4_GLM_PROMPT_LOOKUP_SAMPLING=0` to
+disable sampled lookup, or `=1` to opt an experimental temperature above 1.0
+in. Set
 `DS4_GLM_PROMPT_LOOKUP=0` to disable this optimization for GLM entirely, or
 `DS4_PROMPT_LOOKUP_DISABLE=1` for the global rollback.
+
+Greedy GLM prompt verification on an M5 selects intermediate argmax token IDs
+on the GPU and reads back only the final full logits row. Set
+`DS4_GLM_PROMPT_LOOKUP_GPU_TOP1=0` to restore the all-logits readback. Set
+`DS4_GLM_PROMPT_LOOKUP_ADAPTIVE=0` to retain the former fixed three-draft
+schedule, or change `DS4_GLM_PROMPT_LOOKUP_ADAPTIVE_STREAK` from its default
+of eight full accepts for diagnostic policy experiments. As for DeepSeek,
+`DS4_PROMPT_LOOKUP_MAX=N` remains an explicit fixed-depth override.
+
+For the resident GLM IQ2/Q2 top-8 expert layout on M5, verifier batches through
+16 rows also reuse the decode gate+up+SwiGLU pair kernel. This avoids separate
+gate and up expert-weight passes while leaving ordinary prefill and other
+quant layouts unchanged. Set `DS4_METAL_DISABLE_M5_GLM_TINY_PAIR_16=1` to
+restore the former five-row ceiling; `DS4_METAL_GLM_TINY_PAIR_MAX_TOKENS=N`
+is the lower-level diagnostic threshold override.
+
+For GLM models with Q4_K attention output on M5, an exact-16-row TensorOps
+tile handles the common 15-draft verifier pass. It reads the activation tile
+directly, double-buffers dequantized weights, and avoids the generic 32-row
+tile's unused second half. This is limited to resident single-GPU 8192/16384
+to 4096 attention-output projections. Set
+`DS4_METAL_DISABLE_M5_GLM_ATTN_Q4_MPP_N16=1` to restore the generic tile.
+
+On M5 Metal, DeepSeek prompt lookup begins with seven drafts and promotes to
+15 only after eight consecutive fully accepted verifier passes. The deeper
+block uses the 9--16-row F16 verifier bridge and falls back immediately after
+a partial or missed match. Set `DS4_PROMPT_LOOKUP_ADAPTIVE=0` to retain the
+fixed seven-draft schedule, or `DS4_METAL_DISABLE_M5_PL_MV16=1` to disable only
+the Metal bridge. `DS4_PROMPT_LOOKUP_MAX` remains an explicit depth override.
 
 For a small multi-user server on one M5 Max, four 8192-token sessions fit the
 tested Q2 layout. Native decode batching supports both the dense prefix and the

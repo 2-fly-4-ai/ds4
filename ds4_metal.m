@@ -500,6 +500,7 @@ static int g_glm_stream_expert_addr_table_building;
 static uint64_t g_model_residency_count;
 static int g_model_residency_added_to_queue;
 static int g_glm_model_mode;
+static int g_prompt_verifier_mv16_active;
 static int g_ssd_streaming_mode;
 static int g_glm_streaming_prefill_full_layer_runtime;
 static int g_metal4_runtime_available;
@@ -2871,6 +2872,12 @@ int ds4_gpu_set_decode_pipeline_fast_lookup(int enabled) {
     return previous;
 }
 
+int ds4_gpu_set_prompt_verifier_mv16(int enabled) {
+    const int previous = g_prompt_verifier_mv16_active;
+    g_prompt_verifier_mv16_active = enabled != 0;
+    return previous;
+}
+
 static id<MTLComputePipelineState> ds4_gpu_get_mul_mv_pipeline(
         const char *function_name,
         int16_t     nsg) {
@@ -5201,6 +5208,19 @@ static int16_t ds4_gpu_mv_ext_nxpsg(uint64_t in_dim, uint64_t n_tok) {
     if ((in_dim % 256u) == 0 && n_tok < 3) return 16;
     if ((in_dim % 128u) == 0) return 8;
     return 4;
+}
+
+/* DeepSeek prompt-verifier bridge for the 9..16-row hole between the tiny
+ * matvec and full prefill-matmul paths. F16 reuses the eight-row
+ * specialization over two row tiles; Q4_K reuses the high-bandwidth classic
+ * matvec. GLM remains excluded: hot M5 A/B found its Q4 workload slower here. */
+static bool ds4_gpu_pl_mv16_enabled(uint64_t n_tok) {
+    if (n_tok <= 8u || n_tok > 16u) return false;
+    const int override = ds4_gpu_env_bool("DS4_METAL_ENABLE_PL_MV16");
+    if (override >= 0) return override > 0;
+    return g_prompt_verifier_mv16_active && !g_glm_model_mode &&
+           ds4_gpu_device_is_m5_apple_silicon() &&
+           getenv("DS4_METAL_DISABLE_M5_PL_MV16") == NULL;
 }
 
 static int16_t ds4_gpu_mv_ext_r1ptg(uint64_t n_tok) {
@@ -19104,6 +19124,54 @@ static int ds4_gpu_matmul_quant_impl_tensor(
         id<MTLCommandBuffer> cb = ds4_gpu_command_buffer(&owned);
         if (!cb) return 0;
 
+        /* GLM-5.3 prompt verification commonly evaluates 15 drafts plus the
+         * replacement row.  The generic 64x32 tile duplicates its second
+         * 16-row half at N=16 and discards it.  This exact-N16 TensorOps tile
+         * reads the RHS directly and double-buffers each dequantized Q4_K
+         * weight tile, avoiding that duplicate work. */
+        if (weight_type == DS4_METAL_TENSOR_Q4_K &&
+            n_tok == 16u &&
+            (in_dim == 16384u || in_dim == 8192u) && out_dim == 4096u &&
+            g_glm_model_mode && !g_ssd_streaming_mode &&
+            !ds4_gpu_tp_world_is_two() &&
+            ds4_gpu_device_is_m5_apple_silicon() &&
+            ds4_gpu_mpp_available() &&
+            getenv("DS4_METAL_DISABLE_M5_GLM_ATTN_Q4_MPP_N16") == NULL) {
+            id<MTLComputePipelineState> pipeline =
+                ds4_gpu_get_mul_mm_pipeline(
+                    "kernel_mul_mm_q4_K_f32_nax_direct_rhs_n16", false, false);
+            if (pipeline) {
+                static int q4_mpp_n16_trace_once;
+                if (!q4_mpp_n16_trace_once &&
+                    getenv("DS4_METAL_TRACE_M5_GLM_ATTN_Q4_MPP_N16") != NULL) {
+                    q4_mpp_n16_trace_once = 1;
+                    fprintf(stderr,
+                            "ds4: M5 GLM exact-N16 TensorOps Q4 attention projection active K=%llu M=%llu\n",
+                            (unsigned long long)in_dim,
+                            (unsigned long long)out_dim);
+                }
+                ds4_gpu_mul_mm_args args =
+                    ds4_gpu_make_mm_args(in_dim, out_dim, n_tok, row_bytes);
+                id<MTLComputeCommandEncoder> enc = ds4_gpu_compute_encoder(cb);
+                [enc setComputePipelineState:pipeline];
+                [enc setBytes:&args length:sizeof(args) atIndex:0];
+                [enc setBuffer:wbuf offset:(NSUInteger)inner_offset atIndex:1];
+                [enc setBuffer:xbuf offset:ds4_gpu_tensor_offset(x) atIndex:2];
+                [enc setBuffer:outbuf offset:ds4_gpu_tensor_offset(out) atIndex:3];
+                [enc setThreadgroupMemoryLength:8192u atIndex:0];
+                [enc dispatchThreadgroups:MTLSizeMake(1u,
+                                                      (NSUInteger)out_dim / 64u,
+                                                      1u)
+                     threadsPerThreadgroup:MTLSizeMake(128u, 1u, 1u)];
+                ds4_gpu_end_compute_encoder(cb, enc);
+                if (!ds4_gpu_finish_command_buffer(cb, owned,
+                                                   "M5 GLM exact-N16 Q4 MPP matmul")) {
+                    return 0;
+                }
+                return 1;
+            }
+        }
+
         /*
          * Small-batch Q4_K goes to the classic (llama.cpp-style) matvec:
          * the mul_mv_ext family tops out around 220 GB/s on M5 for the GLM
@@ -19111,7 +19179,7 @@ static int ds4_gpu_matmul_quant_impl_tensor(
          * (misc/q4mv_bench.m). Falls through to ext when unavailable.
          */
         if (weight_type == DS4_METAL_TENSOR_Q4_K &&
-            n_tok <= 8u &&
+            (n_tok <= 8u || ds4_gpu_pl_mv16_enabled(n_tok)) &&
             (in_dim % 256u) == 0 &&
             getenv("DS4_METAL_DISABLE_Q4_MV_CLASSIC") == NULL) {
             const int16_t nsg = 2;
@@ -20245,10 +20313,12 @@ int ds4_gpu_matmul_f16_tensor(
             return 1;
         }
 
-        if (n_tok <= 8 && (in_dim % 128u) == 0) {
+        if ((n_tok <= 8 || ds4_gpu_pl_mv16_enabled(n_tok)) &&
+            (in_dim % 128u) == 0) {
             const int16_t nsg = 2;
             const int16_t nxpsg = ds4_gpu_mv_ext_nxpsg(in_dim, n_tok);
-            const int16_t r1ptg = ds4_gpu_mv_ext_r1ptg(n_tok);
+            const int16_t r1ptg = ds4_gpu_pl_mv16_enabled(n_tok) ? 8 :
+                ds4_gpu_mv_ext_r1ptg(n_tok);
             const char *fn_name = ds4_gpu_mv_ext_name(0, r1ptg);
             id<MTLComputePipelineState> pipeline =
                 fn_name ? ds4_gpu_get_mul_mv_ext_pipeline(fn_name, nsg, nxpsg) : nil;
@@ -25834,8 +25904,6 @@ int ds4_gpu_attention_output_q4_K_batch_tensor(
         group_dim > UINT32_MAX || rank > UINT32_MAX || out_dim > UINT32_MAX) {
         return 0;
     }
-    if (n_tokens < 32u) return 0;
-
     @autoreleasepool {
         const uint64_t low_dim = (uint64_t)n_groups * rank;
         if ((group_dim % 256u) != 0 || (low_dim % 256u) != 0 || low_dim > UINT32_MAX) {
@@ -25868,6 +25936,7 @@ int ds4_gpu_attention_output_q4_K_batch_tensor(
         }
         (void)group_tmp;
         (void)low_tmp;
+        if (n_tokens < 32u) return 0;
 
         const uint64_t padded_n_tokens_u64 =
             ((uint64_t)n_tokens + DS4_METAL_ATTN_OUT_MPP_TILE_N - 1u) /
@@ -43124,9 +43193,33 @@ int ds4_gpu_routed_moe_batch_tensor(
          * tiny batches so ordinary prefill keeps using the higher-throughput
          * grouped matmul path.
          */
+        /* GLM's M5 prompt verifier normally sends up to 16 rows.  The
+         * resident IQ2/Q2 top-8 model is still in the memory-bound mul_mv
+         * regime at those shapes, so reuse the exact gate+up+SwiGLU pair
+         * kernel instead of reading both expert tensors in separate passes.
+         * Keep the promotion scoped to the measured hybrid quant and expose
+         * both a rollback and an explicit threshold for diagnostics. */
+        const bool use_m5_glm_tiny_pair_16 =
+            g_glm_model_mode &&
+            ds4_gpu_device_is_m5_apple_silicon() &&
+            n_expert == 8u &&
+            gate_type == DS4_METAL_TENSOR_IQ2_XXS &&
+            down_type == DS4_METAL_TENSOR_Q2_K &&
+            !g_ssd_streaming_mode &&
+            g_tp_split_world == 1 &&
+            getenv("DS4_METAL_DISABLE_M5_GLM_TINY_PAIR_16") == NULL;
+        uint32_t tiny_pair_max_tokens = use_m5_glm_tiny_pair_16 ? 16u : 5u;
+        const char *tiny_pair_max_env = getenv("DS4_METAL_GLM_TINY_PAIR_MAX_TOKENS");
+        if (g_glm_model_mode && tiny_pair_max_env && tiny_pair_max_env[0]) {
+            char *end = NULL;
+            const unsigned long parsed = strtoul(tiny_pair_max_env, &end, 10);
+            if (end != tiny_pair_max_env && *end == '\0' && parsed >= 1ul && parsed <= 31ul) {
+                tiny_pair_max_tokens = (uint32_t)parsed;
+            }
+        }
         const bool use_tiny_pair_mv =
             !g_quality_mode &&
-            n_tokens <= 5u &&
+            n_tokens <= tiny_pair_max_tokens &&
             !use_q4_batch_expert_table &&
             !use_mm_id &&
             ((gate_type == DS4_METAL_TENSOR_IQ2_XXS && g_moe_mul_mv_id_iq2_xxs_pair_pipeline) ||

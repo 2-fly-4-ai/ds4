@@ -53,6 +53,20 @@ Two additional seeded checks after the retune:
 | Repeated C fixture, 256 tokens, temperature 0.7 | 38.37 t/s | 64.14 t/s | +67.2% | identical |
 | Novel prose, 256 tokens, temperature 0.7 | 39.05 t/s | 38.97 t/s | -0.2% | identical |
 
+### Adaptive deep verifier
+
+The fixed depth-three result above is now the safe starting schedule rather
+than the final ceiling on M5 Metal. After eight consecutive full verifier
+accepts, GLM promotes to 15 drafts; a no-match or partial acceptance resets it
+to three immediately. This improved a seeded C-source reproduction A/B from
+58.96 to 61.88 t/s (+5.0%) and a 93K-token repeated continuation from 32.28
+to 40.38 t/s (+25.1%). Both produced byte-identical sampled output. Novel,
+structured, and ambiguous controls did not promote and remained neutral.
+
+Set `DS4_GLM_PROMPT_LOOKUP_ADAPTIVE=0` for the former fixed schedule, or use
+`DS4_GLM_PROMPT_LOOKUP_ADAPTIVE_STREAK=N` for policy experiments. An explicit
+`DS4_PROMPT_LOOKUP_MAX=N` remains a fixed-depth override.
+
 ## Routing and rollback
 
 Sampled prompt lookup is automatic on supported resident single-GPU GLM-5.3

@@ -528,10 +528,9 @@ static void test_metal_f16_matvec_fast_nr0_4(void) {
     free(weights_raw);
 }
 
-static void test_metal_f16_prefill_matmul(void) {
+static void test_metal_f16_prefill_matmul_case(uint32_t n_tok) {
     const uint32_t in_dim = 128;
     const uint32_t out_dim = 64;
-    const uint32_t n_tok = 128;
     const uint64_t weight_bytes = (uint64_t)out_dim * in_dim * sizeof(uint16_t);
     const uint64_t weight_alloc = test_round_up_u64(weight_bytes, (uint64_t)getpagesize());
     const uint64_t x_bytes = (uint64_t)n_tok * in_dim * sizeof(float);
@@ -6106,7 +6105,13 @@ static void test_metal_router_weights_batch_exact(void) {
 
 static void test_metal_kernel_group(void) {
     test_metal_f16_matvec_fast_nr0_4();
-    test_metal_f16_prefill_matmul();
+    char *saved_pl_mv16 = test_save_env("DS4_METAL_ENABLE_PL_MV16");
+    setenv("DS4_METAL_ENABLE_PL_MV16", "1", 1);
+    test_metal_f16_prefill_matmul_case(9);
+    test_metal_f16_prefill_matmul_case(12);
+    test_metal_f16_prefill_matmul_case(16);
+    test_restore_env("DS4_METAL_ENABLE_PL_MV16", saved_pl_mv16);
+    test_metal_f16_prefill_matmul_case(128);
     test_metal_q8_0_prefill_matmul();
     test_metal_pack_slot_rows_f32();
     test_metal_store_raw_kv_batch_wrap();

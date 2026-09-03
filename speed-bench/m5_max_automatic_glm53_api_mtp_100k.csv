@@ -1,0 +1,13 @@
+mode,workload,prompt_tokens,completion_tokens,prefill_seconds,generation_tps,output_sha256,byte_identical_to_plain,notes
+plain,prose,2812,128,6.320,31.41,028a30f7a7c9e140f5602f142dd35a82a68d9886f8aa0f9588821984495cb048,reference,raw completion entered thinking state
+mtp,prose,2812,128,7.168,27.24,028a30f7a7c9e140f5602f142dd35a82a68d9886f8aa0f9588821984495cb048,yes,mtp draft 2
+plain,code,2447,128,5.093,31.60,9592d4129682dd7fea4c78929815b4e866752ab2b13680a74f51309c841d4ced,reference,raw completion entered thinking state
+mtp,code,2447,128,5.740,28.10,9592d4129682dd7fea4c78929815b4e866752ab2b13680a74f51309c841d4ced,yes,mtp draft 2
+plain,structured,2340,128,4.824,32.11,de3e5102b43da26046ea64540af28b4b2d33480e9aa09714f6440e17ae685103,reference,raw completion entered thinking state
+mtp,structured,2340,128,5.355,28.24,023ba97cb9e0169cfdf144a9db16b1a6e64ee84c4eb2fff68a1c11a70bfbaf0e,no,mtp draft 2; output diverged
+plain,prose,100507,128,352.166,21.59,c3b3ae7011c6cb314f8bf1ffceefbaf4cfe062708b3e4931b366fdfe1de5699b,reference,raw completion entered thinking state
+mtp,prose,100507,128,315.080,25.86,c3b3ae7011c6cb314f8bf1ffceefbaf4cfe062708b3e4931b366fdfe1de5699b,yes,mtp draft 2; prefill not a controlled thermal AB
+plain,code,100737,128,363.593,21.56,48f4612c06724ad47c7f1f2b1313e822f30117a261ad91d57087d9a73d6fbcc8,reference,raw completion entered thinking state
+mtp,code,100737,128,318.997,25.20,48f4612c06724ad47c7f1f2b1313e822f30117a261ad91d57087d9a73d6fbcc8,yes,mtp draft 2; prefill not a controlled thermal AB
+plain,structured,100769,128,385.115,21.42,1c54f179ab43a15596dfd4bc9aa0d1ae03ee3193ba594f5caa72f69d031b7550,reference,raw completion entered thinking state
+mtp,structured,100769,128,311.026,25.26,1c54f179ab43a15596dfd4bc9aa0d1ae03ee3193ba594f5caa72f69d031b7550,yes,mtp draft 2; prefill not a controlled thermal AB

@@ -44703,9 +44703,11 @@ static bool glm53_graph_forward_output_head_rows_impl(
         uint32_t           rows,
         float             *logits_first,
         float             *logits_last,
-        float             *logits_all) {
+        float             *logits_all,
+        int32_t           *top_ids) {
     if (!g || !g->glm53 || !model || !weights || !hc_rows || rows < 2u ||
-        (!logits_all && (!logits_first || !logits_last)) ||
+        (!logits_all && !top_ids && (!logits_first || !logits_last)) ||
+        (top_ids && !logits_last) ||
         !g->batch_hc_cur || !g->batch_cur ||
         !g->batch_ffn_norm ||
         !glm53_graph_session_batch_logits_ensure(g, rows)) {
@@ -44757,6 +44759,14 @@ static bool glm53_graph_forward_output_head_rows_impl(
                                      g->batch_ffn_norm,
                                      rows);
     }
+    if (ok && top_ids) {
+        ok = g->batch_router_selected &&
+             ds4_gpu_indexer_topk_tensor(g->batch_router_selected,
+                                         g->session_batch_logits,
+                                         DS4_N_VOCAB,
+                                         rows,
+                                         1u) != 0;
+    }
     if (ok) ok = ds4_gpu_end_commands() != 0;
     else (void)ds4_gpu_synchronize();
     const uint64_t logits_bytes = (uint64_t)DS4_N_VOCAB * sizeof(float);
@@ -44765,6 +44775,15 @@ static bool glm53_graph_forward_output_head_rows_impl(
                                  0,
                                  logits_all,
                                  (uint64_t)rows * logits_bytes) != 0;
+    } else if (ok && top_ids) {
+        ok = ds4_gpu_tensor_read(g->batch_router_selected,
+                                 0,
+                                 top_ids,
+                                 (uint64_t)rows * sizeof(top_ids[0])) != 0 &&
+             ds4_gpu_tensor_read(g->session_batch_logits,
+                                 (uint64_t)(rows - 1u) * logits_bytes,
+                                 logits_last,
+                                 logits_bytes) != 0;
     } else if (ok) {
         ok = ds4_gpu_tensor_read(g->session_batch_logits,
                                  0,
@@ -44788,7 +44807,7 @@ static bool glm53_graph_forward_output_head_rows(
         float             *logits_last) {
     return glm53_graph_forward_output_head_rows_impl(
         g, model, weights, hc_rows, rows,
-        logits_first, logits_last, NULL);
+        logits_first, logits_last, NULL, NULL);
 }
 
 static bool glm53_graph_forward_output_head_rows_all(
@@ -44799,7 +44818,19 @@ static bool glm53_graph_forward_output_head_rows_all(
         uint32_t           rows,
         float             *logits_all) {
     return glm53_graph_forward_output_head_rows_impl(
-        g, model, weights, hc_rows, rows, NULL, NULL, logits_all);
+        g, model, weights, hc_rows, rows, NULL, NULL, logits_all, NULL);
+}
+
+static bool glm53_graph_forward_output_head_rows_top1_last(
+        ds4_glm_gpu_graph *g,
+        const ds4_model   *model,
+        const ds4_weights *weights,
+        const float       *hc_rows,
+        uint32_t           rows,
+        int32_t           *top_ids,
+        float             *logits_last) {
+    return glm53_graph_forward_output_head_rows_impl(
+        g, model, weights, hc_rows, rows, NULL, logits_last, NULL, top_ids);
 }
 
 static bool glm_graph_profile_stage(
@@ -54943,6 +54974,7 @@ struct ds4_session {
     uint64_t pl_gate_partials;
     uint64_t pl_gate_ambiguous;
     uint32_t pl_gate_skip_remaining;
+    uint32_t pl_adaptive_full_streak;
     double pl_scan_sec;
 };
 
@@ -75951,11 +75983,10 @@ static int ds4_session_eval_speculative_argmax_impl(
 #define DS4_PL_NGRAM 4
 #define DS4_PL_GATE_NGRAM 24
 #define DS4_PL_GATE_CONSENSUS 4
-/* Array bound; the effective depth defaults to 7 so the fused verify pass
- * (anchor + drafts = 8 positions) stays on the small-batch mat-vec kernels,
- * which cover 2..8 tokens (metal/dense.metal); batch 9+ falls onto the full
- * prefill matmul path whose fixed cost eats the speculation win.  Tunable via
- * DS4_PROMPT_LOOKUP_MAX (1..15; spec_logits holds 16 rows). */
+/* Array bound. The portable/default schedule stays at seven drafts so the
+ * fused pass has eight rows. M5 Metal DeepSeek sessions may promote to 15
+ * after a sustained full-accept streak, using the scoped F16 verifier bridge.
+ * DS4_PROMPT_LOOKUP_MAX remains the explicit 1..15 override. */
 #define DS4_PL_MAX_DRAFT 15
 
 static int prompt_lookup_max_draft(void) {
@@ -75970,6 +76001,86 @@ static int prompt_lookup_max_draft(void) {
         }
     }
     return cached;
+}
+
+static bool prompt_lookup_adaptive_enabled(const ds4_session *s) {
+    if (s && ds4_session_is_glm(s)) {
+        const char *glm = getenv("DS4_GLM_PROMPT_LOOKUP_ADAPTIVE");
+        if (glm) return glm[0] && glm[0] != '0';
+#if defined(__APPLE__) && !defined(DS4_NO_GPU)
+        return s->engine && s->engine->backend == DS4_BACKEND_METAL &&
+               ds4_gpu_device_is_m5_apple_silicon();
+#else
+        return false;
+#endif
+    }
+    const char *e = getenv("DS4_PROMPT_LOOKUP_ADAPTIVE");
+    if (e) return e[0] && e[0] != '0';
+#if defined(__APPLE__) && !defined(DS4_NO_GPU)
+    return s && s->engine &&
+           s->engine->backend == DS4_BACKEND_METAL &&
+           ds4_gpu_device_is_m5_apple_silicon();
+#else
+    (void)s;
+    return false;
+#endif
+}
+
+static uint32_t prompt_lookup_adaptive_promote_streak(const ds4_session *s) {
+    const char *name = s && ds4_session_is_glm(s) ?
+        "DS4_GLM_PROMPT_LOOKUP_ADAPTIVE_STREAK" :
+        "DS4_PROMPT_LOOKUP_ADAPTIVE_STREAK";
+    const char *e = getenv(name);
+    if (e && e[0]) {
+        char *end = NULL;
+        errno = 0;
+        const unsigned long v = strtoul(e, &end, 10);
+        if (end != e && *end == '\0' && errno == 0 && v >= 1u && v <= 64u) {
+            return (uint32_t)v;
+        }
+    }
+    return 8u;
+}
+
+static int prompt_lookup_effective_draft_cap(ds4_session *s, int shallow_cap) {
+    int max_cap = prompt_lookup_max_draft();
+    if (getenv("DS4_PROMPT_LOOKUP_MAX") != NULL) return max_cap;
+    const bool adaptive = prompt_lookup_adaptive_enabled(s);
+    if (!s || !adaptive) return shallow_cap;
+    max_cap = DS4_PL_MAX_DRAFT;
+    if (max_cap <= shallow_cap) return max_cap;
+    if (s->pl_adaptive_full_streak >=
+        prompt_lookup_adaptive_promote_streak(s)) {
+        return max_cap;
+    }
+    return shallow_cap;
+}
+
+static void prompt_lookup_adaptive_note(ds4_session *s, bool full_accept) {
+    if (!s || !prompt_lookup_adaptive_enabled(s)) return;
+    if (!full_accept) {
+        s->pl_adaptive_full_streak = 0;
+    } else if (s->pl_adaptive_full_streak < UINT32_MAX) {
+        s->pl_adaptive_full_streak++;
+    }
+}
+
+/* Greedy verification only needs one token ID per intermediate row.  Keep the
+ * final logits row for the next decode step, but select intermediate argmaxes
+ * on the GPU so the M5 does not copy and scan up to 15 full vocabulary rows. */
+static bool prompt_lookup_glm_gpu_top1_enabled(const ds4_session *s,
+                                               bool exact_sampling) {
+    if (exact_sampling) return false;
+    const char *e = getenv("DS4_GLM_PROMPT_LOOKUP_GPU_TOP1");
+    if (e) return e[0] && e[0] != '0';
+#if defined(__APPLE__) && !defined(DS4_NO_GPU)
+    return s && ds4_session_is_glm(s) && s->engine &&
+           s->engine->backend == DS4_BACKEND_METAL &&
+           ds4_gpu_device_is_m5_apple_silicon();
+#else
+    (void)s;
+    return false;
+#endif
 }
 
 static bool prompt_lookup_gate_enabled(void) {
@@ -76122,14 +76233,10 @@ static int ds4_session_eval_glm_prompt_lookup(
     }
     if (!gate_skipped && max_tokens >= 2 && accepted_cap >= 2 &&
         s->checkpoint.len + 2 <= s->ctx_size && first_token != eos_token) {
-        int draft_cap = prompt_lookup_max_draft();
-        /* GLM's batch kernels peak earlier than DeepSeek's verifier.  On an
-         * M5 Max, three drafts (four verifier rows) sustain about 8% more
-         * sampled lookup throughput than four drafts, with neutral no-match
-         * cost.  Preserve the shared env override for other hardware. */
-        if (getenv("DS4_PROMPT_LOOKUP_MAX") == NULL && draft_cap > 3) {
-            draft_cap = 3;
-        }
+        int draft_cap = prompt_lookup_effective_draft_cap(s, 3);
+        /* GLM begins with three drafts (four verifier rows).  M5 Metal may
+         * promote to 15 after a sustained full-accept streak; an explicit
+         * DS4_PROMPT_LOOKUP_MAX remains a fixed-depth override. */
         if (draft_cap > max_tokens - 1) draft_cap = max_tokens - 1;
         if (draft_cap > accepted_cap - 1) draft_cap = accepted_cap - 1;
         const int room = s->ctx_size - s->checkpoint.len;
@@ -76150,6 +76257,7 @@ static int ds4_session_eval_glm_prompt_lookup(
     }
     if (draft_n <= 0) {
         s->pl_no_match++;
+        prompt_lookup_adaptive_note(s, false);
         if (ds4_session_eval(s, first_token, err, errlen) != 0) return -1;
         accepted[0] = first_token;
         return 1;
@@ -76163,11 +76271,15 @@ static int ds4_session_eval_glm_prompt_lookup(
     const uint32_t n_verify = (uint32_t)draft_n + 1u;
     const uint64_t hc_row_values =
         (uint64_t)DS4_N_EMBD * DS4_N_HC;
+    const bool gpu_top1 = prompt_lookup_glm_gpu_top1_enabled(
+        s, exact_sampling);
     int toks[DS4_PL_MAX_DRAFT + 1];
+    int32_t row_tops[DS4_PL_MAX_DRAFT + 1];
     toks[0] = first_token;
     memcpy(toks + 1, drafts, (size_t)draft_n * sizeof(drafts[0]));
     float *hc_rows = xmalloc((size_t)n_verify * hc_row_values * sizeof(float));
-    float *row_logits = xmalloc((size_t)n_verify * DS4_N_VOCAB * sizeof(float));
+    float *row_logits = xmalloc((size_t)(gpu_top1 ? 1u : n_verify) *
+                                DS4_N_VOCAB * sizeof(float));
 
     bool kda_saved = glm_graph_mtp_ensure(g);
     const bool kda_shadow = kda_saved && glm53_graph_has_kda_shadows(g);
@@ -76192,8 +76304,12 @@ static int ds4_session_eval_glm_prompt_lookup(
         g->mtp_kda_outofplace = false;
     }
     if (verified) {
-        verified = glm53_graph_forward_output_head_rows_all(
-            g, &e->model, &e->weights, hc_rows, n_verify, row_logits);
+        verified = gpu_top1 ?
+            glm53_graph_forward_output_head_rows_top1_last(
+                g, &e->model, &e->weights, hc_rows, n_verify,
+                row_tops, row_logits) :
+            glm53_graph_forward_output_head_rows_all(
+                g, &e->model, &e->weights, hc_rows, n_verify, row_logits);
     }
     if (!verified) {
         if (kda_saved && !kda_shadow) {
@@ -76209,11 +76325,13 @@ static int ds4_session_eval_glm_prompt_lookup(
     int commit_total = 1;
     int replacement = -1;
     for (int i = 0; i < draft_n; i++) {
-        const float *logits = row_logits + (size_t)i * DS4_N_VOCAB;
-        const int target_token = exact_sampling ?
-            sample_top_p_min_p(logits, DS4_N_VOCAB, temperature,
-                               top_k, top_p, min_p, rng, s->sample_probs) :
-            glm_session_logits_argmax(logits);
+        const float *logits = gpu_top1 ? NULL :
+            row_logits + (size_t)i * DS4_N_VOCAB;
+        const int target_token = gpu_top1 ? row_tops[i] :
+            (exact_sampling ?
+             sample_top_p_min_p(logits, DS4_N_VOCAB, temperature,
+                                top_k, top_p, min_p, rng, s->sample_probs) :
+             glm_session_logits_argmax(logits));
         if (target_token != drafts[i]) {
             if (exact_sampling) replacement = target_token;
             break;
@@ -76222,6 +76340,7 @@ static int ds4_session_eval_glm_prompt_lookup(
     }
     const int matched_drafts = commit_total - 1;
     const bool full_accept = commit_total == (int)n_verify;
+    prompt_lookup_adaptive_note(s, full_accept);
     int returned_total = commit_total;
 
     bool commit_ok = true;
@@ -76233,7 +76352,8 @@ static int ds4_session_eval_glm_prompt_lookup(
         }
         ds4_session_glm_note_dense_cache(s, pos, n_verify);
         memcpy(s->logits,
-               row_logits + (size_t)(n_verify - 1u) * DS4_N_VOCAB,
+               gpu_top1 ? row_logits :
+                   row_logits + (size_t)(n_verify - 1u) * DS4_N_VOCAB,
                (size_t)DS4_N_VOCAB * sizeof(float));
     } else {
         /* The verifier wrote KDA state only to shadows.  Re-run a rare partial
@@ -76347,7 +76467,7 @@ int ds4_session_eval_prompt_lookup_argmax(ds4_session *s, int first_token,
      * stream per cycle instead of the MTP path's sequential-eval-plus-verify two.
      * On no match (or any uncertainty) the cycle is exactly the baseline eval.
      */
-    int draft_cap = prompt_lookup_max_draft();
+    int draft_cap = prompt_lookup_effective_draft_cap(s, 7);
     if (draft_cap > max_tokens - 1) draft_cap = max_tokens - 1;
     if (draft_cap > accepted_cap - 1) draft_cap = accepted_cap - 1;
     const int room = s->ctx_size - s->checkpoint.len;
@@ -76383,6 +76503,7 @@ int ds4_session_eval_prompt_lookup_argmax(ds4_session *s, int first_token,
     }
     if (draft_n <= 0) {
         s->pl_no_match++;
+        prompt_lookup_adaptive_note(s, false);
         if (ds4_session_eval(s, first_token, err, errlen) != 0) return -1;
         accepted[0] = first_token;
         return 1;
@@ -76404,10 +76525,17 @@ int ds4_session_eval_prompt_lookup_argmax(ds4_session *s, int first_token,
         token_vec_push(&s->checkpoint, first_token);
         for (int i = 0; i < draft_n; i++) token_vec_push(&s->checkpoint, drafts[i]);
         verifier_may_have_mutated = true;
+#if defined(__APPLE__)
+        const int previous_mv16 =
+            ds4_gpu_set_prompt_verifier_mv16(n_verify > 8);
+#endif
         ok = metal_graph_verify_suffix_tops(&s->graph, &e->model, &e->weights,
                                             &s->checkpoint, (uint32_t)start,
                                             (uint32_t)n_verify, false, false,
                                             row_tops, NULL, NULL);
+#if defined(__APPLE__)
+        (void)ds4_gpu_set_prompt_verifier_mv16(previous_mv16);
+#endif
     }
     if (ok) {
         /* The anchor is the sampled target token and is always committed;
@@ -76431,6 +76559,7 @@ int ds4_session_eval_prompt_lookup_argmax(ds4_session *s, int first_token,
             ok = spec_frontier_restore(&frontier, s);
             if (ok && commit_total == 1) {
                 s->pl_free_miss++;
+                prompt_lookup_adaptive_note(s, false);
                 if (gate) {
                     s->pl_gate_skip_remaining = prompt_lookup_gate_backoff(
                         "DS4_PROMPT_LOOKUP_GATE_MISS_BACKOFF", 64);
@@ -76448,16 +76577,24 @@ int ds4_session_eval_prompt_lookup_argmax(ds4_session *s, int first_token,
             if (ok) {
                 token_vec_push(&s->checkpoint, first_token);
                 for (int i = 0; i + 1 < commit_total; i++) token_vec_push(&s->checkpoint, drafts[i]);
+#if defined(__APPLE__)
+                const int previous_mv16 =
+                    ds4_gpu_set_prompt_verifier_mv16(commit_total > 8);
+#endif
                 ok = metal_graph_verify_suffix_tops(&s->graph, &e->model, &e->weights,
                                                     &s->checkpoint, (uint32_t)start,
                                                     (uint32_t)commit_total, false,
                                                     false, row_tops, NULL, NULL);
+#if defined(__APPLE__)
+                (void)ds4_gpu_set_prompt_verifier_mv16(previous_mv16);
+#endif
             }
             if (ok) ok = metal_graph_read_spec_logits_row(&s->graph,
                                                           (uint32_t)(commit_total - 1),
                                                           row_logits);
         }
         if (ok) {
+            prompt_lookup_adaptive_note(s, commit_total == n_verify);
             memcpy(s->logits, row_logits, (size_t)DS4_N_VOCAB * sizeof(s->logits[0]));
             accepted[n_accept++] = first_token;
             for (int i = 0; i + 1 < commit_total && n_accept < accepted_cap; i++) {

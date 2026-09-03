@@ -7,6 +7,13 @@ before resuming work toward >45 t/s.
 
 Here we collect prefill and generation speed obtained with different hardware.
 
+M5 Max adaptive prompt-verifier campaign (Sep 3): see
+`speed-bench/m5_max_adaptive_prompt_verifier_2026-09-03.md` for the final
+DeepSeek 7-to-15 and GLM 3-to-15 draft policies, Metal verifier work,
+end-to-end A/B results through 93K context, the M5 GLM IQ2/Q2 routed-MoE
+small-batch fusion, rejected variants, correctness checks, and rollback
+controls.
+
 Run `ds4-bench` as:
 
 ```
@@ -377,7 +384,10 @@ so a 95K-to-99K A/B does not require eight complete 99K prefills:
 ```
 
 Snapshot restore is outside the timed interval. Full-vocabulary logits are
-still compared bit-for-bit after every suffix run.
+still compared bit-for-bit after every suffix run. The final
+`snapshot_timing` line reports the one-time base prefill and snapshot save,
+plus the average restore latency and snapshot size, so cache reuse can be
+compared directly with recomputing the prefix.
 
 To isolate the default routed-down tail-SIMDgroup cull from the retained pair
 default, use its down-specific rollback as the candidate:
