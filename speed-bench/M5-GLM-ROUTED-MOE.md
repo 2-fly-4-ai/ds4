@@ -1,6 +1,12 @@
 # M5 GLM-5.3 routed-MoE campaign
 
-## Accepted optimization
+> Update (2026-09-03): the N64 path documented below remains available, but
+> the later exact split-N32 specialization is now the M5 default. It measured
+> 0.61-1.40% faster than N64 across balanced 4K-through-16K frontiers and
+> 7.12% faster than legacy N32 at 2K. See
+> [M5-IQ2-SPLIT-PREFILL.md](M5-IQ2-SPLIT-PREFILL.md).
+
+## Prior N64 optimization
 
 The resident GLM-5.3 hybrid quant routes eight rows per token across 256
 experts. The original grouped TensorOps path always built 32-row expert work
