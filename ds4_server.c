@@ -11012,7 +11012,10 @@ static slot_reuse slot_probe_reuse_locked(server *s, server_slot *slot,
             rewind_to = live_prefix_rewind_target(
                 true, live_pos, req->prompt.len, common);
         }
-    } else {
+    } else if (!s->engine || !ds4_engine_is_qwen4(s->engine)) {
+        /* Qwen3.8's recurrent GDN state cannot be reconstructed by trimming
+         * only the token checkpoint.  A shorter/equal prompt must take the
+         * ordinary miss path, which resets and replays the complete prompt. */
         const char *rr = getenv("DS4_KV_REWIND_REUSE");
         const char *rm = getenv("DS4_KV_REWIND_MIN_TOKENS");
         const int rewind_min = rm && atoi(rm) > 0 ? atoi(rm) : 256;

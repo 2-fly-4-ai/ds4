@@ -61133,7 +61133,10 @@ static bool ds4_session_greedy_splitkv_replay_exact(
 
 int ds4_session_eval_argmax(ds4_session *s, int token, char *err, size_t errlen) {
     if (!s) return -1;
-    if (ds4_session_is_cpu(s) || ds4_session_is_glm(s)) {
+    /* Qwen owns a recurrent GDN/QSA graph rather than the DeepSeek raw-KV
+     * graph used by the specialized one-token argmax path below. */
+    if (ds4_session_is_cpu(s) || ds4_session_is_glm(s) ||
+        ds4_session_is_qwen4(s)) {
         if (ds4_session_eval(s, token, err, errlen) != 0) return -1;
         return ds4_session_argmax(s);
     }
@@ -69298,14 +69301,18 @@ bool ds4_session_is_distributed(ds4_session *s) {
 int ds4_session_set_power(ds4_session *s, int power_percent) {
     if (!s || !s->engine || power_percent < 1 || power_percent > 100) return 1;
 #ifndef DS4_NO_GPU
-    if (ds4_session_is_glm(s) && power_percent != 100) {
-        fprintf(stderr, "ds4: session power throttling is not supported for GLM 5.2 yet\n");
+    if ((ds4_session_is_glm(s) || ds4_session_is_qwen4(s)) &&
+        power_percent != 100) {
+        fprintf(stderr, "ds4: session power throttling is not supported for this model graph yet\n");
         return 1;
     }
 #endif
     s->engine->power_percent = power_percent;
 #ifndef DS4_NO_GPU
-    if (!ds4_session_is_cpu(s) && !ds4_session_is_glm(s)) s->graph.power_percent = (uint32_t)power_percent;
+    if (!ds4_session_is_cpu(s) && !ds4_session_is_glm(s) &&
+        !ds4_session_is_qwen4(s)) {
+        s->graph.power_percent = (uint32_t)power_percent;
+    }
 #endif
     return 0;
 }
@@ -69416,6 +69423,13 @@ int ds4_session_layer_slice_reset(ds4_session *s, char *err, size_t errlen) {
     if (errlen) snprintf(err, errlen, "GPU support is not compiled in");
     return 1;
 #else
+    if (ds4_session_is_qwen4(s)) {
+        qwen4_graph_reset(&s->qwen4_graph);
+        s->checkpoint.len = 0;
+        s->checkpoint_valid = false;
+        s->mtp_draft_valid = false;
+        return 0;
+    }
     if (ds4_session_is_glm(s)) {
         s->checkpoint.len = 0;
         s->checkpoint_valid = false;
@@ -69461,6 +69475,13 @@ int ds4_session_eval_output_head_from_hc(ds4_session *s,
     if (errlen) snprintf(err, errlen, "GPU support is not compiled in");
     return 1;
 #else
+    if (ds4_session_is_qwen4(s)) {
+        if (errlen) {
+            snprintf(err, errlen,
+                     "Qwen3.8 output-head evaluation from an external HC state is not supported");
+        }
+        return 1;
+    }
     if (ds4_session_is_glm(s)) {
         ds4_glm_gpu_graph *gg = &s->glm_graph;
         bool ok = ds4_gpu_tensor_write(gg->cur,
@@ -73357,7 +73378,8 @@ int ds4_session_eval(ds4_session *s, int token, char *err, size_t errlen) {
 bool ds4_session_chain_greedy_supported(const ds4_session *s) {
     if (!s || !s->engine || s->engine->backend != DS4_BACKEND_METAL) return false;
     if (!s->checkpoint_valid || s->checkpoint.len <= 0) return false;
-    if (ds4_session_is_cpu(s) || ds4_session_is_glm(s) || s->distributed) {
+    if (ds4_session_is_cpu(s) || ds4_session_is_glm(s) ||
+        ds4_session_is_qwen4(s) || s->distributed) {
         return false;
     }
     ds4_engine *e = s->engine;
@@ -80103,6 +80125,9 @@ bool ds4_session_prompt_lookup_supported(const ds4_session *s) {
         !prompt_lookup_draft_enabled()) {
         return false;
     }
+    /* Qwen's recurrent GDN state needs its own multi-row verifier snapshot.
+     * Until that exists, never route it through DeepSeek's spec_logits graph. */
+    if (ds4_session_is_qwen4(s)) return false;
     if (ds4_session_is_glm(s)) {
         return prompt_lookup_glm_enabled() &&
                s->glm_graph_ready && s->glm_graph.glm53 &&
@@ -80118,7 +80143,10 @@ bool ds4_engine_prompt_lookup_supported(const ds4_engine *e) {
     (void)e;
     return false;
 #else
-    return e && e->backend == DS4_BACKEND_METAL && e->metal_ready &&
+    /* Qwen's recurrent GDN state needs its own multi-row verifier snapshot.
+     * Until that exists, never advertise the DeepSeek prompt-lookup path. */
+    return e && !ds4_model_is_qwen4() &&
+           e->backend == DS4_BACKEND_METAL && e->metal_ready &&
            prompt_lookup_draft_enabled() &&
            (g_ds4_shape.family != DS4_MODEL_FAMILY_GLM_DSA ||
             prompt_lookup_glm_enabled());
