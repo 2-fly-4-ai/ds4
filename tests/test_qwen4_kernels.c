@@ -1181,23 +1181,27 @@ static void test_attention(arena_t *a, uint32_t H, uint32_t Hkv, uint32_t D, uin
 /* ---- routed experts ---- */
 
 static uint64_t arena_tier(arena_t *a, uint32_t wtype, uint64_t rows, uint64_t cols, double **shadow) {
-    return wtype == 12u ? arena_q4_K(a, rows, cols, shadow, 0.05f) :
+    return wtype == 2u ? arena_q4_0(a, rows, cols, shadow, 0.05f) :
+           wtype == 12u ? arena_q4_K(a, rows, cols, shadow, 0.05f) :
            wtype == 10u ? arena_q2_K(a, rows, cols, shadow, 0.05f) :
            wtype == 16u ? arena_iq2_xxs(a, rows, cols, shadow, 0.05f) : arena_q8_0(a, rows, cols, shadow, 0.05f);
 }
 
-/* wtype is the gate/up type (0 f32, 8 q8_0, 12 q4_K, 10 q2_K, 16 iq2_xxs); down
- * and the shared expert are q8_0, or f32 with wtype 0 */
+/* wtype is the gate/up type (0 f32, 2 q4_0, 8 q8_0, 12 q4_K,
+ * 10 q2_K, 16 iq2_xxs). The fast-pack keeps all routed Q4_0 projections
+ * together; other quantized tiers use q8_0 down/shared weights. */
 static void test_moe(arena_t *a, uint32_t NE, uint32_t slots, uint32_t E, uint32_t F, uint32_t T, uint32_t wtype) {
     double *gate_w, *up_w, *down_w, *sg_w, *su_w, *sd_w;
     uint64_t gate_off, up_off, down_off, sg_off, su_off, sd_off;
-    const bool q8 = wtype != 0u;
-    const uint32_t dtype = q8 ? 8u : 0u;
-    const char *tier_name = wtype == 12u ? "q4_K" : wtype == 10u ? "q2_K" : wtype == 16u ? "iq2_xxs" : q8 ? "q8_0" : "f32";
-    if (q8) {
+    const bool quant = wtype != 0u;
+    const uint32_t dtype = wtype == 2u ? 2u : quant ? 8u : 0u;
+    const uint32_t shared_type = quant ? 8u : 0u;
+    const char *tier_name = wtype == 2u ? "q4_0" : wtype == 12u ? "q4_K" : wtype == 10u ? "q2_K" : wtype == 16u ? "iq2_xxs" : quant ? "q8_0" : "f32";
+    if (quant) {
         gate_off = arena_tier(a, wtype, (uint64_t)NE * F, E, &gate_w);
         up_off = arena_tier(a, wtype, (uint64_t)NE * F, E, &up_w);
-        down_off = arena_q8_0(a, (uint64_t)NE * E, F, &down_w, 0.05f);
+        down_off = wtype == 2u ? arena_q4_0(a, (uint64_t)NE * E, F, &down_w, 0.05f) :
+                                 arena_q8_0(a, (uint64_t)NE * E, F, &down_w, 0.05f);
         sg_off = arena_q8_0(a, F, E, &sg_w, 0.05f);
         su_off = arena_q8_0(a, F, E, &su_w, 0.05f);
         sd_off = arena_q8_0(a, E, F, &sd_w, 0.05f);
@@ -1257,9 +1261,9 @@ static void test_moe(arena_t *a, uint32_t NE, uint32_t slots, uint32_t E, uint32
     ds4_gpu_tensor *gsg = upload(sgate, T);
     ds4_gpu_tensor *gout = upload(NULL, (uint64_t)T * E);
     require_ok(ds4_gpu_qwen4_moe_mid_tensor(gmid, gx, gsel, a->base, a->size, gate_off, up_off, wtype, NE, T, slots, E, F,
-                                            sg_off, su_off, dtype), "moe mid");
+                                            sg_off, su_off, shared_type), "moe mid");
     require_ok(ds4_gpu_qwen4_moe_down_tensor(gpart, gmid, gsel, a->base, a->size, down_off, dtype, NE, T, slots, F, E,
-                                             sd_off, dtype), "moe down");
+                                             sd_off, shared_type), "moe down");
     char name[96];
     const uint32_t CH = DS4_QWEN4_HC_CHUNKS;
     float *R0 = rand_vec((uint64_t)T * 4 * E, 1.0f);
@@ -1276,7 +1280,7 @@ static void test_moe(arena_t *a, uint32_t NE, uint32_t slots, uint32_t E, uint32
     ds4_gpu_tensor *gR = upload(R0, (uint64_t)T * 4 * E);
     ds4_gpu_tensor *ginj = upload(injv, (uint64_t)T * 4 * CH * 4);
     require_ok(ds4_gpu_qwen4_moe_reduce_tensor(gout, gpart, gw, gsg, NULL, gR, ginj, T, slots, n_out, E, 4), "moe reduce");
-    const char *dname = q8 ? "q8_0" : "f32";
+    const char *dname = dtype == 2u ? "q4_0" : quant ? "q8_0" : "f32";
     snprintf(name, sizeof(name), "moe %s E=%u F=%u slots=%u T=%u: reduce+combine", dname, E, F, slots, T);
     check_tensor(name, gR, R_ref, (uint64_t)T * 4 * E, 2e-5);
     ds4_gpu_tensor_free(ginj); ds4_gpu_tensor_free(gR); free(R_ref); free(injv); free(R0);
@@ -1286,7 +1290,7 @@ static void test_moe(arena_t *a, uint32_t NE, uint32_t slots, uint32_t E, uint32
     check_tensor(name, gpart, part, (uint64_t)T * n_out * E, 2e-5);
     snprintf(name, sizeof(name), "moe %s E=%u F=%u slots=%u T=%u: out", dname, E, F, slots, T);
     check_tensor(name, gout, out, (uint64_t)T * E, 2e-5);
-    if (q8 && (E % 64) == 0 && (F % 64) == 0) {
+    if (quant && (E % 64) == 0 && (F % 64) == 0) {
         /* prefill path: lists + tiled GEMMs over routed slots only (f16 tiles) */
         ds4_gpu_tensor *glists = ds4_gpu_tensor_alloc((uint64_t)NE * T * 4);
         ds4_gpu_tensor *gcounts = ds4_gpu_tensor_alloc((uint64_t)NE * 4);
@@ -1752,6 +1756,7 @@ int main(void) {
     test_attention(&arena, 4, 2, 32, 8, 4, 32, 2, 30);
     printf("routed experts\n");
     test_moe(&arena, 16, 10, 2560, 640, 2, 8u);
+    test_moe(&arena, 16, 10, 2560, 640, 37, 2u);
     test_moe(&arena, 16, 10, 2560, 640, 37, 12u);
     test_moe(&arena, 16, 10, 2560, 640, 100, 12u);
     test_moe(&arena, 16, 10, 2560, 640, 37, 10u);

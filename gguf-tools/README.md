@@ -236,6 +236,14 @@ projections, kept at the released BF16 by default), `--no-mtp` and
 `gen_qwen4_unicode.py` regenerates `ds4_qwen4_unicode.inc` for the `qwen35`
 pre-tokenizer from a current `regex` release.
 
+`qwen4_fastpack_compat.py` streams Ivan Fioravanti's split DS4 Q4 fast-pack
+into the upstream-schema monolithic layout. It preserves compatible Q4_0,
+Q4_1, Q8_0 and BF16 payloads, reverses the pack-specific GDN and
+hyper-connection transforms, removes routed-down padding, and optionally
+adds the MTP block. A known-good `qwen4exp` GGUF is required as `--template`;
+use `--plan` first to validate all tensor names and transforms without writing
+the roughly 101 GiB output file. See the main README for the complete command.
+
 `make test-qwen4-kernels` runs the Metal kernel tests and
 `make test-qwen4-vision` checks the vision tower against the HF implementation
 (`tests/qwen4_vision_ref.py`).

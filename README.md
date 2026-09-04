@@ -317,6 +317,25 @@ llama-quantize --imatrix imatrix.gguf --allow-requantize --tensor-type hc_=f16 \
   gguf/Qwen3.8-Flash-Next-Q8.gguf gguf/Qwen3.8-Flash-Next-IQ2.gguf Q8_0   # about 77 GB
 ```
 
+Ivan Fioravanti's four-file DS4 fast-pack can also be repacked without
+re-quantizing its Q4_0 trunk. Use a known-good `qwen4exp` GGUF as the metadata
+and tensor-name template, then join the base, Q4_1 PLE and MTP artifacts:
+
+```sh
+python gguf-tools/qwen4_fastpack_compat.py \
+  --template gguf/Qwen3.8-Flash-Next-DS4-Q2K-from-IQ4XS.gguf \
+  --base /path/to/Qwen3.8-Flash-Next-Q40RoutedExperts-BF16Emb-BF16Control-Q8GDN-Q8QSA-Q8Shared-Q8Out.gguf \
+  --ple /path/to/Qwen3.8-Flash-Next-PLE-Q4_1.gguf \
+  --mtp /path/to/qwen3.8-flash-next-q4-mtp.gguf \
+  --out gguf/Qwen3.8-Flash-Next-DS4-FastPack-Q4.gguf
+./ds4 -m gguf/Qwen3.8-Flash-Next-DS4-FastPack-Q4.gguf --mtp --temp 0
+```
+
+The joined file is about 101 GiB, but the 30 GiB PLE table remains CPU-mapped
+and is excluded from Metal residency; the resident model is about 71 GiB.
+Q4_0 routed-expert prefill automatically uses the tiled Metal path from 128
+rows upward and keeps the lower-overhead row path for shorter batches.
+
 The Q8 file keeps every weight at 8 bits except the QSA indexer projections,
 which stay at the released BF16. The MXFP4 file keeps the routed experts in
 native MXFP4 blocks, the Q4K file requantizes the expert gate/up projections
@@ -380,7 +399,7 @@ compares the tower with the Hugging Face implementation.
 
 Metal only for now. The Metal graph accepts Q8_0, Q4_0, F16, BF16 and F32
 dense weights, Q8_0/MXFP4/Q4_0/Q4_K/Q2_K/IQ2_XXS experts, F16/F32/Q8_0
-hyper-connection mixers and a Q8_0/Q4_0/MXFP4/F16/F32 n-gram table.
+hyper-connection mixers and a Q8_0/Q4_0/Q4_1/MXFP4/F16/F32 n-gram table.
 Multi-node tensor parallelism is not implemented yet.
 
 ## GLM 5.3 Flash

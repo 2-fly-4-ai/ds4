@@ -1817,7 +1817,7 @@ struct ds4_metal_args_qwen4_moe_mm {
     uint32_t n_out;        /* slots per token in the mid/part layout */
     uint32_t in_dim;
     uint32_t out_rows;
-    uint32_t weight_type;  /* 8 q8_0, 10 q2_K, 12 q4_K, 16 iq2_xxs, 39 mxfp4 */
+    uint32_t weight_type;  /* 2 q4_0, 8 q8_0, 10 q2_K, 12 q4_K, 16 iq2_xxs, 39 mxfp4 */
     uint32_t row_bytes;
     uint32_t list_cap;
     uint64_t expert_bytes;
@@ -1860,6 +1860,18 @@ kernel void kernel_qwen4_moe_build_lists(
 /* dequantize 8 consecutive values (quarter q of 32-wide block b of a row) */
 template <typename D>
 static inline void qwen4_mm_stage8(device const char *row, uint b, uint q, uint type, threadgroup D *dst) {
+    if (type == 2) {
+        device const uchar *blk = (device const uchar *)(row + (uint64_t)b * 18);
+        const float d = (float)(*(device const half *)blk);
+        const uint base = (q & 1u) * 8u;
+        const bool high = q >= 2u;
+        for (uint i = 0; i < 8; i++) {
+            const uint byte = blk[2u + base + i];
+            const uint code = high ? (byte >> 4u) : (byte & 0xFu);
+            dst[i] = (D)(d * ((float)code - 8.0f));
+        }
+        return;
+    }
     if (type == 12) {
         const uint sb = b / 8, group = b % 8, l = q * 8;
         device const uchar *blk = (device const uchar *)(row + (uint64_t)sb * 144);

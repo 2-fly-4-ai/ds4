@@ -2255,6 +2255,7 @@ enum {
     DS4_TENSOR_F32      = 0,
     DS4_TENSOR_F16      = 1,
     DS4_TENSOR_Q4_0     = 2,
+    DS4_TENSOR_Q4_1     = 3,
     DS4_TENSOR_Q8_0     = 8,
     DS4_TENSOR_Q2_K     = 10,
     DS4_TENSOR_Q4_K     = 12,
@@ -5212,7 +5213,8 @@ static void tensor_expect_qwen4_expert_layout(
         const ds4_tensor *t, uint64_t d0, uint64_t d1, uint64_t d2) {
     if (!t) ds4_die("internal error: missing tensor while validating layout");
     if (!tensor_is_routed_expert_type(t->type) &&
-        t->type != DS4_TENSOR_F16 && t->type != DS4_TENSOR_F32) {
+        t->type != DS4_TENSOR_Q4_0 && t->type != DS4_TENSOR_F16 &&
+        t->type != DS4_TENSOR_BF16 && t->type != DS4_TENSOR_F32) {
         fprintf(stderr, "ds4: routed expert tensor %.*s has unsupported type %u\n",
                 (int)t->name.len, t->name.ptr, t->type);
         exit(1);
@@ -5248,7 +5250,7 @@ static void weights_validate_qwen4_layout(
     if (w->ple_embd) {
         const uint32_t t = w->ple_embd->type;
         if (t != DS4_TENSOR_F32 && t != DS4_TENSOR_F16 && t != DS4_TENSOR_Q8_0 &&
-            t != DS4_TENSOR_MXFP4 && t != DS4_TENSOR_Q4_0) {
+            t != DS4_TENSOR_MXFP4 && t != DS4_TENSOR_Q4_0 && t != DS4_TENSOR_Q4_1) {
             fprintf(stderr, "ds4: per_layer_token_embd has unsupported type %u\n", t);
             exit(1);
         }
@@ -7988,6 +7990,24 @@ static void model_map_span_vec_include_output(ds4_model_map_span_vec *spans, con
     model_map_span_vec_include_one(spans, w->ple_embd);
 }
 
+/* Qwen's per-layer embedding table is consumed exclusively by the host-side
+ * PLE gather (qwen4_ref_row). In the fast-pack layout it can be tens of GiB,
+ * so including it in the Metal model views needlessly exhausts the residency
+ * budget. Keep the mmap available to the CPU, but omit only that tensor from
+ * the accelerator spans. */
+static void model_map_span_vec_include_output_without_ple(
+        ds4_model_map_span_vec *spans,
+        const ds4_weights      *w) {
+    model_map_span_vec_include_one(spans, w->output_hc_base);
+    model_map_span_vec_include_one(spans, w->output_hc_fn);
+    model_map_span_vec_include_one(spans, w->output_hc_scale);
+    model_map_span_vec_include_one(spans, w->output_norm);
+    model_map_span_vec_include_one(spans, w->output);
+    model_map_span_vec_include_one(spans, w->output_hc_norm);
+    model_map_span_vec_include_one(spans, w->output_hc_down);
+    model_map_span_vec_include_one(spans, w->output_hc_up);
+}
+
 static int model_map_span_cmp(const void *a, const void *b) {
     const ds4_model_map_span *sa = a;
     const ds4_model_map_span *sb = b;
@@ -8034,6 +8054,19 @@ static DS4_MAYBE_UNUSED bool weights_model_map_spans(
         model_map_span_vec_include_layer(spans, &w->layer[il]);
     }
     if (include_output) model_map_span_vec_include_output(spans, w);
+    return model_map_span_vec_finish(spans);
+}
+
+static bool weights_qwen4_gpu_resident_spans(
+        const ds4_weights *w,
+        ds4_model_map_span_vec *spans) {
+    if (!w || !spans || !ds4_model_is_qwen4() || !w->ple_embd) return false;
+    memset(spans, 0, sizeof(*spans));
+    model_map_span_vec_include_one(spans, w->token_embd);
+    for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
+        model_map_span_vec_include_layer(spans, &w->layer[il]);
+    }
+    model_map_span_vec_include_output_without_ple(spans, w);
     return model_map_span_vec_finish(spans);
 }
 
@@ -55323,7 +55356,8 @@ static bool qwen4_graph_dense_ok(const ds4_tensor *t) {
 
 /* expert types the tiled prefill GEMM stages (kernel_qwen4_moe_mm_*) */
 static bool qwen4_expert_type_has_mm(uint32_t type) {
-    return type == DS4_TENSOR_Q8_0 || type == DS4_TENSOR_MXFP4 || type == DS4_TENSOR_Q4_K ||
+    if (type == DS4_TENSOR_Q4_0 && getenv("DS4_QWEN4_DISABLE_Q4_0_MM")) return false;
+    return type == DS4_TENSOR_Q8_0 || type == DS4_TENSOR_Q4_0 || type == DS4_TENSOR_MXFP4 || type == DS4_TENSOR_Q4_K ||
            type == DS4_TENSOR_Q2_K || type == DS4_TENSOR_IQ2_XXS;
 }
 
@@ -55343,8 +55377,8 @@ static bool qwen4_graph_weights_supported(const ds4_weights *w) {
     }
     if (w->ple_embd->type != DS4_TENSOR_F32 && w->ple_embd->type != DS4_TENSOR_F16 &&
         w->ple_embd->type != DS4_TENSOR_Q8_0 && w->ple_embd->type != DS4_TENSOR_Q4_0 &&
-        w->ple_embd->type != DS4_TENSOR_MXFP4) {
-        fprintf(stderr, "ds4: Qwen3.8 Metal graph needs a F32/F16/Q8_0/Q4_0/MXFP4 n-gram table\n");
+        w->ple_embd->type != DS4_TENSOR_Q4_1 && w->ple_embd->type != DS4_TENSOR_MXFP4) {
+        fprintf(stderr, "ds4: Qwen3.8 Metal graph needs a F32/F16/Q8_0/Q4_0/Q4_1/MXFP4 n-gram table\n");
         return false;
     }
     if (DS4_N_NEXTN_PREDICT != 0) {
@@ -55766,7 +55800,11 @@ static bool qwen4_graph_moe(ds4_qwen4_gpu_graph *g, const ds4_model *m, const ds
      * (weights read once per 32 tokens) and run the shared expert as dense
      * GEMMs; decode keeps the per-(token, slot) row kernels with the shared
      * expert as an extra slot. */
-    const bool mm = T > 8u && (DS4_N_EMBD % 64u) == 0 && (DS4_N_FF_EXP % 64u) == 0 &&
+    /* Q4_0's expert-list setup loses on very small batches; measured Metal
+     * crossover is between 64 and 128 rows. Other quant types retain the
+     * established >8-row policy. */
+    const bool q4_mm_batch = l->ffn_gate_exps->type != DS4_TENSOR_Q4_0 || T >= 128u;
+    const bool mm = T > 8u && q4_mm_batch && (DS4_N_EMBD % 64u) == 0 && (DS4_N_FF_EXP % 64u) == 0 &&
         qwen4_expert_type_has_mm(l->ffn_gate_exps->type) &&
         l->ffn_up_exps->type == l->ffn_gate_exps->type &&
         qwen4_expert_type_has_mm(l->ffn_down_exps->type) &&
@@ -63590,6 +63628,22 @@ static void qwen4_ref_row(const ds4_model *m, const ds4_tensor *t, uint64_t row,
         }
         break;
     }
+    case DS4_TENSOR_Q4_1: {
+        const uint64_t blocks = n / 32u;
+        const uint8_t *p = (const uint8_t *)tensor_data(m, t) + row * blocks * 20u;
+        for (uint64_t b = 0; b < blocks; b++, p += 20u) {
+            uint16_t dh, mh;
+            memcpy(&dh, p, sizeof(dh));
+            memcpy(&mh, p + 2u, sizeof(mh));
+            const float d = f16_to_f32(dh);
+            const float min = f16_to_f32(mh);
+            for (uint32_t j = 0; j < 16u; j++) {
+                out[b * 32u + j] = d * (float)(p[4u + j] & 0x0fu) + min;
+                out[b * 32u + 16u + j] = d * (float)(p[4u + j] >> 4) + min;
+            }
+        }
+        break;
+    }
     case DS4_TENSOR_Q4_K: {
         const uint64_t blocks = n / 256u;
         const uint8_t *p = (const uint8_t *)tensor_data(m, t) + row * blocks * 144u;
@@ -67748,6 +67802,38 @@ static int ds4_engine_open_internal(ds4_engine **out,
                     spans.len,
                     (double)span_bytes / 1073741824.0,
                     (double)(e->model.size - e->model.tensor_data_pos) / 1073741824.0);
+            model_map_ok = ds4_gpu_set_model_map_spans(e->model.map,
+                                                        e->model.size,
+                                                        load_offsets,
+                                                        load_sizes,
+                                                        load_span_count,
+                                                        spans.max_tensor_bytes);
+            free(spans.v);
+        } else if (ds4_model_is_qwen4() && e->weights.ple_embd) {
+            ds4_model_map_span_vec spans;
+            if (!weights_qwen4_gpu_resident_spans(&e->weights, &spans)) {
+                fprintf(stderr, "ds4: failed to build Qwen GPU-resident model spans\n");
+                ds4_engine_close(e);
+                *out = NULL;
+                return 1;
+            }
+            uint64_t *offsets = xmalloc((size_t)spans.len * sizeof(offsets[0]));
+            uint64_t *sizes = xmalloc((size_t)spans.len * sizeof(sizes[0]));
+            uint64_t span_bytes = 0;
+            for (uint32_t i = 0; i < spans.len; i++) {
+                offsets[i] = spans.v[i].off;
+                sizes[i] = spans.v[i].end - spans.v[i].off;
+                span_bytes += sizes[i];
+            }
+            load_offsets = offsets;
+            load_sizes = sizes;
+            load_span_count = spans.len;
+            e->startup_model_span_bytes = span_bytes;
+            fprintf(stderr,
+                    "ds4: Qwen PLE remains CPU-mapped; Metal residency restricted "
+                    "to %u model spans (%.2f GiB)\n",
+                    spans.len,
+                    (double)span_bytes / 1073741824.0);
             model_map_ok = ds4_gpu_set_model_map_spans(e->model.map,
                                                         e->model.size,
                                                         load_offsets,
