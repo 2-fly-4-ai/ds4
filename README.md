@@ -362,7 +362,22 @@ The MTP block is inside the same GGUF; `--mtp` enables it and speeds up
 greedy decoding. At non-zero temperature it keeps target-matching greedy
 drafts, like the GLM path, which skews sampled output toward the greedy
 choice; `--mtp-exact-sampling` preserves the ordinary sampling distribution
-at a smaller speedup. Prefill runs in 8192-token chunks
+at a smaller speedup.
+
+On an M5 Mac, greedy Qwen sessions also use guarded prompt-lookup drafting.
+When two earlier occurrences agree on the continuation of the current
+eight-token suffix, DS4 verifies the anchor plus up to seven context-derived
+tokens in one native Qwen pass. Full matches commit directly; partial matches
+restore the recurrent GDN/PLE state after the anchor and replay only the
+accepted suffix. With `--mtp`, a request that has no reusable context falls
+through to the embedded neural drafter; without it, the fallback is ordinary
+one-token decode. This route is shared by the CLI, server, and agent and stays
+off for sampled generation. `DS4_PROMPT_LOOKUP_DISABLE=1` is the rollback;
+`DS4_PROMPT_LOOKUP_MAX=1..7` controls Qwen's verifier depth, and
+`DS4_QWEN4_PROMPT_LOOKUP_MIN_MATCH=4..64` overrides its default eight-token
+match length.
+
+Prefill runs in 8192-token chunks
 (`DS4_QWEN4_PREFILL_CHUNK` overrides it; the transient buffers scale with the
 chunk size). For A/B checks, `DS4_QWEN4_NO_FUSE=1` selects the unfused decode
 kernels, `DS4_QWEN4_NO_IDX_SELECT=1` the argsort top-k and

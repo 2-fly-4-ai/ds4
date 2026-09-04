@@ -1,0 +1,33 @@
+Reproduce the C source below, but rename the function `enqueue` to `ring_push` everywhere and change `BUFFER_CAPACITY` from 64 to 128. Return only the edited source without Markdown fences. Two identical reference copies are included so the required output is unambiguous.
+
+#define BUFFER_CAPACITY 64
+typedef struct RingBuffer { unsigned head; unsigned tail; int values[BUFFER_CAPACITY]; } RingBuffer;
+static int enqueue(RingBuffer *buffer, int value) {
+    unsigned next = (buffer->head + 1u) % BUFFER_CAPACITY;
+    if (next == buffer->tail) return 0;
+    buffer->values[buffer->head] = value;
+    buffer->head = next;
+    return 1;
+}
+static int dequeue(RingBuffer *buffer, int *value) {
+    if (buffer->tail == buffer->head) return 0;
+    *value = buffer->values[buffer->tail];
+    buffer->tail = (buffer->tail + 1u) % BUFFER_CAPACITY;
+    return 1;
+}
+
+#define BUFFER_CAPACITY 64
+typedef struct RingBuffer { unsigned head; unsigned tail; int values[BUFFER_CAPACITY]; } RingBuffer;
+static int enqueue(RingBuffer *buffer, int value) {
+    unsigned next = (buffer->head + 1u) % BUFFER_CAPACITY;
+    if (next == buffer->tail) return 0;
+    buffer->values[buffer->head] = value;
+    buffer->head = next;
+    return 1;
+}
+static int dequeue(RingBuffer *buffer, int *value) {
+    if (buffer->tail == buffer->head) return 0;
+    *value = buffer->values[buffer->tail];
+    buffer->tail = (buffer->tail + 1u) % BUFFER_CAPACITY;
+    return 1;
+}

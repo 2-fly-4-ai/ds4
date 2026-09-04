@@ -18602,10 +18602,11 @@ static uint64_t metal_graph_q8_0_row_bytes(uint64_t in_dim) {
  * Metal Release Graph Allocation.
  * ========================================================================= */
 
-/* Prompt-lookup speculative drafting: on M5 Metal DeepSeek-4 and GLM-5.3 it is available
- * automatically to the frontends' guarded greedy routers.  The legacy env flag
- * remains an explicit force-enable for experiments on other configurations;
- * setting it to 0 (or DS4_PROMPT_LOOKUP_DISABLE=1) is a rollback switch. */
+/* Prompt-lookup speculative drafting: on M5 Metal DeepSeek-4, GLM-5.3 and
+ * Qwen3.8 it is available automatically to the frontends' guarded greedy
+ * routers.  The legacy env flag remains an explicit force-enable for
+ * experiments on other configurations; setting it to 0 (or
+ * DS4_PROMPT_LOOKUP_DISABLE=1) is a rollback switch. */
 static bool prompt_lookup_draft_enabled(void) {
     static int cached = -1;
     if (cached < 0) {
@@ -18620,7 +18621,8 @@ static bool prompt_lookup_draft_enabled(void) {
         } else {
 #if defined(__APPLE__)
             cached = ((g_ds4_shape.family == DS4_MODEL_FAMILY_DEEPSEEK4 ||
-                       g_ds4_shape.family == DS4_MODEL_FAMILY_GLM_DSA) &&
+                       g_ds4_shape.family == DS4_MODEL_FAMILY_GLM_DSA ||
+                       g_ds4_shape.family == DS4_MODEL_FAMILY_QWEN4_EXP) &&
                       ds4_gpu_device_is_m5_apple_silicon()) ? 1 : 0;
 #else
             cached = 0;
@@ -55477,6 +55479,8 @@ static bool qwen4_graph_alloc(ds4_qwen4_gpu_graph *g, const ds4_weights *w, uint
     memset(g, 0, sizeof(*g));
     if (!qwen4_graph_weights_supported(w)) return false;
     mtp = mtp && DS4_N_NEXTN_PREDICT != 0;
+    const bool prompt_lookup = prompt_lookup_draft_enabled();
+    const bool snapshot = mtp || prompt_lookup;
     const uint64_t E = DS4_N_EMBD, hc = DS4_N_HC, hc_dim = E * hc, T = cap_tokens;
     const uint64_t conv_dim = DS4_N_LIN_CONV_DIM;
     const uint64_t v_dim = (uint64_t)DS4_N_LIN_V_HEAD * DS4_N_LIN_HEAD_DIM;
@@ -55494,7 +55498,7 @@ static bool qwen4_graph_alloc(ds4_qwen4_gpu_graph *g, const ds4_weights *w, uint
                 "DS4_QWEN4_YARN_FACTOR (see README)\n", ctx_cap, g_qwen4_native_ctx);
     }
     g->sel_stride = g->k_blocks * 4u + 4u;
-    g->n_logit_rows = mtp ? 2u : 1u;
+    g->n_logit_rows = prompt_lookup ? 8u : (mtp ? 2u : 1u);
 
     bool ok = true;
 #define QWEN4_ALLOC(field_, n_) do { g->field_ = qwen4_graph_alloc_f32(n_); ok = ok && g->field_; } while (0)
@@ -55549,6 +55553,8 @@ static bool qwen4_graph_alloc(ds4_qwen4_gpu_graph *g, const ds4_weights *w, uint
         QWEN4_ALLOC(mtp_cat, (hc + 1u) * 2u * E);
         QWEN4_ALLOC(mtp_proj, (hc + 1u) * E);
         QWEN4_ALLOC(mtp_R, hc_dim);
+    }
+    if (snapshot) {
         QWEN4_ALLOC(snap_ple_hist, (uint64_t)(DS4_N_PLE_CONV - 1u) * DS4_N_PLE_NGRAM * hc_dim);
     }
 #undef QWEN4_ALLOC
@@ -55557,7 +55563,7 @@ static bool qwen4_graph_alloc(ds4_qwen4_gpu_graph *g, const ds4_weights *w, uint
             g->layer_lin_state[il] = qwen4_graph_alloc_f32(v_dim * DS4_N_LIN_HEAD_DIM);
             g->layer_lin_hist[il] = qwen4_graph_alloc_f32((uint64_t)(DS4_N_LIN_CONV - 1u) * conv_dim);
             ok = ok && g->layer_lin_state[il] && g->layer_lin_hist[il];
-            if (ok && mtp) {
+            if (ok && snapshot) {
                 g->snap_lin_state[il] = qwen4_graph_alloc_f32(v_dim * DS4_N_LIN_HEAD_DIM);
                 g->snap_lin_hist[il] = qwen4_graph_alloc_f32((uint64_t)(DS4_N_LIN_CONV - 1u) * conv_dim);
                 ok = g->snap_lin_state[il] && g->snap_lin_hist[il];
@@ -70375,7 +70381,8 @@ static int ds4_session_qwen4_spec_cycle(ds4_session *s, int first_token, float t
     s->glm_mtp_have = 0;
     const int d = s->glm_mtp_draft;
     const int toks[2] = { first_token, d };
-    if (!s->qwen4_verify_logits) s->qwen4_verify_logits = xmalloc(2u * (size_t)V * sizeof(float));
+    /* Prompt lookup shares this buffer and may verify up to eight rows. */
+    if (!s->qwen4_verify_logits) s->qwen4_verify_logits = xmalloc(8u * (size_t)V * sizeof(float));
     float *rows = s->qwen4_verify_logits;
     /* the recurrent kernels snapshot their state after row 0, so a rejected
      * draft only needs the snapshot restored, not a replay of first_token */
@@ -80121,6 +80128,14 @@ static int prompt_lookup_gate_min_match(void) {
     return (int)v;
 }
 
+static int prompt_lookup_qwen_min_match(void) {
+    uint32_t v = prompt_lookup_gate_backoff(
+        "DS4_QWEN4_PROMPT_LOOKUP_MIN_MATCH", 8u);
+    if (v < DS4_PL_NGRAM) v = DS4_PL_NGRAM;
+    if (v > 64u) v = 64u;
+    return (int)v;
+}
+
 /* The matched n-gram ends with `pending` (the sampled-but-not-yet-evaluated
  * anchor token), so drafting happens before the anchor's forward pass and the
  * anchor can join the verify batch. */
@@ -80189,9 +80204,14 @@ ds4_decode_route ds4_session_select_decode_route(
         ds4_session *s, int pending,
         bool allow_prompt_lookup, bool allow_neural_speculation,
         bool ignore_eos) {
+    int prompt_candidate = 0;
     if (allow_prompt_lookup && !ignore_eos &&
-        ds4_session_prompt_lookup_supported(s) &&
-        ds4_session_prompt_lookup_candidate(s, pending, 0) > 0) {
+        ds4_session_prompt_lookup_supported(s)) {
+        prompt_candidate = ds4_session_prompt_lookup_candidate(
+            s, pending, ds4_session_is_qwen4(s) ?
+                prompt_lookup_qwen_min_match() : 0);
+    }
+    if (prompt_candidate > 0) {
         return DS4_DECODE_ROUTE_PROMPT_LOOKUP;
     }
     if (allow_neural_speculation && s && s->engine &&
@@ -80211,9 +80231,10 @@ bool ds4_session_prompt_lookup_supported(const ds4_session *s) {
         !prompt_lookup_draft_enabled()) {
         return false;
     }
-    /* Qwen's recurrent GDN state needs its own multi-row verifier snapshot.
-     * Until that exists, never route it through DeepSeek's spec_logits graph. */
-    if (ds4_session_is_qwen4(s)) return false;
+    if (ds4_session_is_qwen4(s)) {
+        return s->qwen4_graph_ready && s->qwen4_graph.snap_ple_hist != NULL &&
+               s->qwen4_graph.n_logit_rows >= 2u;
+    }
     if (ds4_session_is_glm(s)) {
         return prompt_lookup_glm_enabled() &&
                s->glm_graph_ready && s->glm_graph.glm53 &&
@@ -80229,10 +80250,7 @@ bool ds4_engine_prompt_lookup_supported(const ds4_engine *e) {
     (void)e;
     return false;
 #else
-    /* Qwen's recurrent GDN state needs its own multi-row verifier snapshot.
-     * Until that exists, never advertise the DeepSeek prompt-lookup path. */
-    return e && !ds4_model_is_qwen4() &&
-           e->backend == DS4_BACKEND_METAL && e->metal_ready &&
+    return e && e->backend == DS4_BACKEND_METAL && e->metal_ready &&
            prompt_lookup_draft_enabled() &&
            (g_ds4_shape.family != DS4_MODEL_FAMILY_GLM_DSA ||
             prompt_lookup_glm_enabled());
@@ -80495,6 +80513,149 @@ static int ds4_session_eval_glm_prompt_lookup(
 }
 #endif
 
+/* Qwen's native recurrent graph preserves the state after row zero of a
+ * verifier block.  Full matches commit the whole block directly; partial
+ * matches restore that anchor snapshot and replay only the agreeing suffix.
+ * This keeps rollback correct without a state snapshot at every row. */
+static int ds4_session_eval_qwen_prompt_lookup(
+        ds4_session *s, int first_token, int max_tokens, int eos_token,
+        int *accepted, int accepted_cap, char *err, size_t errlen) {
+#ifdef DS4_NO_GPU
+    (void)s; (void)first_token; (void)max_tokens; (void)eos_token;
+    (void)accepted; (void)accepted_cap;
+    if (errlen) snprintf(err, errlen, "GPU support is not compiled in");
+    return -1;
+#else
+    if (!s || !accepted || max_tokens <= 0 || accepted_cap <= 0) return 0;
+    ds4_engine *e = s->engine;
+    ds4_qwen4_gpu_graph *g = &s->qwen4_graph;
+    const uint32_t pos = g->pos;
+
+    int drafts[7];
+    bool ambiguous = false;
+    int draft_n = 0;
+    const bool gate = prompt_lookup_gate_enabled();
+    if (max_tokens >= 2 && accepted_cap >= 2 &&
+        pos + 2u <= g->ctx_cap && first_token != eos_token) {
+        int draft_cap = prompt_lookup_max_draft();
+        if (draft_cap > 7) draft_cap = 7;
+        if (draft_cap > max_tokens - 1) draft_cap = max_tokens - 1;
+        if (draft_cap > accepted_cap - 1) draft_cap = accepted_cap - 1;
+        if (draft_cap > (int)g->n_logit_rows - 1) {
+            draft_cap = (int)g->n_logit_rows - 1;
+        }
+        const int room = (int)g->ctx_cap - (int)pos;
+        if (draft_cap > room - 1) draft_cap = room - 1;
+        const double scan_t0 = now_sec();
+        draft_n = prompt_lookup_propose(
+            &s->checkpoint, first_token, draft_cap,
+            gate ? prompt_lookup_qwen_min_match() : DS4_PL_NGRAM,
+            gate, &ambiguous, drafts);
+        s->pl_scan_sec += now_sec() - scan_t0;
+        if (ambiguous) s->pl_gate_ambiguous++;
+        for (int i = 0; i < draft_n; i++) {
+            if (drafts[i] == eos_token) {
+                draft_n = i + 1;
+                break;
+            }
+        }
+    }
+    if (draft_n <= 0) {
+        s->pl_no_match++;
+        if (e && e->glm_mtp && DS4_N_NEXTN_PREDICT != 0 &&
+            g->mtp_R && accepted_cap >= 2) {
+            return ds4_session_qwen4_spec_cycle(
+                s, first_token, 0.0f, 0, 0.0f, 0.0f, NULL, false,
+                accepted, accepted_cap, err, errlen);
+        }
+        if (ds4_session_eval(s, first_token, err, errlen) != 0) return -1;
+        accepted[0] = first_token;
+        return 1;
+    }
+
+    int toks[8];
+    toks[0] = first_token;
+    memcpy(toks + 1, drafts, (size_t)draft_n * sizeof(drafts[0]));
+    const uint32_t n_verify = (uint32_t)draft_n + 1u;
+    const uint32_t V = DS4_N_VOCAB;
+    if (!s->qwen4_verify_logits) {
+        s->qwen4_verify_logits = xmalloc(8u * (size_t)V * sizeof(float));
+    }
+    float *rows = s->qwen4_verify_logits;
+    const bool pl_log = getenv("DS4_PROMPT_LOOKUP_LOG") != NULL;
+    const double verify_t0 = pl_log ? now_sec() : 0.0;
+
+    /* Any pending neural draft belongs to the old frontier. */
+    s->glm_mtp_have = 0;
+    g->snap_after_first = g->snap_ple_hist != NULL;
+    g->snap_valid = false;
+    if (!qwen4_graph_forward_tokens(
+            g, &e->model, &e->weights, toks, n_verify, rows, true)) {
+        g->snap_after_first = false;
+        if (errlen) snprintf(err, errlen,
+                             "Qwen3.8 prompt-lookup verification failed");
+        s->checkpoint_valid = false;
+        return -1;
+    }
+
+    int commit_total = 1;
+    for (int i = 0; i < draft_n; i++) {
+        if (sample_argmax(rows + (size_t)i * V, V) != drafts[i]) break;
+        commit_total++;
+    }
+    const bool full_match = commit_total == (int)n_verify;
+    token_vec_push(&s->checkpoint, first_token);
+    accepted[0] = first_token;
+    if (full_match) {
+        for (int i = 0; i < draft_n; i++) {
+            token_vec_push(&s->checkpoint, drafts[i]);
+            accepted[i + 1] = drafts[i];
+        }
+        memcpy(s->logits, rows + (size_t)(n_verify - 1u) * V,
+               (size_t)V * sizeof(float));
+    } else {
+        if (!g->snap_valid || !qwen4_graph_state_copy(g, false)) {
+            if (errlen) snprintf(err, errlen,
+                                 "Qwen3.8 prompt-lookup rejection restore failed");
+            s->checkpoint_valid = false;
+            return -1;
+        }
+        memcpy(s->logits, rows, (size_t)V * sizeof(float));
+        for (int i = 0; i + 1 < commit_total; i++) {
+            if (!qwen4_graph_forward_tokens(
+                    g, &e->model, &e->weights, &drafts[i], 1,
+                    s->logits, false)) {
+                if (errlen) snprintf(err, errlen,
+                                     "Qwen3.8 prompt-lookup partial replay failed");
+                s->checkpoint_valid = false;
+                return -1;
+            }
+            token_vec_push(&s->checkpoint, drafts[i]);
+            accepted[i + 1] = drafts[i];
+        }
+        if (commit_total == 1) s->pl_free_miss++;
+        if (gate) {
+            s->pl_gate_partials++;
+            s->pl_gate_skip_remaining = prompt_lookup_gate_backoff(
+                commit_total == 1 ? "DS4_PROMPT_LOOKUP_GATE_MISS_BACKOFF" :
+                                    "DS4_PROMPT_LOOKUP_GATE_PARTIAL_BACKOFF",
+                commit_total == 1 ? 64 : 8);
+        }
+    }
+    s->checkpoint_valid = true;
+    s->mtp_draft_valid = false;
+    s->pl_passes++;
+    s->pl_drafted += (uint64_t)draft_n;
+    s->pl_committed += (uint64_t)(commit_total - 1);
+    if (pl_log) {
+        fprintf(stderr,
+                "ds4: Qwen3.8 prompt-lookup drafted=%d committed=%d verify=%.3f ms\n",
+                draft_n, commit_total - 1, (now_sec() - verify_t0) * 1000.0);
+    }
+    return commit_total;
+#endif
+}
+
 /* Greedy prompt-lookup speculative eval.  Same contract and acceptance rule as
  * ds4_session_eval_speculative_argmax, with the session's own token history as
  * the drafter instead of the MTP head: commit one normal target token, draft
@@ -80520,6 +80681,12 @@ int ds4_session_eval_prompt_lookup_argmax(ds4_session *s, int first_token,
     return -1;
 #else
     ds4_engine *e = s->engine;
+
+    if (ds4_session_is_qwen4(s)) {
+        return ds4_session_eval_qwen_prompt_lookup(
+            s, first_token, max_tokens, eos_token,
+            accepted, accepted_cap, err, errlen);
+    }
 
     if (ds4_session_is_glm(s)) {
         return ds4_session_eval_glm_prompt_lookup(
