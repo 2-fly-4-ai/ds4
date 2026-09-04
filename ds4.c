@@ -55043,6 +55043,7 @@ struct ds4_session {
     uint64_t pl_gate_skips;
     uint64_t pl_gate_partials;
     uint64_t pl_gate_ambiguous;
+    uint64_t pl_parity_replays;
     uint32_t pl_gate_skip_remaining;
     uint32_t pl_adaptive_full_streak;
     double pl_scan_sec;
@@ -65749,7 +65750,7 @@ void ds4_session_free(ds4_session *s) {
                 "ds4: prompt-lookup summary: attempts=%llu no_match=%llu first_miss=%llu "
                 "verify_passes=%llu drafted=%llu committed=%llu accept=%.1f%% "
                 "tokens/pass=%.2f scan=%.2f ms total gate_skips=%llu "
-                "gate_partials=%llu gate_ambiguous=%llu\n",
+                "gate_partials=%llu gate_ambiguous=%llu parity_replays=%llu\n",
                 (unsigned long long)attempts,
                 (unsigned long long)s->pl_no_match,
                 (unsigned long long)s->pl_free_miss,
@@ -65761,7 +65762,8 @@ void ds4_session_free(ds4_session *s) {
                 s->pl_scan_sec * 1000.0,
                 (unsigned long long)s->pl_gate_skips,
                 (unsigned long long)s->pl_gate_partials,
-                (unsigned long long)s->pl_gate_ambiguous);
+                (unsigned long long)s->pl_gate_ambiguous,
+                (unsigned long long)s->pl_parity_replays);
     }
     ds4_dist_session_free(s->distributed);
     if (ds4_session_is_cpu(s)) {
@@ -76162,6 +76164,75 @@ static bool prompt_lookup_gate_enabled(void) {
     return cached == 1;
 }
 
+/* Batched verification changes reduction order versus one-token decode.  A
+ * comfortable greedy margin makes that harmless; a near tie can otherwise
+ * select a different route even when every context draft was accepted.  All
+ * verifier logits already live in shared Metal memory, so inspect the rows
+ * and replay only ambiguous blocks through exact one-token decode. */
+static float prompt_lookup_parity_margin(void) {
+    const char *e = getenv("DS4_PROMPT_LOOKUP_PARITY_MARGIN");
+    if (!e || !e[0]) return 0.25f;
+    char *end = NULL;
+    errno = 0;
+    const float v = strtof(e, &end);
+    while (end && isspace((unsigned char)*end)) end++;
+    if (end != e && end && *end == '\0' && errno == 0 &&
+        isfinite(v) && v >= 0.0f) {
+        return v;
+    }
+    return 0.25f;
+}
+
+#ifndef DS4_NO_GPU
+/* The verifier already computes top-1 IDs for acceptance. For the parity
+ * guard, run one tiny top-2 reduction over its resident logits and read only
+ * two IDs and two scalar logits per row. This avoids copying/scanning up to
+ * fifteen full vocabulary rows on the CPU. */
+static bool prompt_lookup_read_row_margins(ds4_gpu_graph *g,
+                                           uint32_t n_rows,
+                                           float *margins,
+                                           int *top0_out,
+                                           int *top1_out) {
+    if (!g || !g->spec_logits || !margins || n_rows == 0 ||
+        n_rows > (uint32_t)DS4_PL_MAX_DRAFT + 1u) {
+        return false;
+    }
+    uint32_t ids[2u * (DS4_PL_MAX_DRAFT + 1u)];
+    bool ok = ds4_gpu_begin_commands() != 0;
+    if (ok) {
+        ok = ds4_gpu_indexer_topk_tensor(metal_graph_comp_selected(g),
+                                         g->spec_logits,
+                                         DS4_N_VOCAB,
+                                         n_rows,
+                                         2) != 0;
+    }
+    if (ok) ok = ds4_gpu_end_commands() != 0;
+    else (void)ds4_gpu_synchronize();
+    if (ok) {
+        ok = ds4_gpu_tensor_read(metal_graph_comp_selected(g), 0, ids,
+                                 (uint64_t)n_rows * 2u * sizeof(ids[0])) != 0;
+    }
+    for (uint32_t row = 0; ok && row < n_rows; row++) {
+        const uint32_t top0 = ids[2u * row];
+        const uint32_t top1 = ids[2u * row + 1u];
+        float value0 = 0.0f, value1 = 0.0f;
+        if (top0 >= DS4_N_VOCAB || top1 >= DS4_N_VOCAB) return false;
+        ok = ds4_gpu_tensor_read(
+                 g->spec_logits,
+                 ((uint64_t)row * DS4_N_VOCAB + top0) * sizeof(float),
+                 &value0, sizeof(value0)) != 0 &&
+             ds4_gpu_tensor_read(
+                 g->spec_logits,
+                 ((uint64_t)row * DS4_N_VOCAB + top1) * sizeof(float),
+                 &value1, sizeof(value1)) != 0;
+        margins[row] = value0 - value1;
+        if (top0_out) top0_out[row] = (int)top0;
+        if (top1_out) top1_out[row] = (int)top1;
+    }
+    return ok;
+}
+#endif
+
 static uint32_t prompt_lookup_gate_backoff(const char *name, uint32_t fallback) {
     const char *e = getenv(name);
     if (!e || !e[0]) return fallback;
@@ -76242,6 +76313,23 @@ int ds4_session_prompt_lookup_candidate(ds4_session *s, int pending,
     return prompt_lookup_propose(&s->checkpoint, pending,
                                  prompt_lookup_max_draft(), min_match,
                                  true, &ambiguous, drafts);
+}
+
+ds4_decode_route ds4_session_select_decode_route(
+        ds4_session *s, int pending,
+        bool allow_prompt_lookup, bool allow_neural_speculation,
+        bool ignore_eos) {
+    if (allow_prompt_lookup && !ignore_eos &&
+        ds4_session_prompt_lookup_supported(s) &&
+        ds4_session_prompt_lookup_candidate(s, pending, 0) > 0) {
+        return DS4_DECODE_ROUTE_PROMPT_LOOKUP;
+    }
+    if (allow_neural_speculation && s && s->engine &&
+        ds4_engine_mtp_draft_tokens(s->engine) > 1 &&
+        getenv("DS4_MTP_SPEC_DISABLE") == NULL) {
+        return DS4_DECODE_ROUTE_NEURAL_SPECULATION;
+    }
+    return DS4_DECODE_ROUTE_PLAIN;
 }
 
 bool ds4_session_prompt_lookup_supported(const ds4_session *s) {
@@ -76341,8 +76429,10 @@ static int ds4_session_eval_glm_prompt_lookup(
     const uint32_t n_verify = (uint32_t)draft_n + 1u;
     const uint64_t hc_row_values =
         (uint64_t)DS4_N_EMBD * DS4_N_HC;
-    const bool gpu_top1 = prompt_lookup_glm_gpu_top1_enabled(
-        s, exact_sampling);
+    const float parity_margin = exact_sampling ? 0.0f :
+        prompt_lookup_parity_margin();
+    const bool gpu_top1 = parity_margin <= 0.0f &&
+        prompt_lookup_glm_gpu_top1_enabled(s, exact_sampling);
     int toks[DS4_PL_MAX_DRAFT + 1];
     int32_t row_tops[DS4_PL_MAX_DRAFT + 1];
     toks[0] = first_token;
@@ -76410,11 +76500,41 @@ static int ds4_session_eval_glm_prompt_lookup(
     }
     const int matched_drafts = commit_total - 1;
     const bool full_accept = commit_total == (int)n_verify;
+    float min_margin = FLT_MAX;
+    int min_margin_row = -1;
+    int min_top0 = -1, min_top1 = -1;
+    if (!exact_sampling && !gpu_top1) {
+        for (int row = 0; row < commit_total; row++) {
+            int top0 = -1, top1 = -1;
+            float value0 = DS4_NEG_INF, value1 = DS4_NEG_INF;
+            logits_top2(row_logits + (size_t)row * DS4_N_VOCAB,
+                        DS4_N_VOCAB, &top0, &value0, &top1, &value1);
+            const float margin = value0 - value1;
+            if (margin < min_margin) {
+                min_margin = margin;
+                min_margin_row = row;
+                min_top0 = top0;
+                min_top1 = top1;
+            }
+        }
+    }
+    const bool parity_replay = parity_margin > 0.0f &&
+        (!isfinite(min_margin) || min_margin < parity_margin);
+    if (!exact_sampling &&
+        getenv("DS4_PROMPT_LOOKUP_PARITY_LOG") != NULL) {
+        fprintf(stderr,
+                "ds4: GLM prompt-lookup parity start=%u rows=%u "
+                "committed=%d min_row=%d top=%d second=%d "
+                "margin=%.6f threshold=%.6f replay=%d\n",
+                pos, n_verify, commit_total, min_margin_row,
+                min_top0, min_top1, (double)min_margin,
+                (double)parity_margin, parity_replay ? 1 : 0);
+    }
     prompt_lookup_adaptive_note(s, full_accept);
     int returned_total = commit_total;
 
     bool commit_ok = true;
-    if (full_accept) {
+    if (full_accept && !parity_replay) {
         if (kda_shadow) glm53_graph_swap_kda_shadows(g);
         for (int i = 0; i < commit_total; i++) {
             token_vec_push(&s->checkpoint, toks[i]);
@@ -76426,9 +76546,9 @@ static int ds4_session_eval_glm_prompt_lookup(
                    row_logits + (size_t)(n_verify - 1u) * DS4_N_VOCAB,
                (size_t)DS4_N_VOCAB * sizeof(float));
     } else {
-        /* The verifier wrote KDA state only to shadows.  Re-run a rare partial
-         * prefix through exact one-token decode so the committed frontier has
-         * the same numerics and recurrent state as ordinary GLM generation.
+        /* The verifier wrote KDA state only to shadows. Re-run a partial prefix
+         * or a near-tied full block through exact one-token decode so the
+         * committed frontier has ordinary GLM numerics and recurrent state.
          * Exact sampling also appends the target-sampled replacement token;
          * drawing directly from each target row consumes the same one RNG
          * value per output token as ordinary sampling. */
@@ -76470,6 +76590,7 @@ static int ds4_session_eval_glm_prompt_lookup(
     s->checkpoint_valid = true;
     s->glm_mtp_have = 0;
     s->glm_mtp_rollback_valid = false;
+    if (parity_replay) s->pl_parity_replays++;
 
     s->pl_passes++;
     s->pl_drafted += (uint64_t)draft_n;
@@ -76503,9 +76624,10 @@ static int ds4_session_eval_glm_prompt_lookup(
  * the drafter instead of the MTP head: commit one normal target token, draft
  * the continuation from the most recent matching context span, verify the
  * suffix with the target model in one batched pass, and commit only the
- * agreeing prefix (rolling back speculative Metal state otherwise).  The
- * batched verifier is the same one the MTP path uses, with the same non-quality
- * caveat about batched reductions on nearly-tied logits. */
+ * agreeing prefix (rolling back speculative Metal state otherwise).  Batched
+ * reductions can move nearly tied logits across an argmax boundary, so the
+ * default parity guard replays ambiguous committed blocks through the normal
+ * one-token path before their state can escape the verifier. */
 int ds4_session_eval_prompt_lookup_argmax(ds4_session *s, int first_token,
                                           int max_tokens, int eos_token,
                                           int *accepted, int accepted_cap,
@@ -76581,11 +76703,12 @@ int ds4_session_eval_prompt_lookup_argmax(ds4_session *s, int first_token,
 
     const bool pl_log = getenv("DS4_PROMPT_LOOKUP_LOG") != NULL;
     int row_tops[DS4_PL_MAX_DRAFT];
-    float *row_logits = xmalloc((size_t)DS4_N_VOCAB * sizeof(row_logits[0]));
     ds4_spec_frontier frontier;
     memset(&frontier, 0, sizeof(frontier));
     const int start = s->checkpoint.len;
     const int n_verify = 1 + draft_n;
+    float *row_logits = xmalloc((size_t)DS4_N_VOCAB *
+                                sizeof(row_logits[0]));
     const double verify_t0 = pl_log ? now_sec() : 0.0;
     const bool have_frontier = spec_frontier_snapshot(&frontier, s);
     bool ok = have_frontier;
@@ -76599,9 +76722,12 @@ int ds4_session_eval_prompt_lookup_argmax(ds4_session *s, int first_token,
         const int previous_mv16 =
             ds4_gpu_set_prompt_verifier_mv16(n_verify > 8);
 #endif
+        const bool capture_dspark =
+            e->support_kind == DS4_SUPPORT_DSPARK && e->dspark;
         ok = metal_graph_verify_suffix_tops(&s->graph, &e->model, &e->weights,
                                             &s->checkpoint, (uint32_t)start,
-                                            (uint32_t)n_verify, false, false,
+                                            (uint32_t)n_verify, false,
+                                            capture_dspark,
                                             row_tops, NULL, NULL);
 #if defined(__APPLE__)
         (void)ds4_gpu_set_prompt_verifier_mv16(previous_mv16);
@@ -76616,11 +76742,7 @@ int ds4_session_eval_prompt_lookup_argmax(ds4_session *s, int first_token,
             if (row_tops[i] != drafts[i]) break;
             commit_total++;
         }
-        if (commit_total == n_verify) {
-            ok = metal_graph_read_spec_logits_row(&s->graph,
-                                                  (uint32_t)(n_verify - 1),
-                                                  row_logits);
-        } else {
+        if (commit_total != n_verify) {
             /* Partial accept: rebuild exact state for just the accepted prefix.
              * A lone anchor replays through the normal decode path (exact
              * one-token numerics, as the MTP partial path does); longer
@@ -76651,21 +76773,84 @@ int ds4_session_eval_prompt_lookup_argmax(ds4_session *s, int first_token,
                 const int previous_mv16 =
                     ds4_gpu_set_prompt_verifier_mv16(commit_total > 8);
 #endif
+                const bool capture_dspark =
+                    e->support_kind == DS4_SUPPORT_DSPARK && e->dspark;
                 ok = metal_graph_verify_suffix_tops(&s->graph, &e->model, &e->weights,
                                                     &s->checkpoint, (uint32_t)start,
                                                     (uint32_t)commit_total, false,
-                                                    false, row_tops, NULL, NULL);
+                                                    capture_dspark,
+                                                    row_tops, NULL, NULL);
 #if defined(__APPLE__)
                 (void)ds4_gpu_set_prompt_verifier_mv16(previous_mv16);
 #endif
             }
-            if (ok) ok = metal_graph_read_spec_logits_row(&s->graph,
-                                                          (uint32_t)(commit_total - 1),
-                                                          row_logits);
+        }
+        float row_margins[DS4_PL_MAX_DRAFT + 1];
+        int row_top0[DS4_PL_MAX_DRAFT + 1];
+        int row_top1[DS4_PL_MAX_DRAFT + 1];
+        const float parity_margin = prompt_lookup_parity_margin();
+        if (ok && parity_margin > 0.0f) {
+            ok = prompt_lookup_read_row_margins(
+                &s->graph, (uint32_t)commit_total,
+                row_margins, row_top0, row_top1);
         }
         if (ok) {
+            ok = metal_graph_read_spec_logits_row(
+                &s->graph, (uint32_t)(commit_total - 1), row_logits);
+        }
+        if (ok) {
+            float min_margin = FLT_MAX;
+            int min_margin_row = -1;
+            int min_top0 = -1, min_top1 = -1;
+            if (parity_margin > 0.0f) {
+                for (int row = 0; row < commit_total; row++) {
+                    const float margin = row_margins[row];
+                    if (margin < min_margin) {
+                        min_margin = margin;
+                        min_margin_row = row;
+                        min_top0 = row_top0[row];
+                        min_top1 = row_top1[row];
+                    }
+                }
+            }
+            const bool parity_replay = parity_margin > 0.0f &&
+                (!isfinite(min_margin) || min_margin < parity_margin);
+            if (getenv("DS4_PROMPT_LOOKUP_PARITY_LOG") != NULL) {
+                fprintf(stderr,
+                        "ds4: prompt-lookup parity start=%d rows=%d "
+                        "committed=%d min_row=%d top=%d second=%d "
+                        "margin=%.6f threshold=%.6f replay=%d\n",
+                        start, n_verify, commit_total, min_margin_row,
+                        min_top0, min_top1, (double)min_margin,
+                        (double)parity_margin, parity_replay ? 1 : 0);
+            }
+            if (parity_replay) {
+                s->checkpoint.len = start;
+                if (!spec_frontier_restore(&frontier, s)) {
+                    snprintf(err, errlen,
+                             "prompt-lookup parity rollback failed");
+                    s->checkpoint_valid = false;
+                    spec_frontier_free(&frontier);
+                    free(row_logits);
+                    return -1;
+                }
+                for (int i = 0; i < commit_total; i++) {
+                    const int replay_token =
+                        i == 0 ? first_token : drafts[i - 1];
+                    if (ds4_session_eval(s, replay_token,
+                                         err, errlen) != 0) {
+                        s->checkpoint_valid = false;
+                        spec_frontier_free(&frontier);
+                        free(row_logits);
+                        return -1;
+                    }
+                }
+                s->pl_parity_replays++;
+            } else {
+                memcpy(s->logits, row_logits,
+                       (size_t)DS4_N_VOCAB * sizeof(s->logits[0]));
+            }
             prompt_lookup_adaptive_note(s, commit_total == n_verify);
-            memcpy(s->logits, row_logits, (size_t)DS4_N_VOCAB * sizeof(s->logits[0]));
             accepted[n_accept++] = first_token;
             for (int i = 0; i + 1 < commit_total && n_accept < accepted_cap; i++) {
                 accepted[n_accept++] = drafts[i];
@@ -76673,6 +76858,11 @@ int ds4_session_eval_prompt_lookup_argmax(ds4_session *s, int first_token,
             }
             s->checkpoint_valid = true;
             s->mtp_draft_valid = false;
+            s->dspark_draft_valid = false;
+            s->dspark_draft_len = 0;
+            if (!parity_replay && e->support_kind == DS4_SUPPORT_DSPARK) {
+                ds4_session_dspark_capture_note_checkpoint(s);
+            }
             s->pl_passes++;
             s->pl_drafted += (uint64_t)draft_n;
             s->pl_committed += (uint64_t)(commit_total - 1);

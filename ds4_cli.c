@@ -482,7 +482,6 @@ static bool cli_prompt_lookup_hybrid_enabled(ds4_session *session,
     const bool sampled = temperature > 0.0f && sampled_enabled &&
         ds4_engine_is_glm_dsa(engine);
     return (temperature <= 0.0f || sampled) &&
-           ds4_engine_mtp_draft_tokens(engine) <= 1 &&
            ds4_session_prompt_lookup_supported(session) &&
            cli_env_flag_enabled("DS4_PROMPT_LOOKUP_HYBRID", true) &&
            cli_env_flag_enabled("DS4_PROMPT_LOOKUP_GATE", true);
@@ -620,9 +619,9 @@ static int run_sampled_generation(ds4_engine *engine, const cli_config *cfg, con
 
 cli_hybrid_chain_again:
     prompt_lookup_active = prompt_lookup_hybrid &&
-        ds4_engine_is_glm_dsa(engine) &&
-        !ds4_think_mode_enabled(think_mode) &&
-        cli_env_flag_enabled("DS4_GLM_PROMPT_LOOKUP", true);
+        (!ds4_engine_is_glm_dsa(engine) ||
+         (!ds4_think_mode_enabled(think_mode) &&
+          cli_env_flag_enabled("DS4_GLM_PROMPT_LOOKUP", true)));
     prompt_lookup_pending = -1;
     if (!generation_finished && cfg->gen.temperature <= 0.0f &&
         prompt_lookup_hybrid &&
@@ -678,22 +677,9 @@ cli_hybrid_chain_again:
 
         int toks[17];
         int ntok = 0;
-        if (ds4_engine_mtp_draft_tokens(engine) > 1 &&
-            getenv("DS4_MTP_SPEC_DISABLE") == NULL) {
-            cli_dist_busy_set(cfg, true);
-            ntok = ds4_session_eval_speculative(
-                session, token, max_tokens - generated,
-                ds4_token_eos(engine), cfg->gen.temperature, 0,
-                cfg->gen.top_p, cfg->gen.min_p, &rng,
-                toks, (int)(sizeof(toks) / sizeof(toks[0])),
-                err, sizeof(err));
-            cli_dist_busy_set(cfg, false);
-            if (ntok < 0) {
-                fprintf(stderr, "ds4: decode failed: %s\n", err);
-                ds4_session_free(session);
-                return 1;
-            }
-        } else if (prompt_lookup_active) {
+        const ds4_decode_route route = ds4_session_select_decode_route(
+            session, token, prompt_lookup_active, true, false);
+        if (route == DS4_DECODE_ROUTE_PROMPT_LOOKUP) {
             cli_dist_busy_set(cfg, true);
             ntok = cfg->gen.temperature <= 0.0f ?
                 ds4_session_eval_prompt_lookup_argmax(
@@ -707,6 +693,20 @@ cli_hybrid_chain_again:
                     cfg->gen.top_p, cfg->gen.min_p, &rng, toks,
                     (int)(sizeof(toks) / sizeof(toks[0])),
                     err, sizeof(err));
+            cli_dist_busy_set(cfg, false);
+            if (ntok < 0) {
+                fprintf(stderr, "ds4: decode failed: %s\n", err);
+                ds4_session_free(session);
+                return 1;
+            }
+        } else if (route == DS4_DECODE_ROUTE_NEURAL_SPECULATION) {
+            cli_dist_busy_set(cfg, true);
+            ntok = ds4_session_eval_speculative(
+                session, token, max_tokens - generated,
+                ds4_token_eos(engine), cfg->gen.temperature, 0,
+                cfg->gen.top_p, cfg->gen.min_p, &rng,
+                toks, (int)(sizeof(toks) / sizeof(toks[0])),
+                err, sizeof(err));
             cli_dist_busy_set(cfg, false);
             if (ntok < 0) {
                 fprintf(stderr, "ds4: decode failed: %s\n", err);
@@ -750,7 +750,8 @@ cli_hybrid_chain_again:
             if (generated >= max_tokens) break;
         }
         if (stop) break;
-        if (prompt_lookup_active && ntok == 1 && generated < max_tokens) {
+        if (route == DS4_DECODE_ROUTE_PROMPT_LOOKUP &&
+            ntok == 1 && generated < max_tokens) {
             goto cli_hybrid_chain_again;
         }
     }
@@ -1666,9 +1667,9 @@ static int run_chat_turn(ds4_engine *engine, cli_config *cfg, repl_chat *chat,
 
 repl_hybrid_chain_again:
     prompt_lookup_active = prompt_lookup_hybrid &&
-        ds4_engine_is_glm_dsa(engine) &&
-        !ds4_think_mode_enabled(think_mode) &&
-        cli_env_flag_enabled("DS4_GLM_PROMPT_LOOKUP", true);
+        (!ds4_engine_is_glm_dsa(engine) ||
+         (!ds4_think_mode_enabled(think_mode) &&
+          cli_env_flag_enabled("DS4_GLM_PROMPT_LOOKUP", true)));
     prompt_lookup_pending = -1;
     if (!generation_finished && cfg->gen.temperature <= 0.0f &&
         prompt_lookup_hybrid &&
@@ -1728,21 +1729,9 @@ repl_hybrid_chain_again:
 
         int toks[17];
         int ntok = 0;
-        if (ds4_engine_mtp_draft_tokens(engine) > 1 &&
-            getenv("DS4_MTP_SPEC_DISABLE") == NULL) {
-            cli_dist_busy_set(cfg, true);
-            ntok = ds4_session_eval_speculative(
-                chat->session, token, max_tokens - generated,
-                ds4_token_eos(engine), cfg->gen.temperature, 0,
-                cfg->gen.top_p, cfg->gen.min_p, &rng,
-                toks, (int)(sizeof(toks) / sizeof(toks[0])),
-                err, sizeof(err));
-            cli_dist_busy_set(cfg, false);
-            if (ntok < 0) {
-                fprintf(stderr, "ds4: decode failed: %s\n", err);
-                return 1;
-            }
-        } else if (prompt_lookup_active) {
+        const ds4_decode_route route = ds4_session_select_decode_route(
+            chat->session, token, prompt_lookup_active, true, false);
+        if (route == DS4_DECODE_ROUTE_PROMPT_LOOKUP) {
             cli_dist_busy_set(cfg, true);
             ntok = cfg->gen.temperature <= 0.0f ?
                 ds4_session_eval_prompt_lookup_argmax(
@@ -1760,6 +1749,19 @@ repl_hybrid_chain_again:
             if (ntok < 0) {
                 fprintf(stderr, "ds4: decode failed: %s\n", err);
                 ds4_session_invalidate(chat->session);
+                return 1;
+            }
+        } else if (route == DS4_DECODE_ROUTE_NEURAL_SPECULATION) {
+            cli_dist_busy_set(cfg, true);
+            ntok = ds4_session_eval_speculative(
+                chat->session, token, max_tokens - generated,
+                ds4_token_eos(engine), cfg->gen.temperature, 0,
+                cfg->gen.top_p, cfg->gen.min_p, &rng,
+                toks, (int)(sizeof(toks) / sizeof(toks[0])),
+                err, sizeof(err));
+            cli_dist_busy_set(cfg, false);
+            if (ntok < 0) {
+                fprintf(stderr, "ds4: decode failed: %s\n", err);
                 return 1;
             }
         } else {
@@ -1799,7 +1801,8 @@ repl_hybrid_chain_again:
             if (generated >= max_tokens) break;
         }
         if (stop) break;
-        if (prompt_lookup_active && ntok == 1 && generated < max_tokens) {
+        if (route == DS4_DECODE_ROUTE_PROMPT_LOOKUP &&
+            ntok == 1 && generated < max_tokens) {
             goto repl_hybrid_chain_again;
         }
     }

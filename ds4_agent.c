@@ -942,7 +942,6 @@ static bool agent_prompt_lookup_enabled(ds4_session *session,
     return session && engine &&
            agent_prompt_lookup_mode_eligible(ds4_engine_is_glm_dsa(engine),
                                              temperature, think_mode) &&
-           ds4_engine_mtp_draft_tokens(engine) <= 1 &&
            ds4_session_prompt_lookup_supported(session) &&
            agent_env_flag_enabled("DS4_PROMPT_LOOKUP_HYBRID", true) &&
            agent_env_flag_enabled("DS4_PROMPT_LOOKUP_GATE", true) &&
@@ -9242,8 +9241,9 @@ static int worker_run_turn(agent_worker *w, const char *user_text) {
             int toks[17];
             int ntok = 0;
             const int block_start = ds4_session_pos(w->session);
-            if (ds4_engine_mtp_draft_tokens(w->engine) > 1 &&
-                getenv("DS4_MTP_SPEC_DISABLE") == NULL) {
+            const ds4_decode_route route = ds4_session_select_decode_route(
+                w->session, token, prompt_lookup_enabled, true, false);
+            if (route == DS4_DECODE_ROUTE_NEURAL_SPECULATION) {
                 ntok = ds4_session_eval_speculative(
                     w->session, token, max_tokens - generated,
                     ds4_token_eos(w->engine),
@@ -9257,7 +9257,7 @@ static int worker_run_turn(agent_worker *w, const char *user_text) {
                     agent_set_error(w, err);
                     return 1;
                 }
-            } else if (prompt_lookup_enabled) {
+            } else if (route == DS4_DECODE_ROUTE_PROMPT_LOOKUP) {
                 const float lookup_temperature =
                     greedy_sampling ? 0.0f : cfg->gen.temperature;
                 ntok = lookup_temperature <= 0.0f ?
@@ -9592,8 +9592,9 @@ static int worker_run_raw_prompt(agent_worker *w, const char *user_text) {
         int toks[17];
         int ntok = 0;
         const int block_start = ds4_session_pos(w->session);
-        if (ds4_engine_mtp_draft_tokens(w->engine) > 1 &&
-            getenv("DS4_MTP_SPEC_DISABLE") == NULL) {
+        const ds4_decode_route route = ds4_session_select_decode_route(
+            w->session, token, prompt_lookup_enabled, true, false);
+        if (route == DS4_DECODE_ROUTE_NEURAL_SPECULATION) {
             ntok = ds4_session_eval_speculative(
                 w->session, token, max_tokens - generated,
                 ds4_token_eos(w->engine), cfg->gen.temperature, 0,
@@ -9605,7 +9606,7 @@ static int worker_run_raw_prompt(agent_worker *w, const char *user_text) {
                 ds4_tokens_free(&prompt);
                 return 1;
             }
-        } else if (prompt_lookup_enabled) {
+        } else if (route == DS4_DECODE_ROUTE_PROMPT_LOOKUP) {
             ntok = cfg->gen.temperature <= 0.0f ?
                 ds4_session_eval_prompt_lookup_argmax(
                     w->session, token, max_tokens - generated,

@@ -574,6 +574,18 @@ int ds4_session_eval_prompt_lookup_sampled(
  * selects the gate's configured threshold. */
 int ds4_session_prompt_lookup_candidate(ds4_session *s, int pending,
                                         int min_match);
+typedef enum {
+    DS4_DECODE_ROUTE_PLAIN = 0,
+    DS4_DECODE_ROUTE_PROMPT_LOOKUP,
+    DS4_DECODE_ROUTE_NEURAL_SPECULATION,
+} ds4_decode_route;
+/* Shared frontend router. Prompt-derived drafts are free to propose, so they
+ * take priority when a guarded candidate exists; otherwise use the loaded
+ * MTP/DSpark route, then ordinary one-token decode. */
+ds4_decode_route ds4_session_select_decode_route(
+        ds4_session *s, int pending,
+        bool allow_prompt_lookup, bool allow_neural_speculation,
+        bool ignore_eos);
 /* True when this session has the verifier state needed by the guarded
  * prompt-lookup router. */
 bool ds4_session_prompt_lookup_supported(const ds4_session *s);

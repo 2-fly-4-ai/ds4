@@ -331,16 +331,25 @@ CLI, and `ds4-agent` ordinary/raw generation routes all select the shared
 optimization when their request shape is eligible. The agent's native tool
 parser supports verified blocks and rewinds an unused suffix at parser-mode or
 tool-call boundaries. GLM thinking, API requests carrying tools or stop
-strings, SSD streaming, tensor parallelism, native MTP, and temperatures above
-1.0 keep their existing paths. Set `DS4_GLM_PROMPT_LOOKUP_SAMPLING=0` to
+strings, SSD streaming, tensor parallelism, and temperatures above 1.0 keep
+their existing paths. When native MTP is explicitly enabled, the shared router
+uses a guarded prompt-lookup match first, MTP's adaptive route otherwise, and
+ordinary decode as the final fallback. DSpark uses the same priority order when
+its separate support model is explicitly loaded; neither neural sidecar is
+enabled automatically. Set `DS4_GLM_PROMPT_LOOKUP_SAMPLING=0` to
 disable sampled lookup, or `=1` to opt an experimental temperature above 1.0
 in. Set
 `DS4_GLM_PROMPT_LOOKUP=0` to disable this optimization for GLM entirely, or
 `DS4_PROMPT_LOOKUP_DISABLE=1` for the global rollback.
 
-Greedy GLM prompt verification on an M5 selects intermediate argmax token IDs
-on the GPU and reads back only the final full logits row. Set
-`DS4_GLM_PROMPT_LOOKUP_GPU_TOP1=0` to restore the all-logits readback. Set
+Greedy prompt verification guards numerical route parity by checking every
+committed row's top-two logit margin. A block below the default 0.25 margin is
+restored and replayed through ordinary one-token decode; the session summary
+reports these rare `parity_replays`. Set
+`DS4_PROMPT_LOOKUP_PARITY_MARGIN=0` to disable the guard for a diagnostic
+rollback. With that rollback, greedy GLM verification on an M5 again selects
+intermediate argmax IDs on the GPU and reads only the final full logits row;
+`DS4_GLM_PROMPT_LOOKUP_GPU_TOP1=0` forces its all-logits path. Set
 `DS4_GLM_PROMPT_LOOKUP_ADAPTIVE=0` to retain the former fixed three-draft
 schedule, or change `DS4_GLM_PROMPT_LOOKUP_ADAPTIVE_STREAK` from its default
 of eight full accepts for diagnostic policy experiments. As for DeepSeek,

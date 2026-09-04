@@ -12839,20 +12839,23 @@ hybrid_chain_again:
     const char *gate_env = getenv("DS4_PROMPT_LOOKUP_GATE");
     const bool prompt_lookup_hybrid =
         ds4_session_prompt_lookup_supported(slot->session) &&
-        ds4_engine_mtp_draft_tokens(s->engine) <= 1 &&
         (!hybrid_env || (hybrid_env[0] && hybrid_env[0] != '0')) &&
         (!gate_env || (gate_env[0] && gate_env[0] != '0'));
     const char *glm_pl_env = getenv("DS4_GLM_PROMPT_LOOKUP");
     const bool glm_pl_sampling =
         server_glm_prompt_lookup_sampling_enabled(j->req.temperature);
-    if (prompt_lookup_hybrid && ds4_engine_is_glm53(s->engine) &&
-        !ds4_think_mode_enabled(j->req.think_mode) &&
-        (server_greedy_chain_request_shape_eligible(s, &j->req,
-                                                    max_tokens, room) ||
-         (glm_pl_sampling &&
-          server_sampled_prompt_lookup_request_shape_eligible(
-              s, &j->req, max_tokens, room))) &&
-        (!glm_pl_env || (glm_pl_env[0] && glm_pl_env[0] != '0'))) {
+    const bool glm53 = ds4_engine_is_glm53(s->engine);
+    const bool greedy_lookup_shape =
+        server_greedy_chain_request_shape_eligible(s, &j->req,
+                                                   max_tokens, room);
+    const bool sampled_lookup_shape = glm53 && glm_pl_sampling &&
+        server_sampled_prompt_lookup_request_shape_eligible(
+            s, &j->req, max_tokens, room);
+    if (prompt_lookup_hybrid &&
+        ((!glm53 && greedy_lookup_shape) ||
+         (glm53 && !ds4_think_mode_enabled(j->req.think_mode) &&
+          (greedy_lookup_shape || sampled_lookup_shape) &&
+          (!glm_pl_env || (glm_pl_env[0] && glm_pl_env[0] != '0'))))) {
         prompt_lookup_active = true;
     }
     if (server_greedy_chain_request_shape_eligible(s, &j->req,
@@ -12985,28 +12988,10 @@ hybrid_chain_again:
 
         int toks[17];
         int ntok = 0;
-        if (!s->batched_mode &&
-            ds4_engine_mtp_draft_tokens(s->engine) > 1 &&
-            getenv("DS4_MTP_SPEC_DISABLE") == NULL)
-        {
-            if (j->req.ignore_eos) {
-                ntok = ds4_session_eval_speculative_argmax_ignoring_eos(
-                    slot->session, token, max_tokens - completion,
-                    eos_token, j->req.think_mode,
-                    toks, (int)(sizeof(toks) / sizeof(toks[0])),
-                    err, sizeof(err));
-            } else {
-                ntok = ds4_session_eval_speculative(
-                    slot->session, token, max_tokens - completion,
-                    eos_token, temperature, top_k, top_p, min_p, &rng,
-                    toks, (int)(sizeof(toks) / sizeof(toks[0])),
-                    err, sizeof(err));
-            }
-            if (ntok < 0) {
-                finish = "error";
-                break;
-            }
-        } else if (prompt_lookup_active) {
+        const ds4_decode_route route = ds4_session_select_decode_route(
+            slot->session, token, prompt_lookup_active,
+            !s->batched_mode, j->req.ignore_eos);
+        if (route == DS4_DECODE_ROUTE_PROMPT_LOOKUP) {
             /* Prompt-lookup drafting covers greedy decode spans, which includes
              * forced-greedy tool-call payloads on otherwise sampled requests.
              * Committed tokens flow through the same per-token stop/stream
@@ -13023,6 +13008,24 @@ hybrid_chain_again:
                     top_p, min_p, &rng, toks,
                     (int)(sizeof(toks) / sizeof(toks[0])),
                     err, sizeof(err));
+            if (ntok < 0) {
+                finish = "error";
+                break;
+            }
+        } else if (route == DS4_DECODE_ROUTE_NEURAL_SPECULATION) {
+            if (j->req.ignore_eos) {
+                ntok = ds4_session_eval_speculative_argmax_ignoring_eos(
+                    slot->session, token, max_tokens - completion,
+                    eos_token, j->req.think_mode,
+                    toks, (int)(sizeof(toks) / sizeof(toks[0])),
+                    err, sizeof(err));
+            } else {
+                ntok = ds4_session_eval_speculative(
+                    slot->session, token, max_tokens - completion,
+                    eos_token, temperature, top_k, top_p, min_p, &rng,
+                    toks, (int)(sizeof(toks) / sizeof(toks[0])),
+                    err, sizeof(err));
+            }
             if (ntok < 0) {
                 finish = "error";
                 break;
@@ -13237,7 +13240,8 @@ hybrid_chain_again:
             }
         }
         if (stop_decode) break;
-        if (prompt_lookup_active && ntok == 1 && completion < max_tokens &&
+        if (route == DS4_DECODE_ROUTE_PROMPT_LOOKUP &&
+            ntok == 1 && completion < max_tokens &&
             ds4_session_pos(slot->session) < ds4_session_ctx(slot->session)) {
             goto hybrid_chain_again;
         }
