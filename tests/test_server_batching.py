@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 """Concurrent API correctness/load check for ds4-server session batching.
 
-Each case is submitted twice with the same non-zero seed. The pairs run in one
-cold concurrent wave and must return identical output, even though prompt sizes
-and output limits differ across cases. A fresh nonce avoids accidental reuse of
-an earlier run's in-memory or disk checkpoint.
+Each case is submitted twice with the same non-zero seed. By default the pairs
+run in one cold concurrent wave and must return identical output, even though
+prompt sizes and output limits differ across cases. ``--serial`` instead sends
+the requests one at a time, which exercises live-cache continuation and rewind
+correctness. A fresh nonce avoids accidental reuse of an earlier disk
+checkpoint.
 """
 
 import argparse
 import concurrent.futures
 import json
 import math
+from pathlib import Path
 import statistics
 import sys
 import threading
@@ -174,7 +177,27 @@ def main():
     parser.add_argument("--workers", type=int, default=0)
     parser.add_argument("--timeout", type=float, default=1800.0)
     parser.add_argument("--stream", action="store_true")
+    parser.add_argument(
+        "--serial", action="store_true",
+        help="send requests serially to exercise live-cache reuse/rewind",
+    )
+    parser.add_argument(
+        "--warmup-requests", type=int, default=0,
+        help="discard this many serial requests before the equality oracle",
+    )
     parser.add_argument("--nonce", default="")
+    parser.add_argument(
+        "--prompt-file",
+        help="replace generated messages with this exact UTF-8 prompt",
+    )
+    parser.add_argument(
+        "--copy-corpus-file",
+        help="build a deterministic copy prompt from the start of this file",
+    )
+    parser.add_argument(
+        "--copy-corpus-chars", type=int, default=28128,
+        help="characters read by --copy-corpus-file (default: 28128)",
+    )
     parser.add_argument(
         "--same-prompt", action="store_true",
         help="send one identical prompt and seed in every request",
@@ -196,8 +219,33 @@ def main():
         parser.error("--pairs must be positive")
     if args.cancel_first < 0:
         parser.error("--cancel-first must not be negative")
+    if args.warmup_requests < 0:
+        parser.error("--warmup-requests must not be negative")
+    if args.warmup_requests and not args.serial:
+        parser.error("--warmup-requests requires --serial")
     if args.max_tokens is not None and args.max_tokens < 0:
         parser.error("--max-tokens must be non-negative")
+    if args.prompt_file and args.copy_corpus_file:
+        parser.error("--prompt-file and --copy-corpus-file are mutually exclusive")
+    if args.copy_corpus_chars <= 0:
+        parser.error("--copy-corpus-chars must be positive")
+    prompt_override = None
+    prompt_path = args.prompt_file or args.copy_corpus_file
+    if prompt_path:
+        try:
+            prompt_override = Path(prompt_path).read_text(encoding="utf-8")
+        except OSError as exc:
+            parser.error("cannot read prompt source: %s" % exc)
+    if args.copy_corpus_file:
+        corpus = prompt_override[:args.copy_corpus_chars]
+        prompt_override = (
+            "Reference prose corpus follows.\n\n"
+            + corpus
+            + "\n\nNow reproduce the text between BEGIN COPY and END COPY "
+            "exactly, with no introduction or code fence.\nBEGIN COPY\n"
+            + corpus[:900]
+            + "\nEND COPY"
+        )
 
     nonce = args.nonce or "cold-%d" % time.time_ns()
     cancelled = []
@@ -236,21 +284,36 @@ def main():
         )
         if args.max_tokens is not None:
             payload["max_tokens"] = args.max_tokens
+        if prompt_override is not None:
+            payload["messages"] = [{"role": "user", "content": prompt_override}]
         for copy in range(2):
             requests.append(payload)
             metadata.append((i, copy, name, filler_words))
 
-    workers = args.workers or len(requests)
-    workers = max(1, min(workers, len(requests)))
     start_event = threading.Event()
-    wall_start = time.monotonic()
-    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-        futures = [
-            executor.submit(post_chat, args.url, payload, args.timeout, start_event)
+    if args.serial:
+        workers = 1
+        start_event.set()
+        for _ in range(args.warmup_requests):
+            post_chat(args.url, requests[0], args.timeout, start_event)
+        wall_start = time.monotonic()
+        results = [
+            post_chat(args.url, payload, args.timeout, start_event)
             for payload in requests
         ]
-        start_event.set()
-        results = [future.result() for future in futures]
+    else:
+        workers = args.workers or len(requests)
+        workers = max(1, min(workers, len(requests)))
+        wall_start = time.monotonic()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = [
+                executor.submit(
+                    post_chat, args.url, payload, args.timeout, start_event
+                )
+                for payload in requests
+            ]
+            start_event.set()
+            results = [future.result() for future in futures]
     wall = time.monotonic() - wall_start
 
     failures = 0
@@ -296,6 +359,8 @@ def main():
         "pairs": args.pairs,
         "requests": len(requests),
         "workers": workers,
+        "serial": args.serial,
+        "warmup_requests": args.warmup_requests,
         "stream": args.stream,
         "wall_seconds": round(wall, 3),
         "latency_p50_seconds": round(statistics.median(latencies), 3),

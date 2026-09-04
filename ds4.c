@@ -47654,6 +47654,76 @@ static bool glm53_graph_copy_kda_state(
                                               save);
 }
 
+/* A server hot rewind needs the recurrent KDA state plus the partial
+ * four-token indexer pools.  The latter are scratch during forward decode,
+ * but they are part of the logical state whenever the frontier is not pool
+ * aligned. */
+static uint64_t glm53_graph_rewind_state_bytes(
+        const ds4_glm_gpu_graph *g) {
+    if (!g) return 0;
+    uint64_t total = glm53_graph_kda_state_bytes(g);
+    const uint64_t tail_bytes =
+        (uint64_t)DS4_GLM53_INDEX_POOL_SIZE *
+        DS4_N_INDEXER_HEAD_DIM * sizeof(float);
+    if (total == 0) return 0;
+    for (uint32_t il = g->layer_start; il <= g->layer_end; il++) {
+        if (ds4_glm53_layer_is_kda(il) ||
+            !glm_graph_layer_uses_full_indexer(il)) continue;
+        if (!g->layer_indexer_tail_k[il] ||
+            !g->layer_indexer_tail_gate[il] ||
+            tail_bytes > UINT64_MAX - total) return 0;
+        total += tail_bytes;
+        if (tail_bytes > UINT64_MAX - total) return 0;
+        total += tail_bytes;
+    }
+    return total;
+}
+
+static bool glm53_graph_copy_rewind_state_tensor(
+        ds4_glm_gpu_graph *g,
+        ds4_gpu_tensor    *snapshot,
+        bool               save) {
+    if (!g || !snapshot) return false;
+    const uint64_t kda_bytes = glm53_graph_kda_state_bytes(g);
+    const uint64_t expected = glm53_graph_rewind_state_bytes(g);
+    const uint64_t tail_bytes =
+        (uint64_t)DS4_GLM53_INDEX_POOL_SIZE *
+        DS4_N_INDEXER_HEAD_DIM * sizeof(float);
+    if (kda_bytes == 0 || expected == 0 ||
+        ds4_gpu_tensor_bytes(snapshot) < expected ||
+        !glm53_graph_copy_kda_state_tensor(g, snapshot, save)) {
+        return false;
+    }
+    if (expected == kda_bytes) return true;
+
+    bool ok = glm_graph_begin_commands_if_needed();
+    uint64_t offset = kda_bytes;
+    for (uint32_t il = g->layer_start; ok && il <= g->layer_end; il++) {
+        if (ds4_glm53_layer_is_kda(il) ||
+            !glm_graph_layer_uses_full_indexer(il)) continue;
+        if (!g->layer_indexer_tail_k[il] ||
+            !g->layer_indexer_tail_gate[il]) {
+            ok = false;
+            break;
+        }
+        ds4_gpu_tensor *tails[2] = {
+            g->layer_indexer_tail_k[il],
+            g->layer_indexer_tail_gate[il],
+        };
+        for (uint32_t i = 0; ok && i < 2; i++) {
+            ok = save ?
+                ds4_gpu_tensor_copy(snapshot, offset, tails[i], 0,
+                                    tail_bytes) != 0 :
+                ds4_gpu_tensor_copy(tails[i], 0, snapshot, offset,
+                                    tail_bytes) != 0;
+            offset += tail_bytes;
+        }
+    }
+    if (ok) ok = ds4_gpu_end_commands() != 0;
+    else (void)ds4_gpu_synchronize();
+    return ok && offset == expected;
+}
+
 static bool glm53_graph_make_kda_shadows(ds4_glm_gpu_graph *g) {
     if (!g || !g->glm53 || !g->mtp_kda_backup) return false;
     uint64_t offset = 0;
@@ -76841,7 +76911,7 @@ bool ds4_session_mark_rewind_point(ds4_session *s) {
         return false;
     }
     ds4_glm_gpu_graph *g = &s->glm_graph;
-    const uint64_t bytes = glm53_graph_kda_state_bytes(g);
+    const uint64_t bytes = glm53_graph_rewind_state_bytes(g);
     if (bytes == 0) return false;
     if (!g->rewind_kda_snapshot) {
         g->rewind_kda_snapshot = ds4_gpu_tensor_alloc(bytes);
@@ -76851,7 +76921,7 @@ bool ds4_session_mark_rewind_point(ds4_session *s) {
             malloc((size_t)DS4_N_VOCAB * sizeof(float));
     }
     if (!g->rewind_kda_snapshot || !s->glm_rewind_logits ||
-        !glm53_graph_copy_kda_state_tensor(g, g->rewind_kda_snapshot, true)) {
+        !glm53_graph_copy_rewind_state_tensor(g, g->rewind_kda_snapshot, true)) {
         s->glm_rewind_valid = false;
         return false;
     }
@@ -76888,7 +76958,7 @@ void ds4_session_rewind(ds4_session *s, int pos) {
     if (ds4_session_is_glm(s) && s->glm_graph.glm53 &&
         pos < s->checkpoint.len) {
         if (ds4_session_can_rewind_to(s, pos)) {
-            glm53_state_ok = glm53_graph_copy_kda_state_tensor(
+            glm53_state_ok = glm53_graph_copy_rewind_state_tensor(
                 &s->glm_graph, s->glm_graph.rewind_kda_snapshot, false);
             if (glm53_state_ok) {
                 memcpy(s->logits, s->glm_rewind_logits,
