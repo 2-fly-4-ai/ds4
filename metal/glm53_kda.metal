@@ -3,6 +3,7 @@
 struct glm53_kda_args {
     uint n_heads;
     uint n_rows;
+    uint keep_prefix1;
     float lower_bound;
     float norm_eps;
 };
@@ -171,6 +172,7 @@ kernel void kernel_glm53_kda_prefill_prepare(
         device const float   *a_log,
         device const float   *dt_bias,
         device float         *conv_state,
+        device float         *conv_state_prefix1,
         threadgroup float    *scratch [[threadgroup(0)]],
         uint head [[threadgroup_position_in_grid]],
         ushort tid [[thread_index_in_threadgroup]],
@@ -217,6 +219,17 @@ kernel void kernel_glm53_kda_prefill_prepare(
         v_state[channel] = v_state[projection + channel];
         v_state[projection + channel] = v_state[2ul * projection + channel];
         v_state[2ul * projection + channel] = v_new;
+
+        if (args.keep_prefix1 != 0u && token == 0u) {
+            for (uint w = 0; w < HISTORY; w++) {
+                conv_state_prefix1[(ulong)w * projection + channel] =
+                    q_state[(ulong)w * projection + channel];
+                conv_state_prefix1[((ulong)HISTORY + w) * projection + channel] =
+                    k_state[(ulong)w * projection + channel];
+                conv_state_prefix1[((ulong)(2u * HISTORY) + w) * projection + channel] =
+                    v_state[(ulong)w * projection + channel];
+            }
+        }
 
         sq[tid] = q_acc / (1.0f + exp(-q_acc));
         sk[tid] = k_acc / (1.0f + exp(-k_acc));
@@ -296,6 +309,7 @@ kernel void kernel_glm53_kda_prefill_recurrence_outofplace(
         device const float   *state,
         device float         *out,
         device float         *state_out,
+        device float         *state_prefix1,
         uint2 tgpig [[threadgroup_position_in_grid]],
         ushort lane [[thread_index_in_simdgroup]],
         ushort sg [[simdgroup_index_in_threadgroup]]) {
@@ -320,6 +334,9 @@ kernel void kernel_glm53_kda_prefill_recurrence_outofplace(
             (1.0f + exp(-raw_beta[(ulong)token * args.n_heads + head]));
         const float delta_v = (v[base + value] - hk) * beta;
         h = fma(k4, float4(delta_v), h);
+        if (args.keep_prefix1 != 0u && token == 0u) {
+            *((device float4 *)(state_prefix1 + state_offset)) = h;
+        }
         const float result = simd_sum(dot(h, q4));
         if (lane == 0u) out[base + value] = result;
     }

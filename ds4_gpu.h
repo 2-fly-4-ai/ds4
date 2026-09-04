@@ -3327,6 +3327,7 @@ int ds4_gpu_glm53_kda_prefill_outofplace(
         uint64_t              output_norm_offset,
         uint32_t              n_heads,
         uint32_t              n_tokens,
+        bool                  keep_prefix1,
         float                 gate_lower_bound,
         float                 norm_eps);
 #endif

@@ -221,6 +221,16 @@ diagnostic A/B runs only, set `DS4_GLM_MTP_BATCH_HEAD=0`,
 `DS4_GLM_MTP_CACHE_ONLY=0`, or `DS4_GLM_MTP_DISABLE_KDA_SHADOW=1` to restore
 the corresponding older path.
 
+On M5 Metal, the two-row KDA verifier also writes row zero's convolution and
+recurrent state directly to the committed buffers while retaining row one's
+candidate state in the shadows. A rejected draft can therefore keep row zero
+without replaying a whole target-model token. This lowers the measured
+break-even acceptance rate enough to use a 45% adaptive threshold, applies the
+confidence gate during calibration, and permits short requests to speculate.
+`DS4_GLM_MTP_DISABLE_REJECT_PREFIX=1` restores the older rejection replay and
+conservative policy. `DS4_GLM_MTP_ADAPT_MIN_PERCENT` and
+`DS4_GLM_MTP_ADAPT_TAIL_MIN` override the policy thresholds for diagnostics.
+
 Resident single-GPU GLM decode also appends the output head to the final layer
 command stream instead of submitting and waiting for a second command buffer.
 The change is byte-identical at the full-logit level and helps most at short

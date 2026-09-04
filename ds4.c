@@ -41523,6 +41523,7 @@ typedef struct ds4_glm_gpu_graph {
     ds4_gpu_tensor *mtp_kda_conv_shadow[DS4_MAX_LAYER];
     ds4_gpu_tensor *mtp_kda_recurrent_shadow[DS4_MAX_LAYER];
     bool            mtp_kda_outofplace;
+    bool            mtp_kda_keep_prefix1;
     int32_t        *mtp_selected_host;
     float          *mtp_logits_host;
     uint32_t        mtp_selected_base;
@@ -44386,6 +44387,7 @@ static bool glm53_graph_kda_attention_rows(
             l->kda_o_norm->abs_offset,
             DS4_N_KDA_HEAD,
             rows,
+            g->mtp_kda_keep_prefix1,
             DS4_KDA_GATE_LOWER_BOUND,
             DS4_RMS_EPS) != 0;
         } else
@@ -54962,6 +54964,7 @@ struct ds4_session {
     uint32_t glm_mtp_adapt_skip;
     uint32_t glm_mtp_adapt_backoff;
     bool glm_mtp_adapt_confirmed;
+    bool glm_mtp_last_gate_skip;
     float *glm_mtp_hc;
     float *glm_mtp_logits0;
     float *glm_rewind_logits;
@@ -66056,6 +66059,19 @@ static int speculative_point_replacement(ds4_session *s,
                                           int draft_token,
                                           uint64_t *rng);
 
+/* A two-row M5 verifier can materialize row zero's KDA state while retaining
+ * row one's candidate state in the existing shadows.  Rejection then keeps
+ * the target-verified prefix without paying for another whole-model token.
+ * Other devices retain the conservative replay path until measured. */
+static bool ds4_session_glm_mtp_fast_reject_enabled(const ds4_session *s) {
+    if (!s || !s->glm_graph.glm53) return false;
+    const bool forced =
+        getenv("DS4_GLM_MTP_KEEP_REJECT_PREFIX") != NULL;
+    const bool disabled =
+        getenv("DS4_GLM_MTP_DISABLE_REJECT_PREFIX") != NULL;
+    return forced || (!disabled && ds4_gpu_device_is_m5_apple_silicon());
+}
+
 /* One GLM MTP speculative cycle: evaluate first_token, and when a compatible
  * pending draft exists verify [first_token, draft] in one 2-row batch pass
  * (big gates only under TP).  Greedy and opportunistic sampling accept a draft
@@ -66081,6 +66097,8 @@ static int ds4_session_glm_spec_cycle_impl(
     ds4_glm_gpu_graph *g = &s->glm_graph;
     const uint32_t pos = (uint32_t)s->checkpoint.len;
     const bool timing = s->engine->glm_mtp_timing;
+    const bool keep_reject_prefix =
+        ds4_session_glm_mtp_fast_reject_enabled(s);
     const uint32_t dense_before = s->glm_dense_cache_len;
     const uint64_t hc_row_values =
         (uint64_t)DS4_N_EMBD * (g->glm53 ? DS4_N_HC : 1u);
@@ -66124,6 +66142,7 @@ static int ds4_session_glm_spec_cycle_impl(
 
     const double t0 = timing ? now_sec() : 0.0;
     s->glm_mtp_have = 0;
+    s->glm_mtp_last_gate_skip = false;
     const int d = s->glm_mtp_draft;
     const float draft_margin = s->glm_mtp_draft_margin;
     const char *margin_env = getenv("DS4_GLM_MTP_MARGIN_GATE");
@@ -66131,7 +66150,8 @@ static int ds4_session_glm_spec_cycle_impl(
     const bool adapt_forced_off =
         adapt_env && adapt_env[0] && strcmp(adapt_env, "0") == 0;
     if (g->glm53 &&
-        (s->glm_mtp_adapt_confirmed || adapt_forced_off)) {
+        (keep_reject_prefix || s->glm_mtp_adapt_confirmed ||
+         adapt_forced_off)) {
         char *endp = NULL;
         const float threshold =
             (margin_env && margin_env[0]) ? strtof(margin_env, &endp) : 1.0f;
@@ -66144,19 +66164,21 @@ static int ds4_session_glm_spec_cycle_impl(
                         "ds4: glm mtp confidence skip: margin %.6g < %.6g\n",
                         draft_margin, threshold);
             }
-            return ds4_session_glm_spec_cycle_impl(s,
-                                                   first_token,
-                                                   eos_token,
-                                                   temperature,
-                                                   top_k,
-                                                   top_p,
-                                                   min_p,
-                                                   rng,
-                                                   exact_sampling,
-                                                   accepted,
-                                                   accepted_cap,
-                                                   err,
-                                                   errlen);
+            const int rc = ds4_session_glm_spec_cycle_impl(s,
+                                                           first_token,
+                                                           eos_token,
+                                                           temperature,
+                                                           top_k,
+                                                           top_p,
+                                                           min_p,
+                                                           rng,
+                                                           exact_sampling,
+                                                           accepted,
+                                                           accepted_cap,
+                                                           err,
+                                                           errlen);
+            s->glm_mtp_last_gate_skip = true;
+            return rc;
         }
     }
     int toks[2] = { first_token, d };
@@ -66174,7 +66196,8 @@ static int ds4_session_glm_spec_cycle_impl(
     double t_save = t0;
     if (g->glm53) {
         kda_saved = glm_graph_mtp_ensure(g);
-        kda_shadow = kda_saved && !exact_sampling &&
+        kda_shadow = kda_saved &&
+                     (!exact_sampling || keep_reject_prefix) &&
                      glm53_graph_has_kda_shadows(g);
         if (kda_saved && !kda_shadow) {
             kda_saved = glm53_graph_copy_kda_state(g, true);
@@ -66182,6 +66205,7 @@ static int ds4_session_glm_spec_cycle_impl(
         if (timing) t_save = now_sec();
         if (kda_saved) {
             g->mtp_kda_outofplace = kda_shadow;
+            g->mtp_kda_keep_prefix1 = kda_shadow && keep_reject_prefix;
             if (!glm53_graph_use_indexed_prefill(g) &&
                 glm_graph_span_fits_full_attention(g, pos, 2u)) {
                 verified = glm_graph_forward_tokens(g,
@@ -66219,6 +66243,7 @@ static int ds4_session_glm_spec_cycle_impl(
                                                              2);
             }
             g->mtp_kda_outofplace = false;
+            g->mtp_kda_keep_prefix1 = false;
         }
     } else if (pos + 2u <= glm_graph_indexer_top_k_limit()) {
         /* GLM-5.2 verification must use the compact caches populated by
@@ -66370,17 +66395,25 @@ static int ds4_session_glm_spec_cycle_impl(
     } else {
         bool replay_ok = true;
         if (g->glm53) {
-            replay_ok = (kda_shadow ||
-                         glm53_graph_copy_kda_state(g, false)) &&
-                        glm_graph_forward_token(g,
-                                                &e->model,
-                                                &e->weights,
-                                                first_token,
-                                                NULL,
-                                                pos,
-                                                NULL,
-                                                s->logits,
-                                                false);
+            if (kda_shadow && keep_reject_prefix) {
+                memcpy(s->logits, s->glm_mtp_logits0,
+                       (size_t)DS4_N_VOCAB * sizeof(float));
+                replay_ok = ds4_gpu_tensor_write(g->hc_cur, 0,
+                                                 s->glm_mtp_hc,
+                                                 hc_row_bytes) != 0;
+            } else {
+                replay_ok = (kda_shadow ||
+                             glm53_graph_copy_kda_state(g, false)) &&
+                            glm_graph_forward_token(g,
+                                                    &e->model,
+                                                    &e->weights,
+                                                    first_token,
+                                                    NULL,
+                                                    pos,
+                                                    NULL,
+                                                    s->logits,
+                                                    false);
+            }
         } else {
             memcpy(s->logits, s->glm_mtp_logits0,
                    (size_t)DS4_N_VOCAB * sizeof(float));
@@ -66529,11 +66562,31 @@ static bool ds4_session_glm_mtp_adapt_log(const ds4_session *s) {
            getenv("DS4_GLM_MTP_ADAPT_LOG") != NULL;
 }
 
+static uint32_t ds4_session_glm_mtp_adapt_min_percent(
+        const ds4_session *s) {
+    const uint32_t fallback =
+        ds4_session_glm_mtp_fast_reject_enabled(s) ? 45u :
+                                                     DS4_GLM_MTP_ADAPT_MIN_PERCENT;
+    uint32_t value = ds4_dspark_env_u32(
+        "DS4_GLM_MTP_ADAPT_MIN_PERCENT",
+        fallback);
+    return value <= 100u ? value : fallback;
+}
+
+static uint32_t ds4_session_glm_mtp_adapt_tail_min(
+        const ds4_session *s) {
+    const uint32_t fallback =
+        ds4_session_glm_mtp_fast_reject_enabled(s) ? 0u : 192u;
+    return ds4_dspark_env_u32("DS4_GLM_MTP_ADAPT_TAIL_MIN", fallback);
+}
+
 static bool ds4_session_glm_mtp_adapt_tail_skip(const ds4_session *s,
                                                 int remaining_tokens) {
+    const uint32_t tail_min = ds4_session_glm_mtp_adapt_tail_min(s);
     return ds4_session_glm_mtp_adapt_enabled(s) &&
            s->engine && !s->engine->tp.active &&
-           !s->glm_mtp_adapt_confirmed && remaining_tokens <= 192;
+           !s->glm_mtp_adapt_confirmed && tail_min != 0u &&
+           remaining_tokens <= (int)tail_min;
 }
 
 static int ds4_session_glm_plain_spec_cycle(ds4_session *s,
@@ -66596,13 +66649,15 @@ static int ds4_session_glm_spec_cycle_adaptive(
                                                    err,
                                                    errlen);
     if (rc < 0 || !trial) return rc;
+    if (s->glm_mtp_last_gate_skip) return rc;
 
     s->glm_mtp_adapt_trials++;
     if (rc >= 2) s->glm_mtp_adapt_hits++;
     const uint32_t window = s->glm_mtp_adapt_backoff != 0 ?
         DS4_GLM_MTP_ADAPT_PROBE_WINDOW : DS4_GLM_MTP_ADAPT_WINDOW;
+    const uint32_t min_percent = ds4_session_glm_mtp_adapt_min_percent(s);
     const uint32_t required_hits =
-        (window * DS4_GLM_MTP_ADAPT_MIN_PERCENT + 99u) / 100u;
+        (window * min_percent + 99u) / 100u;
     const uint32_t remaining_trials = window - s->glm_mtp_adapt_trials;
     const bool can_still_qualify =
         s->glm_mtp_adapt_hits + remaining_trials >= required_hits;
