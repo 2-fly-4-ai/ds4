@@ -55637,12 +55637,13 @@ static bool qwen4_gemv(ds4_gpu_tensor *out, const ds4_model *m, const ds4_tensor
     return rc != 0;
 }
 
-/* Decode-sized batches (a token, or the 2-token MTP verify) take the fused
- * kernels; DS4_QWEN4_NO_FUSE=1 forces the prefill kernels for A/B checks. */
+/* Decode-sized batches, including the anchor plus seven prompt-lookup drafts,
+ * take the fused kernels. DS4_QWEN4_NO_FUSE=1 restores the prefill kernels for
+ * diagnostic comparisons. */
 static bool qwen4_graph_fused(uint32_t T) {
     static int no_fuse = -1;
     if (no_fuse < 0) no_fuse = getenv("DS4_QWEN4_NO_FUSE") != NULL;
-    return T <= 2u && !no_fuse;
+    return T <= 8u && !no_fuse;
 }
 
 /* top-k blocks per query: radix select (DS4_QWEN4_NO_IDX_SELECT=1 restores the argsort path) */
