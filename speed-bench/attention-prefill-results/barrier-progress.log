@@ -1,0 +1,8 @@
+barrier cost 2048 1 old exit=0
+barrier cost 2048 2 new exit=0
+barrier cost 2048 3 new exit=0
+barrier cost 2048 4 old exit=0
+barrier cost 8192 1 old exit=0
+barrier cost 8192 2 new exit=0
+barrier cost 8192 3 new exit=0
+barrier cost 8192 4 old exit=0

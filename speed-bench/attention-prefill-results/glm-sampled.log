@@ -1,0 +1,142 @@
+ds4: warming mapped tensor pages: 88.11 GiB
+ds4: warmed tensor pages in 6.222s (checksum=714843033)
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 2.876 ms, residency requested in 871.692 ms, warmup 4.392 ms (mapped 90220.81 MiB from offset 9.07 MiB)
+ds4: Metal mapped mmaped model as 2 overlapping shared buffers
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 0.05 GiB (raw 0.00 + compressed 0.05) + buffers 5.69 GiB + resident model 88.11 GiB = 93.84 GiB planned
+ds4: memory detail: ctx=4096 prefill_cap=4096 raw_kv_rows=0 compressed_kv_rows=4096 backend=metal
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=4096 logical_ctx=4096 kv_layers=45 indexer_layers=11 f16 0.05 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=16.00 MiB
+prefill_check run=0 exact=1
+case=/Users/brianfarley/Desktop/ds4/speed-bench/qwen_prompt_lookup_copy_chat.txt run=0 candidate=-1 temp=0.70 input=259 output=256 prefill_s=0.901361 gen_s=4.136895 tps=61.8822 token_exact=1 logits_exact=1 plain_ms=881.396 lookup_ms=3255.492 mtp_ms=0.000 plain_n=34 lookup_n=222 mtp_n=0
+ds4: prompt-lookup summary: attempts=26 no_match=0 first_miss=0 verify_passes=26 drafted=197 committed=195 accept=99.0% tokens/pass=7.50 scan=0.01 ms total gate_skips=8 gate_partials=1 gate_ambiguous=0 parity_replays=0
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=4096 logical_ctx=4096 kv_layers=45 indexer_layers=11 f16 0.05 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=16.00 MiB
+prefill_check run=-1 exact=1
+case=/Users/brianfarley/Desktop/ds4/speed-bench/qwen_prompt_lookup_copy_chat.txt run=-1 candidate=-2 temp=0.70 input=259 output=256 prefill_s=0.911807 gen_s=4.138010 tps=61.8655 token_exact=1 logits_exact=1 plain_ms=883.384 lookup_ms=3254.614 mtp_ms=0.000 plain_n=34 lookup_n=222 mtp_n=0
+ds4: prompt-lookup summary: attempts=26 no_match=0 first_miss=0 verify_passes=26 drafted=197 committed=195 accept=99.0% tokens/pass=7.50 scan=0.01 ms total gate_skips=8 gate_partials=1 gate_ambiguous=0 parity_replays=0
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=4096 logical_ctx=4096 kv_layers=45 indexer_layers=11 f16 0.05 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=16.00 MiB
+prefill_check run=1 exact=1
+case=/Users/brianfarley/Desktop/ds4/speed-bench/qwen_prompt_lookup_copy_chat.txt run=1 candidate=0 temp=0.70 input=259 output=256 prefill_s=0.894565 gen_s=4.225312 tps=60.5872 token_exact=1 logits_exact=1 plain_ms=894.907 lookup_ms=3330.393 mtp_ms=0.000 plain_n=34 lookup_n=222 mtp_n=0
+ds4: prompt-lookup summary: attempts=26 no_match=0 first_miss=0 verify_passes=26 drafted=197 committed=195 accept=99.0% tokens/pass=7.50 scan=0.02 ms total gate_skips=8 gate_partials=1 gate_ambiguous=0 parity_replays=0
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=4096 logical_ctx=4096 kv_layers=45 indexer_layers=11 f16 0.05 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=16.00 MiB
+prefill_check run=2 exact=1
+case=/Users/brianfarley/Desktop/ds4/speed-bench/qwen_prompt_lookup_copy_chat.txt run=2 candidate=1 temp=0.70 input=259 output=256 prefill_s=0.900418 gen_s=4.136927 tps=61.8817 token_exact=1 logits_exact=1 plain_ms=880.194 lookup_ms=3256.722 mtp_ms=0.000 plain_n=34 lookup_n=222 mtp_n=0
+ds4: prompt-lookup summary: attempts=26 no_match=0 first_miss=0 verify_passes=26 drafted=197 committed=195 accept=99.0% tokens/pass=7.50 scan=0.01 ms total gate_skips=8 gate_partials=1 gate_ambiguous=0 parity_replays=0
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=4096 logical_ctx=4096 kv_layers=45 indexer_layers=11 f16 0.05 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=16.00 MiB
+prefill_check run=3 exact=1
+case=/Users/brianfarley/Desktop/ds4/speed-bench/qwen_prompt_lookup_copy_chat.txt run=3 candidate=1 temp=0.70 input=259 output=256 prefill_s=0.933654 gen_s=4.279708 tps=59.8172 token_exact=1 logits_exact=1 plain_ms=906.626 lookup_ms=3373.076 mtp_ms=0.000 plain_n=34 lookup_n=222 mtp_n=0
+ds4: prompt-lookup summary: attempts=26 no_match=0 first_miss=0 verify_passes=26 drafted=197 committed=195 accept=99.0% tokens/pass=7.50 scan=0.01 ms total gate_skips=8 gate_partials=1 gate_ambiguous=0 parity_replays=0
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=4096 logical_ctx=4096 kv_layers=45 indexer_layers=11 f16 0.05 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=16.00 MiB
+prefill_check run=4 exact=1
+case=/Users/brianfarley/Desktop/ds4/speed-bench/qwen_prompt_lookup_copy_chat.txt run=4 candidate=0 temp=0.70 input=259 output=256 prefill_s=0.920190 gen_s=4.283671 tps=59.7618 token_exact=1 logits_exact=1 plain_ms=904.135 lookup_ms=3379.528 mtp_ms=0.000 plain_n=34 lookup_n=222 mtp_n=0
+ds4: prompt-lookup summary: attempts=26 no_match=0 first_miss=0 verify_passes=26 drafted=197 committed=195 accept=99.0% tokens/pass=7.50 scan=0.02 ms total gate_skips=8 gate_partials=1 gate_ambiguous=0 parity_replays=0
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=4096 logical_ctx=4096 kv_layers=45 indexer_layers=11 f16 0.05 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=16.00 MiB
+prefill_check run=0 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/code.txt run=0 candidate=-1 temp=0.70 input=34 output=256 prefill_s=0.416296 gen_s=6.522167 tps=39.2508 token_exact=1 logits_exact=1 plain_ms=6522.131 lookup_ms=0.000 mtp_ms=0.000 plain_n=256 lookup_n=0 mtp_n=0
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=4096 logical_ctx=4096 kv_layers=45 indexer_layers=11 f16 0.05 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=16.00 MiB
+prefill_check run=-1 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/code.txt run=-1 candidate=-2 temp=0.70 input=34 output=256 prefill_s=0.429768 gen_s=6.664503 tps=38.4125 token_exact=1 logits_exact=1 plain_ms=6664.472 lookup_ms=0.000 mtp_ms=0.000 plain_n=256 lookup_n=0 mtp_n=0
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=4096 logical_ctx=4096 kv_layers=45 indexer_layers=11 f16 0.05 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=16.00 MiB
+prefill_check run=1 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/code.txt run=1 candidate=0 temp=0.70 input=34 output=256 prefill_s=0.434530 gen_s=6.655636 tps=38.4636 token_exact=1 logits_exact=1 plain_ms=6655.593 lookup_ms=0.000 mtp_ms=0.000 plain_n=256 lookup_n=0 mtp_n=0
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=4096 logical_ctx=4096 kv_layers=45 indexer_layers=11 f16 0.05 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=16.00 MiB
+prefill_check run=2 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/code.txt run=2 candidate=1 temp=0.70 input=34 output=256 prefill_s=0.417497 gen_s=6.742705 tps=37.9670 token_exact=1 logits_exact=1 plain_ms=6742.648 lookup_ms=0.000 mtp_ms=0.000 plain_n=256 lookup_n=0 mtp_n=0
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=4096 logical_ctx=4096 kv_layers=45 indexer_layers=11 f16 0.05 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=16.00 MiB
+prefill_check run=3 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/code.txt run=3 candidate=1 temp=0.70 input=34 output=256 prefill_s=0.421548 gen_s=6.683398 tps=38.3039 token_exact=1 logits_exact=1 plain_ms=6683.365 lookup_ms=0.000 mtp_ms=0.000 plain_n=256 lookup_n=0 mtp_n=0
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=4096 logical_ctx=4096 kv_layers=45 indexer_layers=11 f16 0.05 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=16.00 MiB
+prefill_check run=4 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/code.txt run=4 candidate=0 temp=0.70 input=34 output=256 prefill_s=0.430988 gen_s=6.626177 tps=38.6346 token_exact=1 logits_exact=1 plain_ms=6626.149 lookup_ms=0.000 mtp_ms=0.000 plain_n=256 lookup_n=0 mtp_n=0
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=4096 logical_ctx=4096 kv_layers=45 indexer_layers=11 f16 0.05 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=16.00 MiB
+prefill_check run=0 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/story.txt run=0 candidate=-1 temp=0.70 input=34 output=256 prefill_s=0.420046 gen_s=6.637581 tps=38.5683 token_exact=1 logits_exact=1 plain_ms=6637.548 lookup_ms=0.000 mtp_ms=0.000 plain_n=256 lookup_n=0 mtp_n=0
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=4096 logical_ctx=4096 kv_layers=45 indexer_layers=11 f16 0.05 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=16.00 MiB
+prefill_check run=-1 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/story.txt run=-1 candidate=-2 temp=0.70 input=34 output=256 prefill_s=0.421934 gen_s=6.617720 tps=38.6840 token_exact=1 logits_exact=1 plain_ms=6617.686 lookup_ms=0.000 mtp_ms=0.000 plain_n=256 lookup_n=0 mtp_n=0
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=4096 logical_ctx=4096 kv_layers=45 indexer_layers=11 f16 0.05 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=16.00 MiB
+prefill_check run=1 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/story.txt run=1 candidate=0 temp=0.70 input=34 output=256 prefill_s=0.421183 gen_s=6.605462 tps=38.7558 token_exact=1 logits_exact=1 plain_ms=6605.437 lookup_ms=0.000 mtp_ms=0.000 plain_n=256 lookup_n=0 mtp_n=0
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=4096 logical_ctx=4096 kv_layers=45 indexer_layers=11 f16 0.05 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=16.00 MiB
+prefill_check run=2 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/story.txt run=2 candidate=1 temp=0.70 input=34 output=256 prefill_s=0.428974 gen_s=6.639866 tps=38.5550 token_exact=1 logits_exact=1 plain_ms=6639.834 lookup_ms=0.000 mtp_ms=0.000 plain_n=256 lookup_n=0 mtp_n=0
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=4096 logical_ctx=4096 kv_layers=45 indexer_layers=11 f16 0.05 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=16.00 MiB
+prefill_check run=3 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/story.txt run=3 candidate=1 temp=0.70 input=34 output=256 prefill_s=0.416115 gen_s=6.787882 tps=37.7143 token_exact=1 logits_exact=1 plain_ms=6787.854 lookup_ms=0.000 mtp_ms=0.000 plain_n=256 lookup_n=0 mtp_n=0
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=4096 logical_ctx=4096 kv_layers=45 indexer_layers=11 f16 0.05 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=16.00 MiB
+prefill_check run=4 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/story.txt run=4 candidate=0 temp=0.70 input=34 output=256 prefill_s=0.432169 gen_s=6.683283 tps=38.3045 token_exact=1 logits_exact=1 plain_ms=6683.255 lookup_ms=0.000 mtp_ms=0.000 plain_n=256 lookup_n=0 mtp_n=0
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=4096 logical_ctx=4096 kv_layers=45 indexer_layers=11 f16 0.05 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=16.00 MiB
+prefill_check run=0 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/json.txt run=0 candidate=-1 temp=0.70 input=47 output=256 prefill_s=0.463991 gen_s=6.470529 tps=39.5640 token_exact=1 logits_exact=1 plain_ms=5903.923 lookup_ms=566.577 mtp_ms=0.000 plain_n=226 lookup_n=30 mtp_n=0
+ds4: prompt-lookup summary: attempts=9 no_match=0 first_miss=1 verify_passes=8 drafted=24 committed=21 accept=87.5% tokens/pass=2.62 scan=0.01 ms total gate_skips=24 gate_partials=1 gate_ambiguous=0 parity_replays=0
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=4096 logical_ctx=4096 kv_layers=45 indexer_layers=11 f16 0.05 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=16.00 MiB
+prefill_check run=-1 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/json.txt run=-1 candidate=-2 temp=0.70 input=47 output=256 prefill_s=0.489977 gen_s=6.483679 tps=39.4838 token_exact=1 logits_exact=1 plain_ms=5880.761 lookup_ms=602.893 mtp_ms=0.000 plain_n=226 lookup_n=30 mtp_n=0
+ds4: prompt-lookup summary: attempts=9 no_match=0 first_miss=1 verify_passes=8 drafted=24 committed=21 accept=87.5% tokens/pass=2.62 scan=0.00 ms total gate_skips=24 gate_partials=1 gate_ambiguous=0 parity_replays=0
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=4096 logical_ctx=4096 kv_layers=45 indexer_layers=11 f16 0.05 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=16.00 MiB
+prefill_check run=1 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/json.txt run=1 candidate=0 temp=0.70 input=47 output=256 prefill_s=0.472069 gen_s=6.497225 tps=39.4014 token_exact=1 logits_exact=1 plain_ms=5937.538 lookup_ms=559.649 mtp_ms=0.000 plain_n=226 lookup_n=30 mtp_n=0
+ds4: prompt-lookup summary: attempts=9 no_match=0 first_miss=1 verify_passes=8 drafted=24 committed=21 accept=87.5% tokens/pass=2.62 scan=0.00 ms total gate_skips=24 gate_partials=1 gate_ambiguous=0 parity_replays=0
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=4096 logical_ctx=4096 kv_layers=45 indexer_layers=11 f16 0.05 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=16.00 MiB
+prefill_check run=2 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/json.txt run=2 candidate=1 temp=0.70 input=47 output=256 prefill_s=0.501457 gen_s=6.516181 tps=39.2868 token_exact=1 logits_exact=1 plain_ms=5936.131 lookup_ms=580.015 mtp_ms=0.000 plain_n=226 lookup_n=30 mtp_n=0
+ds4: prompt-lookup summary: attempts=9 no_match=0 first_miss=1 verify_passes=8 drafted=24 committed=21 accept=87.5% tokens/pass=2.62 scan=0.00 ms total gate_skips=24 gate_partials=1 gate_ambiguous=0 parity_replays=0
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=4096 logical_ctx=4096 kv_layers=45 indexer_layers=11 f16 0.05 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=16.00 MiB
+prefill_check run=3 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/json.txt run=3 candidate=1 temp=0.70 input=47 output=256 prefill_s=0.563184 gen_s=6.633087 tps=38.5944 token_exact=1 logits_exact=1 plain_ms=5966.608 lookup_ms=666.439 mtp_ms=0.000 plain_n=226 lookup_n=30 mtp_n=0
+ds4: prompt-lookup summary: attempts=9 no_match=0 first_miss=1 verify_passes=8 drafted=24 committed=21 accept=87.5% tokens/pass=2.62 scan=0.01 ms total gate_skips=24 gate_partials=1 gate_ambiguous=0 parity_replays=0
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=4096 logical_ctx=4096 kv_layers=45 indexer_layers=11 f16 0.05 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=16.00 MiB
+prefill_check run=4 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/json.txt run=4 candidate=0 temp=0.70 input=47 output=256 prefill_s=0.540062 gen_s=6.801041 tps=37.6413 token_exact=1 logits_exact=1 plain_ms=6219.159 lookup_ms=581.855 mtp_ms=0.000 plain_n=226 lookup_n=30 mtp_n=0
+ds4: prompt-lookup summary: attempts=9 no_match=0 first_miss=1 verify_passes=8 drafted=24 committed=21 accept=87.5% tokens/pass=2.62 scan=0.00 ms total gate_skips=24 gate_partials=1 gate_ambiguous=0 parity_replays=0

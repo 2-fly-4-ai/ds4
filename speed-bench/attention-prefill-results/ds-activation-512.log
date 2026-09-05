@@ -1,0 +1,18 @@
+ds4: warming mapped tensor pages: 80.26 GiB
+ds4: warmed tensor pages in 5.922s (checksum=645849147)
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 2.474 ms, residency requested in 774.033 ms, warmup 3.693 ms (mapped 82185.67 MiB from offset 5.09 MiB)
+ds4: Metal mapped mmaped model as 1 overlapping shared buffers
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 0.07 GiB (raw 0.06 + compressed 0.00) + buffers 0.00 GiB + resident model 80.26 GiB = 80.33 GiB planned
+ds4: memory detail: ctx=513 prefill_cap=513 raw_kv_rows=768 compressed_kv_rows=130 backend=metal
+metal-prefill-variant-bench: model=/Users/brianfarley/Desktop/ds4/gguf/DeepSeek-V4-Flash-Vision-Exp-IQ2XXS-w2Q2K-AOutQ4K-L27-42.gguf prompt=/Users/brianfarley/Desktop/ds4/ds4.c base=0 prefix=512 warmup=256 ctx=513 repeats=1 candidate_env=DS4_METAL_DISABLE_DS4_SHORT_PREFILL_TAIL32
+run=1 repeat=1 pattern=ABBA slot=1 variant=control tokens=512 seconds=0.857274 tokens_per_second=597.2420 exact=yes
+run=2 repeat=1 pattern=ABBA slot=2 variant=candidate tokens=512 seconds=0.854048 tokens_per_second=599.4979 exact=yes
+run=3 repeat=1 pattern=ABBA slot=3 variant=candidate tokens=512 seconds=0.852445 tokens_per_second=600.6253 exact=yes
+run=4 repeat=1 pattern=ABBA slot=4 variant=control tokens=512 seconds=0.852131 tokens_per_second=600.8466 exact=yes
+aggregate variant=control runs=2 tokens=1024 seconds=1.709405 tokens_per_second=599.0388
+aggregate variant=candidate runs=2 tokens=1024 seconds=1.706493 tokens_per_second=600.0611
+candidate_delta_percent=0.1706 exact_runs=4 exact_floats=517120 vocab=129280

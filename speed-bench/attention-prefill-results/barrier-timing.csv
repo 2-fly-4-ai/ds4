@@ -1,0 +1,3 @@
+prefix_tokens,old_tps,new_tps,timing_change_percent,input_hash,note
+2048,31.204998065533903,30.975946814299324,-0.7340210396858504,dc59319ca25d9337,fixed-token timing only; old kernel has known correctness fault
+8192,29.63788981929223,30.3577374757731,2.428808733921062,770cf38a6e8e19ec,fixed-token timing only; old kernel has known correctness fault

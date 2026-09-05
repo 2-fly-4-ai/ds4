@@ -122,6 +122,12 @@ speed-bench/metal_decode_schedule_bench: speed-bench/metal_decode_schedule_bench
 
 metal-decode-schedule-bench: speed-bench/metal_decode_schedule_bench
 
+speed-bench/route_repeat_bench: speed-bench/route_repeat_bench.c $(CORE_OBJS)
+	$(CC) $(CFLAGS) -I. -o $@ $^ $(METAL_LDLIBS)
+
+speed-bench/fixed_teacher_bench: speed-bench/fixed_teacher_bench.c $(CORE_OBJS)
+	$(CC) $(CFLAGS) -I. -o $@ $^ $(METAL_LDLIBS)
+
 speed-bench/metal_prefill_variant_bench.o: speed-bench/metal_prefill_variant_bench.c ds4.h
 	$(CC) $(CFLAGS) -I. -c -o $@ $<
 
@@ -365,7 +371,7 @@ tests/test_deepseek4_vision_image: tests/test_deepseek4_vision_image.o ds4_image
 	$(CC) $(CFLAGS) -o $@ $^ -lm
 
 ifeq ($(UNAME_S),Darwin)
-$(GLM53_KDA_TEST): tests/test_glm53_kda.o ds4_metal.o
+$(GLM53_KDA_TEST): tests/test_glm53_kda.o ds4_metal.o ds4_image.o
 	$(CC) $(CFLAGS) -o $@ $^ $(METAL_LDLIBS)
 else
 $(GLM53_KDA_TEST): tests/test_glm53_kda.o ds4_cuda.o $(MMQ_OBJS)

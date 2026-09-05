@@ -1,0 +1,17 @@
+model,settings,case,input_tokens,runs,output_tokens,generation_tps,prefill_ms_mean,plain_tokens,lookup_tokens,neural_tokens,exact
+ds,greedy,qwen_prompt_lookup_copy_chat.txt,266,4,1024,74.67447326055878,748.2015,104,920,0,True
+ds,greedy,qwen_prompt_lookup_edit_chat.txt,421,4,712,56.29726855457554,1037.92475,244,468,0,True
+ds,greedy,code.txt,32,4,1024,40.247199557406574,314.81475,1024,0,0,True
+ds,greedy,story.txt,32,4,1024,39.91473059759173,331.28725,1024,0,0,True
+ds,greedy,json.txt,47,4,1024,39.592123796528966,400.00925,996,28,0,True
+glm,greedy,qwen_prompt_lookup_copy_chat.txt,259,4,1024,54.332730137447484,1099.08675,140,884,0,True
+glm,greedy,qwen_prompt_lookup_edit_chat.txt,382,4,1024,42.07802317447126,1380.0555000000002,456,568,0,True
+glm,greedy,code.txt,34,4,1024,33.9271815997786,468.4235,1024,0,0,True
+glm,greedy,story.txt,34,4,1024,38.73629642042953,436.3455000000001,1024,0,0,True
+glm,greedy,json.txt,47,4,1024,38.229181028276116,475.24575000000004,1020,4,0,True
+glm,sampled,qwen_prompt_lookup_copy_chat.txt,259,4,1024,60.50000655810618,912.2067499999999,136,888,0,True
+glm,sampled,code.txt,34,4,1024,38.34069269949779,426.14075,1024,0,0,True
+glm,sampled,story.txt,34,4,1024,38.328383893799234,424.61025,1024,0,0,True
+glm,sampled,json.txt,47,4,1024,38.718165557514745,519.193,904,120,0,True
+glm,mtp,qwen_prompt_lookup_copy_chat.txt,259,4,1024,59.91796855617356,993.46475,0,868,156,True
+glm,mtp,qwen_prompt_lookup_edit_chat.txt,382,4,1024,46.267962440716346,1302.28575,0,40,984,True

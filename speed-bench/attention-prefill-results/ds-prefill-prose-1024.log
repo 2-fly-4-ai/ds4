@@ -1,0 +1,30 @@
+ds4: warming mapped tensor pages: 80.26 GiB
+ds4: warmed tensor pages in 5.887s (checksum=645849147)
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 2.668 ms, residency requested in 750.621 ms, warmup 4.302 ms (mapped 82185.67 MiB from offset 5.09 MiB)
+ds4: Metal mapped mmaped model as 1 overlapping shared buffers
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 0.11 GiB (raw 0.10 + compressed 0.01) + buffers 0.00 GiB + resident model 80.26 GiB = 80.37 GiB planned
+ds4: memory detail: ctx=1025 prefill_cap=1025 raw_kv_rows=1280 compressed_kv_rows=258 backend=metal
+metal-prefill-variant-bench: model=/Users/brianfarley/Desktop/ds4/gguf/DeepSeek-V4-Flash-Vision-Exp-IQ2XXS-w2Q2K-AOutQ4K-L27-42.gguf prompt=/Users/brianfarley/Desktop/ds4/speed-bench/context-corpora/prose.txt base=0 prefix=1024 warmup=1024 ctx=1025 repeats=4 candidate_env=DS4_METAL_DISABLE_DS4_SHORT_PREFILL_TAIL32
+run=1 repeat=1 pattern=ABBA slot=1 variant=control tokens=1024 seconds=1.375388 tokens_per_second=744.5172 exact=yes
+run=2 repeat=1 pattern=ABBA slot=2 variant=candidate tokens=1024 seconds=1.449907 tokens_per_second=706.2522 exact=yes
+run=3 repeat=1 pattern=ABBA slot=3 variant=candidate tokens=1024 seconds=1.480736 tokens_per_second=691.5480 exact=yes
+run=4 repeat=1 pattern=ABBA slot=4 variant=control tokens=1024 seconds=1.483223 tokens_per_second=690.3884 exact=yes
+run=5 repeat=2 pattern=BAAB slot=1 variant=candidate tokens=1024 seconds=1.516885 tokens_per_second=675.0677 exact=yes
+run=6 repeat=2 pattern=BAAB slot=2 variant=control tokens=1024 seconds=1.500636 tokens_per_second=682.3773 exact=yes
+run=7 repeat=2 pattern=BAAB slot=3 variant=control tokens=1024 seconds=1.503051 tokens_per_second=681.2809 exact=yes
+run=8 repeat=2 pattern=BAAB slot=4 variant=candidate tokens=1024 seconds=1.548441 tokens_per_second=661.3103 exact=yes
+run=9 repeat=3 pattern=ABBA slot=1 variant=control tokens=1024 seconds=1.522186 tokens_per_second=672.7167 exact=yes
+run=10 repeat=3 pattern=ABBA slot=2 variant=candidate tokens=1024 seconds=1.551360 tokens_per_second=660.0660 exact=yes
+run=11 repeat=3 pattern=ABBA slot=3 variant=candidate tokens=1024 seconds=1.557367 tokens_per_second=657.5200 exact=yes
+run=12 repeat=3 pattern=ABBA slot=4 variant=control tokens=1024 seconds=1.546561 tokens_per_second=662.1142 exact=yes
+run=13 repeat=4 pattern=BAAB slot=1 variant=candidate tokens=1024 seconds=1.560315 tokens_per_second=656.2777 exact=yes
+run=14 repeat=4 pattern=BAAB slot=2 variant=control tokens=1024 seconds=1.568119 tokens_per_second=653.0117 exact=yes
+run=15 repeat=4 pattern=BAAB slot=3 variant=control tokens=1024 seconds=1.554225 tokens_per_second=658.8493 exact=yes
+run=16 repeat=4 pattern=BAAB slot=4 variant=candidate tokens=1024 seconds=1.590176 tokens_per_second=643.9539 exact=yes
+aggregate variant=control runs=8 tokens=8192 seconds=12.053389 tokens_per_second=679.6429
+aggregate variant=candidate runs=8 tokens=8192 seconds=12.255187 tokens_per_second=668.4517
+candidate_delta_percent=-1.6466 exact_runs=16 exact_floats=2068480 vocab=129280

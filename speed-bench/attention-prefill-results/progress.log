@@ -1,0 +1,17 @@
+test_glm53_kda exit=0
+test_qwen4_kernels exit=0
+test_sampling exit=0
+DS prefill code exit=0
+DS prefill structured exit=0
+DS prefill prose exit=0
+DS activation 512 exit=0
+DS activation 1024 exit=0
+DS activation 1025 exit=0
+DS activation 2048 exit=0
+DS state exit=0
+GLM state 2048 exit=0
+GLM state 8192 exit=0
+ds greedy exit=0
+glm greedy exit=0
+GLM sampled exit=0
+GLM MTP exit=0

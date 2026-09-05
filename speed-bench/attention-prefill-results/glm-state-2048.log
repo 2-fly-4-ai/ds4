@@ -1,0 +1,22 @@
+ds4: warming mapped tensor pages: 88.11 GiB
+ds4: warmed tensor pages in 29.563s (checksum=714843033)
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 2.929 ms, residency requested in 907.266 ms, warmup 4.814 ms (mapped 90220.81 MiB from offset 9.07 MiB)
+ds4: Metal mapped mmaped model as 2 overlapping shared buffers
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 0.10 GiB (raw 0.00 + compressed 0.10) + buffers 5.71 GiB + resident model 88.11 GiB = 93.92 GiB planned
+ds4: memory detail: ctx=9216 prefill_cap=4096 raw_kv_rows=0 compressed_kv_rows=9216 backend=metal
+ds4: GLM session ctx=9216 (model max=1048576); full-attention prefill/work cap=4096; compact indexed decode is used beyond the cap
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=9216 logical_ctx=9216 kv_layers=45 indexer_layers=11 f16 0.10 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=36.00 MiB
+ds4: GLM session ctx=9216 (model max=1048576); full-attention prefill/work cap=4096; compact indexed decode is used beyond the cap
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=9216 logical_ctx=9216 kv_layers=45 indexer_layers=11 f16 0.10 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=36.00 MiB
+metal-decode-schedule-bench: model=/Users/brianfarley/Desktop/ds4/gguf/GLM-5.3-Flash-Q2-Q4K-Attention-SharedDownQ4K.gguf prompt=/Users/brianfarley/Desktop/ds4/ds4.c prefix=2048 ctx=9216 warmup=0 measured=256 control=2/32 candidate=2/32 candidate_env=BENCH_NOOP include_selection=no
+variant=control first_split=2 second_split=32 tokens=256 seconds=8.685014 tokens_per_second=29.4761
+variant=candidate first_split=2 second_split=32 tokens=256 seconds=8.666522 tokens_per_second=29.5390
+exact_rows=257 exact_floats=39804160 exact_selected_ids=0 vocab=154880

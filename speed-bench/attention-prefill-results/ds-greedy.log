@@ -1,0 +1,88 @@
+ds4: warming mapped tensor pages: 80.26 GiB
+ds4: warmed tensor pages in 20.577s (checksum=645849147)
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 8.102 ms, residency requested in 802.612 ms, warmup 4.903 ms (mapped 82185.67 MiB from offset 5.09 MiB)
+ds4: Metal mapped mmaped model as 1 overlapping shared buffers
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 0.37 GiB (raw 0.34 + compressed 0.03) + buffers 0.03 GiB + resident model 80.26 GiB = 80.66 GiB planned
+ds4: memory detail: ctx=4096 prefill_cap=4096 raw_kv_rows=4096 compressed_kv_rows=1026 backend=metal
+prefill_check run=0 exact=1
+case=/Users/brianfarley/Desktop/ds4/speed-bench/qwen_prompt_lookup_copy_chat.txt run=0 candidate=-1 temp=0.00 input=266 output=256 prefill_s=0.763827 gen_s=3.284452 tps=77.9430 token_exact=1 logits_exact=1 plain_ms=634.477 lookup_ms=2649.969 mtp_ms=0.000 plain_n=26 lookup_n=230 mtp_n=0
+ds4: prompt-lookup summary: attempts=19 no_match=0 first_miss=0 verify_passes=19 drafted=211 committed=211 accept=100.0% tokens/pass=11.11 scan=0.01 ms total gate_skips=0 gate_partials=0 gate_ambiguous=0 parity_replays=0
+prefill_check run=-1 exact=1
+case=/Users/brianfarley/Desktop/ds4/speed-bench/qwen_prompt_lookup_copy_chat.txt run=-1 candidate=-2 temp=0.00 input=266 output=256 prefill_s=0.737057 gen_s=3.268632 tps=78.3202 token_exact=1 logits_exact=1 plain_ms=626.395 lookup_ms=2642.232 mtp_ms=0.000 plain_n=26 lookup_n=230 mtp_n=0
+ds4: prompt-lookup summary: attempts=19 no_match=0 first_miss=0 verify_passes=19 drafted=211 committed=211 accept=100.0% tokens/pass=11.11 scan=0.02 ms total gate_skips=0 gate_partials=0 gate_ambiguous=0 parity_replays=0
+prefill_check run=1 exact=1
+case=/Users/brianfarley/Desktop/ds4/speed-bench/qwen_prompt_lookup_copy_chat.txt run=1 candidate=0 temp=0.00 input=266 output=256 prefill_s=0.735144 gen_s=3.359430 tps=76.2034 token_exact=1 logits_exact=1 plain_ms=633.744 lookup_ms=2725.679 mtp_ms=0.000 plain_n=26 lookup_n=230 mtp_n=0
+ds4: prompt-lookup summary: attempts=19 no_match=0 first_miss=0 verify_passes=19 drafted=211 committed=211 accept=100.0% tokens/pass=11.11 scan=0.01 ms total gate_skips=0 gate_partials=0 gate_ambiguous=0 parity_replays=0
+prefill_check run=2 exact=1
+case=/Users/brianfarley/Desktop/ds4/speed-bench/qwen_prompt_lookup_copy_chat.txt run=2 candidate=1 temp=0.00 input=266 output=256 prefill_s=0.744923 gen_s=3.409021 tps=75.0949 token_exact=1 logits_exact=1 plain_ms=633.994 lookup_ms=2775.017 mtp_ms=0.000 plain_n=26 lookup_n=230 mtp_n=0
+ds4: prompt-lookup summary: attempts=19 no_match=0 first_miss=0 verify_passes=19 drafted=211 committed=211 accept=100.0% tokens/pass=11.11 scan=0.02 ms total gate_skips=0 gate_partials=0 gate_ambiguous=0 parity_replays=0
+prefill_check run=3 exact=1
+case=/Users/brianfarley/Desktop/ds4/speed-bench/qwen_prompt_lookup_copy_chat.txt run=3 candidate=1 temp=0.00 input=266 output=256 prefill_s=0.752507 gen_s=3.469377 tps=73.7885 token_exact=1 logits_exact=1 plain_ms=636.912 lookup_ms=2832.456 mtp_ms=0.000 plain_n=26 lookup_n=230 mtp_n=0
+ds4: prompt-lookup summary: attempts=19 no_match=0 first_miss=0 verify_passes=19 drafted=211 committed=211 accept=100.0% tokens/pass=11.11 scan=0.02 ms total gate_skips=0 gate_partials=0 gate_ambiguous=0 parity_replays=0
+prefill_check run=4 exact=1
+case=/Users/brianfarley/Desktop/ds4/speed-bench/qwen_prompt_lookup_copy_chat.txt run=4 candidate=0 temp=0.00 input=266 output=256 prefill_s=0.760232 gen_s=3.475024 tps=73.6686 token_exact=1 logits_exact=1 plain_ms=642.010 lookup_ms=2833.006 mtp_ms=0.000 plain_n=26 lookup_n=230 mtp_n=0
+ds4: prompt-lookup summary: attempts=19 no_match=0 first_miss=0 verify_passes=19 drafted=211 committed=211 accept=100.0% tokens/pass=11.11 scan=0.01 ms total gate_skips=0 gate_partials=0 gate_ambiguous=0 parity_replays=0
+prefill_check run=0 exact=1
+case=/Users/brianfarley/Desktop/ds4/speed-bench/qwen_prompt_lookup_edit_chat.txt run=0 candidate=-1 temp=0.00 input=421 output=178 prefill_s=1.010286 gen_s=3.149554 tps=56.5159 token_exact=1 logits_exact=1 plain_ms=1506.826 lookup_ms=1642.695 mtp_ms=0.000 plain_n=61 lookup_n=117 mtp_n=0
+ds4: prompt-lookup summary: attempts=12 no_match=0 first_miss=0 verify_passes=12 drafted=108 committed=105 accept=97.2% tokens/pass=8.75 scan=0.01 ms total gate_skips=8 gate_partials=1 gate_ambiguous=0 parity_replays=0
+prefill_check run=-1 exact=1
+case=/Users/brianfarley/Desktop/ds4/speed-bench/qwen_prompt_lookup_edit_chat.txt run=-1 candidate=-2 temp=0.00 input=421 output=178 prefill_s=1.038455 gen_s=3.163543 tps=56.2660 token_exact=1 logits_exact=1 plain_ms=1516.661 lookup_ms=1646.850 mtp_ms=0.000 plain_n=61 lookup_n=117 mtp_n=0
+ds4: prompt-lookup summary: attempts=12 no_match=0 first_miss=0 verify_passes=12 drafted=108 committed=105 accept=97.2% tokens/pass=8.75 scan=0.01 ms total gate_skips=8 gate_partials=1 gate_ambiguous=0 parity_replays=0
+prefill_check run=1 exact=1
+case=/Users/brianfarley/Desktop/ds4/speed-bench/qwen_prompt_lookup_edit_chat.txt run=1 candidate=0 temp=0.00 input=421 output=178 prefill_s=1.035566 gen_s=3.159532 tps=56.3375 token_exact=1 logits_exact=1 plain_ms=1506.475 lookup_ms=1653.022 mtp_ms=0.000 plain_n=61 lookup_n=117 mtp_n=0
+ds4: prompt-lookup summary: attempts=12 no_match=0 first_miss=0 verify_passes=12 drafted=108 committed=105 accept=97.2% tokens/pass=8.75 scan=0.01 ms total gate_skips=8 gate_partials=1 gate_ambiguous=0 parity_replays=0
+prefill_check run=2 exact=1
+case=/Users/brianfarley/Desktop/ds4/speed-bench/qwen_prompt_lookup_edit_chat.txt run=2 candidate=1 temp=0.00 input=421 output=178 prefill_s=1.036354 gen_s=3.159551 tps=56.3371 token_exact=1 logits_exact=1 plain_ms=1510.520 lookup_ms=1649.002 mtp_ms=0.000 plain_n=61 lookup_n=117 mtp_n=0
+ds4: prompt-lookup summary: attempts=12 no_match=0 first_miss=0 verify_passes=12 drafted=108 committed=105 accept=97.2% tokens/pass=8.75 scan=0.01 ms total gate_skips=8 gate_partials=1 gate_ambiguous=0 parity_replays=0
+prefill_check run=3 exact=1
+case=/Users/brianfarley/Desktop/ds4/speed-bench/qwen_prompt_lookup_edit_chat.txt run=3 candidate=1 temp=0.00 input=421 output=178 prefill_s=1.033849 gen_s=3.161827 tps=56.2966 token_exact=1 logits_exact=1 plain_ms=1511.062 lookup_ms=1650.730 mtp_ms=0.000 plain_n=61 lookup_n=117 mtp_n=0
+ds4: prompt-lookup summary: attempts=12 no_match=0 first_miss=0 verify_passes=12 drafted=108 committed=105 accept=97.2% tokens/pass=8.75 scan=0.01 ms total gate_skips=8 gate_partials=1 gate_ambiguous=0 parity_replays=0
+prefill_check run=4 exact=1
+case=/Users/brianfarley/Desktop/ds4/speed-bench/qwen_prompt_lookup_edit_chat.txt run=4 candidate=0 temp=0.00 input=421 output=178 prefill_s=1.045930 gen_s=3.166240 tps=56.2181 token_exact=1 logits_exact=1 plain_ms=1513.338 lookup_ms=1652.873 mtp_ms=0.000 plain_n=61 lookup_n=117 mtp_n=0
+ds4: prompt-lookup summary: attempts=12 no_match=0 first_miss=0 verify_passes=12 drafted=108 committed=105 accept=97.2% tokens/pass=8.75 scan=0.01 ms total gate_skips=8 gate_partials=1 gate_ambiguous=0 parity_replays=0
+prefill_check run=0 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/code.txt run=0 candidate=-1 temp=0.00 input=32 output=256 prefill_s=0.324286 gen_s=6.389465 tps=40.0660 token_exact=1 logits_exact=1 plain_ms=6389.416 lookup_ms=0.000 mtp_ms=0.000 plain_n=256 lookup_n=0 mtp_n=0
+prefill_check run=-1 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/code.txt run=-1 candidate=-2 temp=0.00 input=32 output=256 prefill_s=0.314307 gen_s=6.382140 tps=40.1119 token_exact=1 logits_exact=1 plain_ms=6382.096 lookup_ms=0.000 mtp_ms=0.000 plain_n=256 lookup_n=0 mtp_n=0
+prefill_check run=1 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/code.txt run=1 candidate=0 temp=0.00 input=32 output=256 prefill_s=0.311188 gen_s=6.368293 tps=40.1992 token_exact=1 logits_exact=1 plain_ms=6368.248 lookup_ms=0.000 mtp_ms=0.000 plain_n=256 lookup_n=0 mtp_n=0
+prefill_check run=2 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/code.txt run=2 candidate=1 temp=0.00 input=32 output=256 prefill_s=0.317196 gen_s=6.347991 tps=40.3277 token_exact=1 logits_exact=1 plain_ms=6347.952 lookup_ms=0.000 mtp_ms=0.000 plain_n=256 lookup_n=0 mtp_n=0
+prefill_check run=3 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/code.txt run=3 candidate=1 temp=0.00 input=32 output=256 prefill_s=0.316233 gen_s=6.353986 tps=40.2897 token_exact=1 logits_exact=1 plain_ms=6353.939 lookup_ms=0.000 mtp_ms=0.000 plain_n=256 lookup_n=0 mtp_n=0
+prefill_check run=4 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/code.txt run=4 candidate=0 temp=0.00 input=32 output=256 prefill_s=0.314642 gen_s=6.372494 tps=40.1727 token_exact=1 logits_exact=1 plain_ms=6372.458 lookup_ms=0.000 mtp_ms=0.000 plain_n=256 lookup_n=0 mtp_n=0
+prefill_check run=0 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/story.txt run=0 candidate=-1 temp=0.00 input=32 output=256 prefill_s=0.329831 gen_s=6.427009 tps=39.8319 token_exact=1 logits_exact=1 plain_ms=6426.964 lookup_ms=0.000 mtp_ms=0.000 plain_n=256 lookup_n=0 mtp_n=0
+prefill_check run=-1 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/story.txt run=-1 candidate=-2 temp=0.00 input=32 output=256 prefill_s=0.322580 gen_s=6.438361 tps=39.7617 token_exact=1 logits_exact=1 plain_ms=6438.317 lookup_ms=0.000 mtp_ms=0.000 plain_n=256 lookup_n=0 mtp_n=0
+prefill_check run=1 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/story.txt run=1 candidate=0 temp=0.00 input=32 output=256 prefill_s=0.330020 gen_s=6.417281 tps=39.8923 token_exact=1 logits_exact=1 plain_ms=6417.239 lookup_ms=0.000 mtp_ms=0.000 plain_n=256 lookup_n=0 mtp_n=0
+prefill_check run=2 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/story.txt run=2 candidate=1 temp=0.00 input=32 output=256 prefill_s=0.325438 gen_s=6.394622 tps=40.0336 token_exact=1 logits_exact=1 plain_ms=6394.575 lookup_ms=0.000 mtp_ms=0.000 plain_n=256 lookup_n=0 mtp_n=0
+prefill_check run=3 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/story.txt run=3 candidate=1 temp=0.00 input=32 output=256 prefill_s=0.333528 gen_s=6.419412 tps=39.8790 token_exact=1 logits_exact=1 plain_ms=6419.375 lookup_ms=0.000 mtp_ms=0.000 plain_n=256 lookup_n=0 mtp_n=0
+prefill_check run=4 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/story.txt run=4 candidate=0 temp=0.00 input=32 output=256 prefill_s=0.336163 gen_s=6.423374 tps=39.8544 token_exact=1 logits_exact=1 plain_ms=6423.335 lookup_ms=0.000 mtp_ms=0.000 plain_n=256 lookup_n=0 mtp_n=0
+prefill_check run=0 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/json.txt run=0 candidate=-1 temp=0.00 input=47 output=256 prefill_s=0.384145 gen_s=6.475871 tps=39.5314 token_exact=1 logits_exact=1 plain_ms=6214.522 lookup_ms=261.304 mtp_ms=0.000 plain_n=249 lookup_n=7 mtp_n=0
+ds4: prompt-lookup summary: attempts=1 no_match=0 first_miss=0 verify_passes=1 drafted=7 committed=6 accept=85.7% tokens/pass=6.00 scan=0.00 ms total gate_skips=8 gate_partials=1 gate_ambiguous=0 parity_replays=0
+prefill_check run=-1 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/json.txt run=-1 candidate=-2 temp=0.00 input=47 output=256 prefill_s=0.383760 gen_s=6.513873 tps=39.3007 token_exact=1 logits_exact=1 plain_ms=6252.707 lookup_ms=261.110 mtp_ms=0.000 plain_n=249 lookup_n=7 mtp_n=0
+ds4: prompt-lookup summary: attempts=1 no_match=0 first_miss=0 verify_passes=1 drafted=7 committed=6 accept=85.7% tokens/pass=6.00 scan=0.00 ms total gate_skips=8 gate_partials=1 gate_ambiguous=0 parity_replays=0
+prefill_check run=1 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/json.txt run=1 candidate=0 temp=0.00 input=47 output=256 prefill_s=0.430175 gen_s=6.449367 tps=39.6938 token_exact=1 logits_exact=1 plain_ms=6190.010 lookup_ms=259.306 mtp_ms=0.000 plain_n=249 lookup_n=7 mtp_n=0
+ds4: prompt-lookup summary: attempts=1 no_match=0 first_miss=0 verify_passes=1 drafted=7 committed=6 accept=85.7% tokens/pass=6.00 scan=0.00 ms total gate_skips=8 gate_partials=1 gate_ambiguous=0 parity_replays=0
+prefill_check run=2 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/json.txt run=2 candidate=1 temp=0.00 input=47 output=256 prefill_s=0.389824 gen_s=6.476164 tps=39.5296 token_exact=1 logits_exact=1 plain_ms=6212.452 lookup_ms=263.657 mtp_ms=0.000 plain_n=249 lookup_n=7 mtp_n=0
+ds4: prompt-lookup summary: attempts=1 no_match=0 first_miss=0 verify_passes=1 drafted=7 committed=6 accept=85.7% tokens/pass=6.00 scan=0.00 ms total gate_skips=8 gate_partials=1 gate_ambiguous=0 parity_replays=0
+prefill_check run=3 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/json.txt run=3 candidate=1 temp=0.00 input=47 output=256 prefill_s=0.391841 gen_s=6.462821 tps=39.6112 token_exact=1 logits_exact=1 plain_ms=6202.648 lookup_ms=260.118 mtp_ms=0.000 plain_n=249 lookup_n=7 mtp_n=0
+ds4: prompt-lookup summary: attempts=1 no_match=0 first_miss=0 verify_passes=1 drafted=7 committed=6 accept=85.7% tokens/pass=6.00 scan=0.00 ms total gate_skips=8 gate_partials=1 gate_ambiguous=0 parity_replays=0
+prefill_check run=4 exact=1
+case=/Users/brianfarley/Documents/Codex/2026-08-18/let/qwen-pipeline-promotion-2026-09-05/qwen-promoted-short/json.txt run=4 candidate=0 temp=0.00 input=47 output=256 prefill_s=0.388197 gen_s=6.475378 tps=39.5344 token_exact=1 logits_exact=1 plain_ms=6213.047 lookup_ms=262.266 mtp_ms=0.000 plain_n=249 lookup_n=7 mtp_n=0
+ds4: prompt-lookup summary: attempts=1 no_match=0 first_miss=0 verify_passes=1 drafted=7 committed=6 accept=85.7% tokens/pass=6.00 scan=0.00 ms total gate_skips=8 gate_partials=1 gate_ambiguous=0 parity_replays=0

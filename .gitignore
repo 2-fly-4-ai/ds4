@@ -34,6 +34,8 @@
 /tests/test_qwen4_kernels
 /tests/test_qwen4_vision
 /tests/test_deepseek4_vision_image
+/speed-bench/route_repeat_bench
+/speed-bench/fixed_teacher_bench
 *.o
 *.dSYM/
 __pycache__/

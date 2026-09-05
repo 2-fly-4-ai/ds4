@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-attention-prefill/speed-bench/attention-prefill-api-smoke.py", line 86, in <module>
+    assert pair[0]["sha256"] == pair[1]["sha256"], f"{model} API repeated code mismatch"
+AssertionError: ds API repeated code mismatch

@@ -1,0 +1,15 @@
+ds4: warming mapped tensor pages: 88.11 GiB
+ds4: warmed tensor pages in 7.279s (checksum=714843033)
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 2.945 ms, residency requested in 991.942 ms, warmup 4.050 ms (mapped 90220.81 MiB from offset 9.07 MiB)
+ds4: Metal mapped mmaped model as 2 overlapping shared buffers
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 0.09 GiB (raw 0.00 + compressed 0.09) + buffers 5.71 GiB + resident model 88.11 GiB = 93.91 GiB planned
+ds4: memory detail: ctx=8513 prefill_cap=4096 raw_kv_rows=0 compressed_kv_rows=8513 backend=metal
+ds4: GLM session ctx=8513 (model max=1048576); full-attention prefill/work cap=4096; compact indexed decode is used beyond the cap
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=8513 logical_ctx=8513 kv_layers=45 indexer_layers=11 f16 0.09 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=33.27 MiB
+label=old prefix=8192 warm=64 tokens=256 seconds=9.422162000 tps=27.169985 prefill_seconds=17.108667000 input_hash=770cf38a6e8e19ec
