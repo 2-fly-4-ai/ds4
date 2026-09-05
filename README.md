@@ -373,9 +373,27 @@ accepted suffix. With `--mtp`, a request that has no reusable context falls
 through to the embedded neural drafter; without it, the fallback is ordinary
 one-token decode. This route is shared by the CLI, server, and agent and stays
 off for sampled generation. `DS4_PROMPT_LOOKUP_DISABLE=1` is the rollback;
-`DS4_PROMPT_LOOKUP_MAX=1..7` controls Qwen's verifier depth, and
+`DS4_PROMPT_LOOKUP_MAX=1..15` controls Qwen's verifier depth (clamped to seven
+on the legacy path), and
 `DS4_QWEN4_PROMPT_LOOKUP_MIN_MATCH=4..64` overrides its default eight-token
 match length.
+
+For the M5-tested Q4_0 expert trunk (including the Ivan-compatible fast-pack),
+lookup now promotes from seven to fifteen drafts after eight consecutive full
+acceptances. A partial acceptance or missing candidate resets the streak.
+Small-batch arithmetic routes are retained through sixteen verifier rows;
+accepted suffixes are replayed in one batch after restoring the anchor state.
+This is automatic in the shared CLI/server/agent path, not a new MTP flag.
+Reuse-heavy tasks benefit most; fresh code and prose without matching context
+do not gain the same speedup. Explicitly forcing fifteen drafts can be slower
+than adaptation. `DS4_PROMPT_LOOKUP_ADAPTIVE=0` keeps the shallow default.
+
+Qwen Q4_0 expert prefill also stores the routed intermediate in half precision,
+matching the rounding already performed by the down projection. The producer
+and consumer share one format decision; mixed-quant expert pairs keep FP32.
+Model weights and the shared scratch allocation are unchanged. These M5
+pipeline improvements can all be disabled with `DS4_QWEN_PIPELINE_DISABLE=1`
+for a baseline comparison. DeepSeek and GLM do not use this switch.
 
 Prefill runs in 8192-token chunks
 (`DS4_QWEN4_PREFILL_CHUNK` overrides it; the transient buffers scale with the

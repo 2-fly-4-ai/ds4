@@ -1190,17 +1190,21 @@ static uint64_t arena_tier(arena_t *a, uint32_t wtype, uint64_t rows, uint64_t c
 /* wtype is the gate/up type (0 f32, 2 q4_0, 8 q8_0, 12 q4_K,
  * 10 q2_K, 16 iq2_xxs). The fast-pack keeps all routed Q4_0 projections
  * together; other quantized tiers use q8_0 down/shared weights. */
+static void test_moe_types(arena_t *a, uint32_t NE, uint32_t slots, uint32_t E, uint32_t F, uint32_t T, uint32_t wtype, uint32_t dtype);
 static void test_moe(arena_t *a, uint32_t NE, uint32_t slots, uint32_t E, uint32_t F, uint32_t T, uint32_t wtype) {
+    test_moe_types(a, NE, slots, E, F, T, wtype, wtype == 2u ? 2u : wtype ? 8u : 0u);
+}
+
+static void test_moe_types(arena_t *a, uint32_t NE, uint32_t slots, uint32_t E, uint32_t F, uint32_t T, uint32_t wtype, uint32_t dtype) {
     double *gate_w, *up_w, *down_w, *sg_w, *su_w, *sd_w;
     uint64_t gate_off, up_off, down_off, sg_off, su_off, sd_off;
     const bool quant = wtype != 0u;
-    const uint32_t dtype = wtype == 2u ? 2u : quant ? 8u : 0u;
     const uint32_t shared_type = quant ? 8u : 0u;
     const char *tier_name = wtype == 2u ? "q4_0" : wtype == 12u ? "q4_K" : wtype == 10u ? "q2_K" : wtype == 16u ? "iq2_xxs" : quant ? "q8_0" : "f32";
     if (quant) {
         gate_off = arena_tier(a, wtype, (uint64_t)NE * F, E, &gate_w);
         up_off = arena_tier(a, wtype, (uint64_t)NE * F, E, &up_w);
-        down_off = wtype == 2u ? arena_q4_0(a, (uint64_t)NE * E, F, &down_w, 0.05f) :
+        down_off = dtype == 2u ? arena_q4_0(a, (uint64_t)NE * E, F, &down_w, 0.05f) :
                                  arena_q8_0(a, (uint64_t)NE * E, F, &down_w, 0.05f);
         sg_off = arena_q8_0(a, F, E, &sg_w, 0.05f);
         su_off = arena_q8_0(a, F, E, &su_w, 0.05f);
@@ -1297,10 +1301,11 @@ static void test_moe(arena_t *a, uint32_t NE, uint32_t slots, uint32_t E, uint32
         ds4_gpu_tensor *gmid2 = upload(NULL, (uint64_t)T * slots * F);
         ds4_gpu_tensor *gpart2 = upload(NULL, (uint64_t)T * slots * E);
         require_ok(ds4_gpu_qwen4_moe_build_lists_tensor(glists, gcounts, gsel, T, slots, NE, T), "moe lists");
+        const uint32_t half_mid = ds4_gpu_qwen4_half_mid_supported(wtype, wtype, dtype);
         require_ok(ds4_gpu_qwen4_moe_mm_mid_tensor(gmid2, gx, glists, gcounts, a->base, a->size, gate_off, up_off, wtype,
-                                                   NE, T, slots, slots, E, F, T), "moe mm mid");
+                                                   NE, T, slots, slots, E, F, T, half_mid), "moe mm mid");
         require_ok(ds4_gpu_qwen4_moe_mm_down_tensor(gpart2, gmid2, glists, gcounts, a->base, a->size, down_off, dtype,
-                                                    NE, T, slots, slots, F, E, T), "moe mm down");
+                                                    NE, T, slots, slots, F, E, T, half_mid), "moe mm down");
         double *mid_r = malloc((uint64_t)T * slots * F * sizeof(double));
         double *part_r = malloc((uint64_t)T * slots * E * sizeof(double));
         for (uint32_t t = 0; t < T; t++)
@@ -1315,6 +1320,32 @@ static void test_moe(arena_t *a, uint32_t NE, uint32_t slots, uint32_t E, uint32
         if (total != (int)(T * slots)) { fprintf(stderr, "moe lists: %d pairs != %u\n", total, T * slots); exit(1); }
         free(cnt);
         snprintf(name, sizeof(name), "moe mm %s E=%u F=%u slots=%u T=%u: mid", tier_name, E, F, slots, T);
+        if (half_mid) {
+            const uint64_t n = (uint64_t)T * slots * F;
+            uint16_t *packed = malloc(n * sizeof(uint16_t));
+            float *expanded = malloc(n * sizeof(float));
+            require_ok(ds4_gpu_tensor_read(gmid2, 0, packed, n * sizeof(uint16_t)), "half mid read");
+            for (uint64_t i = 0; i < n; i++) expanded[i] = f16_to_f32(packed[i]);
+            require_ok(ds4_gpu_tensor_write(gmid2, 0, expanded, n * sizeof(float)), "half mid expand for check");
+            free(expanded); free(packed);
+            /* Compare the downstream tensor directly with the original GPU
+             * path, not just with the tolerant double-precision oracle. */
+            ds4_gpu_tensor *ref_mid = upload(NULL, n);
+            const uint64_t np = (uint64_t)T * slots * E;
+            ds4_gpu_tensor *ref_part = upload(NULL, np);
+            require_ok(ds4_gpu_qwen4_moe_mm_mid_tensor(ref_mid, gx, glists, gcounts, a->base, a->size, gate_off, up_off,
+                wtype, NE, T, slots, slots, E, F, T, 0), "reference float mid");
+            require_ok(ds4_gpu_qwen4_moe_mm_down_tensor(ref_part, ref_mid, glists, gcounts, a->base, a->size, down_off,
+                dtype, NE, T, slots, slots, F, E, T, 0), "reference float down");
+            float *original = malloc(np * sizeof(float)), *candidate = malloc(np * sizeof(float));
+            require_ok(ds4_gpu_tensor_read(ref_part, 0, original, np * sizeof(float)), "reference down read");
+            require_ok(ds4_gpu_tensor_read(gpart2, 0, candidate, np * sizeof(float)), "half down read");
+            if (memcmp(original, candidate, np * sizeof(float))) {
+                fprintf(stderr, "half intermediate changed downstream GPU tensor\n"); exit(1);
+            }
+            printf("  half intermediate downstream bit parity: %llu floats PASS\n", (unsigned long long)np);
+            free(original); free(candidate); ds4_gpu_tensor_free(ref_part); ds4_gpu_tensor_free(ref_mid);
+        }
         check_tensor(name, gmid2, mid_r, (uint64_t)T * slots * F, 3e-3);
         snprintf(name, sizeof(name), "moe mm %s E=%u F=%u slots=%u T=%u: down", tier_name, E, F, slots, T);
         check_tensor(name, gpart2, part_r, (uint64_t)T * slots * E, 3e-3);
@@ -1475,8 +1506,8 @@ static int bench_p_gdn_r4(void *ud) { bench_ctx *c = ud; return ds4_gpu_qwen4_gd
 static int bench_p_moe_mm(void *ud) {
     bench_ctx *c = ud;
     return ds4_gpu_qwen4_moe_build_lists_tensor(c->t[20], c->t[21], c->t[16], 256, 10, 16, 256) &&
-           ds4_gpu_qwen4_moe_mm_mid_tensor(c->t[22], c->t[18], c->t[20], c->t[21], c->a->base, c->a->size, c->off[8], c->off[9], 8u, 16, 256, 10, 10, 2560, 640, 256) &&
-           ds4_gpu_qwen4_moe_mm_down_tensor(c->t[23], c->t[22], c->t[20], c->t[21], c->a->base, c->a->size, c->off[10], 8u, 16, 256, 10, 10, 640, 2560, 256);
+           ds4_gpu_qwen4_moe_mm_mid_tensor(c->t[22], c->t[18], c->t[20], c->t[21], c->a->base, c->a->size, c->off[8], c->off[9], 8u, 16, 256, 10, 10, 2560, 640, 256, 0) &&
+           ds4_gpu_qwen4_moe_mm_down_tensor(c->t[23], c->t[22], c->t[20], c->t[21], c->a->base, c->a->size, c->off[10], 8u, 16, 256, 10, 10, 640, 2560, 256, 0);
 }
 static int bench_gdn_scan(void *ud) { bench_ctx *c = ud; return ds4_gpu_qwen4_gdn_scan_tensor(c->t[15], c->t[1], c->t[11], c->t[13], c->t[14], 1, 16, 48, 128, NULL, 0u); }
 
@@ -1734,6 +1765,11 @@ int main(void) {
     test_hc(&arena, 64, 8, 3, 8u);
     printf("gated delta net\n");
     test_gdn(&arena, 16, 48, 128, 5);
+    for (uint32_t rows = 9; rows <= 16; rows++) {
+        const int previous = ds4_gpu_set_prompt_verifier_mv16(1);
+        test_gdn(&arena, 16, 48, 128, rows);
+        (void)ds4_gpu_set_prompt_verifier_mv16(previous);
+    }
     test_gdn(&arena, 16, 48, 128, 40);
     test_gdn(&arena, 16, 48, 128, 200);
     test_idx_score_mm(37, 3001, 11000);
@@ -1757,6 +1793,12 @@ int main(void) {
     printf("routed experts\n");
     test_moe(&arena, 16, 10, 2560, 640, 2, 8u);
     test_moe(&arena, 16, 10, 2560, 640, 37, 2u);
+    /* Both mixed-quant directions must preserve the FP32 interface. */
+    require_ok(!ds4_gpu_qwen4_half_mid_supported(2u, 8u, 2u), "mixed up format rejected");
+    require_ok(!ds4_gpu_qwen4_half_mid_supported(2u, 2u, 8u), "mixed down format rejected");
+    require_ok(!ds4_gpu_qwen4_half_mid_supported(8u, 8u, 2u), "mixed gate format rejected");
+    test_moe_types(&arena, 16, 10, 2560, 640, 37, 2u, 8u);
+    test_moe_types(&arena, 16, 10, 2560, 640, 37, 8u, 2u);
     test_moe(&arena, 16, 10, 2560, 640, 37, 12u);
     test_moe(&arena, 16, 10, 2560, 640, 100, 12u);
     test_moe(&arena, 16, 10, 2560, 640, 37, 10u);

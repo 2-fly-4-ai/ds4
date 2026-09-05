@@ -3485,16 +3485,23 @@ int ds4_gpu_qwen4_moe_reduce_tensor(
 int ds4_gpu_qwen4_moe_build_lists_tensor(
         ds4_gpu_tensor *lists, ds4_gpu_tensor *counts, const ds4_gpu_tensor *selected,
         uint32_t n_tokens, uint32_t n_slots, uint32_t n_expert, uint32_t list_cap);
+/* M5-tested pipeline; DS4_QWEN_PIPELINE_DISABLE=1 restores the old path. */
+int ds4_gpu_qwen4_pipeline_enabled(void);
+/* Shared producer/consumer format decision, including mixed-quant fallback. */
+static inline int ds4_gpu_qwen4_half_mid_supported(uint32_t gate, uint32_t up, uint32_t down) {
+    return gate == 2u && up == 2u && down == 2u;
+}
+/* half_mid must be identical for the paired mid/down dispatches. */
 int ds4_gpu_qwen4_moe_mm_mid_tensor(
         ds4_gpu_tensor *mid, const ds4_gpu_tensor *x, const ds4_gpu_tensor *lists, const ds4_gpu_tensor *counts,
         const void *model_map, uint64_t model_size, uint64_t gate_offset, uint64_t up_offset,
         uint32_t weight_type, uint32_t n_expert, uint32_t n_tokens, uint32_t n_slots, uint32_t n_out,
-        uint32_t in_dim, uint32_t ff_dim, uint32_t list_cap);
+        uint32_t in_dim, uint32_t ff_dim, uint32_t list_cap, uint32_t half_mid);
 int ds4_gpu_qwen4_moe_mm_down_tensor(
         ds4_gpu_tensor *part, const ds4_gpu_tensor *mid, const ds4_gpu_tensor *lists, const ds4_gpu_tensor *counts,
         const void *model_map, uint64_t model_size, uint64_t down_offset,
         uint32_t weight_type, uint32_t n_expert, uint32_t n_tokens, uint32_t n_slots, uint32_t n_out,
-        uint32_t ff_dim, uint32_t out_dim, uint32_t list_cap);
+        uint32_t ff_dim, uint32_t out_dim, uint32_t list_cap, uint32_t half_mid);
 /* weight_type covers both the alpha and the beta projection */
 int ds4_gpu_qwen4_gdn_front_tensor(
         ds4_gpu_tensor *qkv, ds4_gpu_tensor *state, const ds4_gpu_tensor *mixed,
