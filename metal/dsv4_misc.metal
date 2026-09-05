@@ -1010,7 +1010,9 @@ kernel void kernel_glm53_indexer_pool_update(
                 (uint64_t)src_row * args.head_dim + tid];
             gate_value = ((device const float *)gate)[
                 (uint64_t)src_row * args.head_dim + tid];
-            if (!complete) {
+            // Retain new rows in the final group even when it is complete:
+            // rejection may commit only a prefix of this verification batch.
+            if (pool == (input_end - 1u) / args.pool_size) {
                 tail_k[(uint64_t)r * args.head_dim + tid] = k_value;
                 tail_gate[(uint64_t)r * args.head_dim + tid] = gate_value;
             }
