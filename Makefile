@@ -371,6 +371,12 @@ tests/test_deepseek4_vision_image: tests/test_deepseek4_vision_image.o ds4_image
 	$(CC) $(CFLAGS) -o $@ $^ -lm
 
 ifeq ($(UNAME_S),Darwin)
+tests/test_metal_dense_scratch: tests/test_metal_dense_scratch.c ds4_metal.o ds4_image.o
+	$(CC) $(CFLAGS) -I. -o $@ $^ $(METAL_LDLIBS)
+
+metal-dense-scratch-test: tests/test_metal_dense_scratch
+	./tests/test_metal_dense_scratch
+
 $(GLM53_KDA_TEST): tests/test_glm53_kda.o ds4_metal.o ds4_image.o
 	$(CC) $(CFLAGS) -o $@ $^ $(METAL_LDLIBS)
 else

@@ -18652,7 +18652,9 @@ static int ds4_gpu_matmul_q8_0_legacy_tensor(
                     [enc setBuffer:wbuf offset:(NSUInteger)inner_offset atIndex:1];
                     [enc setBuffer:xbuf offset:ds4_gpu_tensor_offset(x) atIndex:2];
                     [enc setBuffer:outbuf offset:ds4_gpu_tensor_offset(out) atIndex:3];
-                    [enc setThreadgroupMemoryLength:64u * 32u * sizeof(uint16_t) atIndex:0];
+                    /* The shared direct-RHS shader alternates two 64x32
+                     * half weight tiles, including for one-token dispatch. */
+                    [enc setThreadgroupMemoryLength:2u * 64u * 32u * sizeof(uint16_t) atIndex:0];
                     [enc dispatchThreadgroups:MTLSizeMake(1u,
                                                           ((NSUInteger)out_dim + 63u) / 64u,
                                                           1u)
@@ -19285,7 +19287,9 @@ static int ds4_gpu_matmul_quant_impl_tensor(
                 [enc setBuffer:wbuf offset:(NSUInteger)inner_offset atIndex:1];
                 [enc setBuffer:xbuf offset:ds4_gpu_tensor_offset(x) atIndex:2];
                 [enc setBuffer:outbuf offset:ds4_gpu_tensor_offset(out) atIndex:3];
-                [enc setThreadgroupMemoryLength:64u * 32u * sizeof(uint16_t) atIndex:0];
+                /* Q4 uses the same double-buffered direct-RHS shader as
+                 * F16/Q8: reserving one tile lets the second write past it. */
+                [enc setThreadgroupMemoryLength:2u * 64u * 32u * sizeof(uint16_t) atIndex:0];
                 [enc dispatchThreadgroups:MTLSizeMake((NSUInteger)(n_tok / nax_tile_n),
                                                       (NSUInteger)out_dim / 64u,
                                                       1)
