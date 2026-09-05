@@ -3428,6 +3428,10 @@ kernel void kernel_glm_attention_indexed_decode(
         }
         const float max_score = red[0];
 
+        // The maximum and sum share red[]. All SIMD groups must consume
+        // red[0] before group zero can overwrite it with its local sum.
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+
         float local_sum = 0.0f;
         for (uint s = tid; s < args.n_selected; s += nth) {
             const float w = exp(scores[s] - max_score);
@@ -3525,6 +3529,9 @@ kernel void kernel_glm_attention_indexed_decode(
         threadgroup_barrier(mem_flags::mem_threadgroup);
     }
     const float max_score = red[0];
+
+    // Match the FP16-cache path: protect the maximum read before scratch reuse.
+    threadgroup_barrier(mem_flags::mem_threadgroup);
 
     float local_sum = 0.0f;
     for (uint s = tid; s < args.n_selected; s += nth) {
