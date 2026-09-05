@@ -9608,7 +9608,7 @@ kernel void kernel_mul_mm_id_mpp(
 
 // M5 N32 candidate from PR #864. It coexists with the established N32/N64
 // kernels so the host can perform same-binary rollback comparisons.
-template<typename S0, typename S0_4x4, typename S0_8x8, typename S1, typename S1_2x4, typename S1_8x8, typename block_q, short nl, void (*dequantize_func)(device const block_q *, short, thread S0_4x4 &), typename T0, typename T0_4x4, typename T1, typename T1_2x4>
+template<typename S0, typename S0_4x4, typename S0_8x8, typename S1, typename S1_2x4, typename S1_8x8, typename block_q, short nl, void (*dequantize_func)(device const block_q *, short, thread S0_4x4 &), typename T0, typename T0_4x4, typename T1, typename T1_2x4, bool filter_tail = false>
 kernel void kernel_mul_mm_id_mpp_split16(
         constant ds4_metal_args_mul_mm_id & args,
         device const char * src0,
@@ -9648,7 +9648,7 @@ kernel void kernel_mul_mm_id_mpp_split16(
 
     const int32_t neh1 = tpe_u32[im];
 
-    if (r1 >= neh1) {
+    if (r1 >= neh1 || (filter_tail && neh1 - r1 > 32)) {
         return;
     }
 
@@ -9829,7 +9829,7 @@ kernel void kernel_mul_mm_id_mpp_split16(
 // tile, while A and the complete 64-row B tile remain double-buffered. This
 // trades accumulator registers for half as many work items and half as many
 // IQ2/Q2 weight dequantizations once prefill supplies enough expert rows.
-template<typename S0, typename S0_4x4, typename S0_8x8, typename S1, typename S1_2x4, typename S1_8x8, typename block_q, short nl, void (*dequantize_func)(device const block_q *, short, thread S0_4x4 &), typename T0, typename T0_4x4, typename T1, typename T1_2x4>
+template<typename S0, typename S0_4x4, typename S0_8x8, typename S1, typename S1_2x4, typename S1_8x8, typename block_q, short nl, void (*dequantize_func)(device const block_q *, short, thread S0_4x4 &), typename T0, typename T0_4x4, typename T1, typename T1_2x4, bool filter_tail = false>
 kernel void kernel_mul_mm_id_mpp_split16_n64(
         constant ds4_metal_args_mul_mm_id & args,
         device const char * src0,
@@ -9869,7 +9869,7 @@ kernel void kernel_mul_mm_id_mpp_split16_n64(
 
     const int32_t neh1 = tpe_u32[im];
 
-    if (r1 >= neh1) {
+    if (r1 >= neh1 || (filter_tail && neh1 - r1 <= 32)) {
         return;
     }
 
@@ -10069,6 +10069,12 @@ template [[host_name("kernel_mul_mm_id_iq2_xxs_f16_mpp_split16")]] kernel mul_mm
 template [[host_name("kernel_mul_mm_id_iq2_xxs_f32_mpp_split16_n64")]] kernel mul_mm_id_mpp_split16_n64_t kernel_mul_mm_id_mpp_split16_n64<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_iq2_xxs, QK_NL, dequantize_iq2_xxs_half_lut, float, float4x4, float, float2x4>;
 template [[host_name("kernel_mul_mm_id_q2_K_f16_mpp_split16_n64")]] kernel mul_mm_id_mpp_split16_n64_f16_rhs_t kernel_mul_mm_id_mpp_split16_n64<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_q2_K, QK_NL, dequantize_q2_K, half, half4x4, half, half2x4>;
 template [[host_name("kernel_mul_mm_id_iq2_xxs_f16_mpp_split16_n64")]] kernel mul_mm_id_mpp_split16_n64_f16_rhs_t kernel_mul_mm_id_mpp_split16_n64<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_iq2_xxs, QK_NL, dequantize_iq2_xxs_half_lut, half, half4x4, half, half2x4>;
+template [[host_name("kernel_mul_mm_id_iq2_xxs_f32_mpp_split16_occupancy")]] kernel mul_mm_id_mpp_split16_t kernel_mul_mm_id_mpp_split16<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_iq2_xxs, QK_NL, dequantize_iq2_xxs_half_lut, float, float4x4, float, float2x4, true>;
+template [[host_name("kernel_mul_mm_id_q2_K_f16_mpp_split16_occupancy")]]    kernel mul_mm_id_mpp_split16_f16_rhs_t kernel_mul_mm_id_mpp_split16<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_q2_K, QK_NL, dequantize_q2_K, half, half4x4, half, half2x4, true>;
+template [[host_name("kernel_mul_mm_id_iq2_xxs_f16_mpp_split16_occupancy")]] kernel mul_mm_id_mpp_split16_f16_rhs_t kernel_mul_mm_id_mpp_split16<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_iq2_xxs, QK_NL, dequantize_iq2_xxs_half_lut, half, half4x4, half, half2x4, true>;
+template [[host_name("kernel_mul_mm_id_iq2_xxs_f32_mpp_split16_n64_occupancy")]] kernel mul_mm_id_mpp_split16_n64_t kernel_mul_mm_id_mpp_split16_n64<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_iq2_xxs, QK_NL, dequantize_iq2_xxs_half_lut, float, float4x4, float, float2x4, true>;
+template [[host_name("kernel_mul_mm_id_q2_K_f16_mpp_split16_n64_occupancy")]] kernel mul_mm_id_mpp_split16_n64_f16_rhs_t kernel_mul_mm_id_mpp_split16_n64<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_q2_K, QK_NL, dequantize_q2_K, half, half4x4, half, half2x4, true>;
+template [[host_name("kernel_mul_mm_id_iq2_xxs_f16_mpp_split16_n64_occupancy")]] kernel mul_mm_id_mpp_split16_n64_f16_rhs_t kernel_mul_mm_id_mpp_split16_n64<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_iq2_xxs, QK_NL, dequantize_iq2_xxs_half_lut, half, half4x4, half, half2x4, true>;
 
 template [[host_name("kernel_mul_mm_id_iq2_xxs_f32_mpp")]] kernel mul_mm_id_mpp_t kernel_mul_mm_id_mpp<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_iq2_xxs, QK_NL, dequantize_iq2_xxs, float, float4x4, float, float2x4, 32>;
 template [[host_name("kernel_mul_mm_id_q2_K_f16_mpp")]]    kernel mul_mm_id_mpp_f16_rhs_t kernel_mul_mm_id_mpp<half, half4x4, simdgroup_half8x8, half, half2x4, simdgroup_half8x8, block_q2_K, QK_NL, dequantize_q2_K, half, half4x4, half, half2x4, 32>;

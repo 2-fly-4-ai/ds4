@@ -33049,6 +33049,38 @@ static int ds4_gpu_encode_mul_mm_id_mapped_tile(
     /* The work map and cooperative kernel must use the same expert-row tile.
      * Most paths retain the established 32-row contract; the guarded M5 GLM
      * large-prefill path passes 64. */
+    id<MTLComputePipelineState> occupancy_tail = nil;
+    // Keep the measured 1K DeepSeek Flash case narrow. Other contexts, GLM,
+    // SSD streaming, devices and expert shapes retain their established route.
+    const bool short_ds4 = !g_glm_model_mode && !g_ssd_streaming_mode &&
+        mm_args->ne21 == 1024 && mm_args->ne02 == 256 && mm_args->ne20 == 6 &&
+        ((mm_args->ne00 == 4096 && mm_args->ne0 == 2048) ||
+         (mm_args->ne00 == 2048 && mm_args->ne0 == 4096)) &&
+        work_tile_n == 64u && threadgroup_bytes == 16384u &&
+        ds4_gpu_device_name_contains("M5 Max") &&
+        getenv("DS4_METAL_DISABLE_DS4_SHORT_PREFILL_TAIL32") == NULL;
+    if (short_ds4) {
+        const char *names[] = {"kernel_mul_mm_id_iq2_xxs_f32_mpp_split16",
+            "kernel_mul_mm_id_q2_K_f16_mpp_split16",
+            "kernel_mul_mm_id_iq2_xxs_f16_mpp_split16"};
+        for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
+            char original[128], full[128], tail[128];
+            snprintf(original, sizeof(original), "%s_n64", names[i]);
+            if (mm_pipeline != ds4_gpu_get_mul_mm_id_pipeline(original, false)) continue;
+            snprintf(full, sizeof(full), "%s_n64_occupancy", names[i]);
+            snprintf(tail, sizeof(tail), "%s_occupancy", names[i]);
+            id<MTLComputePipelineState> full_pipeline = ds4_gpu_get_mul_mm_id_pipeline(full, false);
+            id<MTLComputePipelineState> tail_pipeline = ds4_gpu_get_mul_mm_id_pipeline(tail, false);
+            if (full_pipeline && tail_pipeline) {
+                mm_pipeline = full_pipeline;
+                occupancy_tail = tail_pipeline;
+                if (getenv("DS4_METAL_TRACE_DS4_SHORT_PREFILL_TAIL32"))
+                    fprintf(stderr, "ds4: short-prefill tail32 tokens=%d experts=%d topk=%d k=%d out=%d\n",
+                            mm_args->ne21, mm_args->ne02, mm_args->ne20, mm_args->ne00, mm_args->ne0);
+            }
+            break;
+        }
+    }
     const bool use_resource_hints =
         getenv("DS4_METAL_MOE_MM_ID_USE_RESOURCES") != NULL &&
         getenv("DS4_METAL_DISABLE_MOE_MM_ID_USE_RESOURCES") == NULL;
@@ -33091,6 +33123,15 @@ static int ds4_gpu_encode_mul_mm_id_mapped_tile(
                                           ((NSUInteger)mm_args->ne0 + 63u) / 64u,
                                           1)
          threadsPerThreadgroup:MTLSizeMake(128, 1, 1)];
+    if (occupancy_tail) {
+        // Both dispatches consume the SAME 64-row work map. The first skips
+        // <=32-row tails; this N32 dispatch handles only those skipped tiles.
+        [enc setComputePipelineState:occupancy_tail];
+        [enc setThreadgroupMemoryLength:12288u atIndex:0];
+        [enc dispatchThreadgroups:MTLSizeMake((NSUInteger)work_cap,
+            ((NSUInteger)mm_args->ne0 + 63u) / 64u, 1)
+            threadsPerThreadgroup:MTLSizeMake(128, 1, 1)];
+    }
     ds4_gpu_end_compute_encoder(cb, enc);
     return 1;
 }
