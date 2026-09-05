@@ -5,7 +5,7 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parent / "attention-prefill-results"
 with (root / "prefill.csv").open("w") as f:
-    w = csv.writer(f)
+    w = csv.writer(f, lineterminator="\n")
     w.writerow(["corpus", "input_tokens", "old_tps", "new_tps", "gain_percent", "saved_ms", "exact_runs"])
     for p in (root / f"ds-prefill-{kind}-1024.log" for kind in ("code", "structured", "prose")):
         s = p.read_text()
@@ -18,7 +18,7 @@ with (root / "prefill.csv").open("w") as f:
                     1024*(1/old-1/new)*1000, exact[1]])
 
 with (root / "generation.csv").open("w") as f:
-    w = csv.writer(f)
+    w = csv.writer(f, lineterminator="\n")
     w.writerow(["model", "settings", "case", "input_tokens", "runs", "output_tokens",
                 "generation_tps", "prefill_ms_mean", "plain_tokens", "lookup_tokens", "neural_tokens", "exact"])
     for filename, expected_cases in (("ds-greedy.log", 5), ("glm-greedy.log", 5),
@@ -50,7 +50,7 @@ for n in (512, 1024, 1025, 2048):
 for p in (root / "ds-state-1024.log", root / "glm-state-2048.log", root / "glm-state-8192.log"):
     assert "exact_rows=257 " in p.read_text(), p
 with (root / "barrier-timing.csv").open("w") as f:
-    w = csv.writer(f)
+    w = csv.writer(f, lineterminator="\n")
     w.writerow(["prefix_tokens", "old_tps", "new_tps", "timing_change_percent", "input_hash", "note"])
     for n in (2048, 8192):
         rows = []

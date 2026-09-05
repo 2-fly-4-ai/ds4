@@ -158,3 +158,12 @@ This is a targeted port/regression campaign, not a new 100K/256K benchmark or
 the repository's full golden-model quality suite. Test servers are stopped
 after their requests. Experimental branches and the user's prior benchmark
 artifacts are preserved; nothing is pushed remotely by this task.
+
+## Delivery
+
+The focused commits were fast-forwarded onto `main`. All production CLI/API
+binaries were rebuilt there, and GLM KDA, Qwen kernels and sampling tests were
+rerun successfully from main. The CSV writer was normalized to LF line endings;
+this formatting cleanup did not alter measurements. No model server or
+benchmark is left running. The pre-existing DeepSeek cache-rewind caveat above
+remains explicitly open; no cache policy was silently disabled to make it pass.
