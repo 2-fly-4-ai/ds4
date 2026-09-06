@@ -383,12 +383,19 @@ tests/test_glm_router_parity: tests/test_glm_router_parity.c ds4.c ds4.h ds4_gpu
 tests/test_ds4_hot_rewind: tests/test_ds4_hot_rewind.c ds4.c ds4.h ds4_gpu.h ds4_image.o ds4_distributed.o ds4_tp.o ds4_ssd.o ds4_metal.o ds4_layer_pack.o
 	$(CC) $(CFLAGS) -fno-finite-math-only -I. -o $@ $< ds4_image.o ds4_distributed.o ds4_tp.o ds4_ssd.o ds4_metal.o ds4_layer_pack.o $(METAL_LDLIBS)
 
+tests/test_ds4_indexer_threshold tests/test_ds4_indexer_live: %: %.c ds4.c ds4.h ds4_gpu.h ds4_image.o ds4_distributed.o ds4_tp.o ds4_ssd.o ds4_metal.o ds4_layer_pack.o
+	$(CC) $(CFLAGS) -fno-finite-math-only -I. -o $@ $< ds4_image.o ds4_distributed.o ds4_tp.o ds4_ssd.o ds4_metal.o ds4_layer_pack.o $(METAL_LDLIBS)
+
+.PHONY: test-ds4-indexer-contract
+test-ds4-indexer-contract: tests/test_ds4_indexer_threshold
+	@for setting in default 64 128 256 512 1024 2048 4096 bad; do ./tests/test_ds4_indexer_threshold $$setting || exit 1; done
+
 .PHONY: glm-verifier-kernel-test
 glm-verifier-kernel-test: tests/test_glm_short_matmul_parity tests/test_glm_pool_prefix
 	./tests/test_glm_short_matmul_parity
 	./tests/test_glm_pool_prefix
 
-test: glm-verifier-kernel-test
+test: glm-verifier-kernel-test test-ds4-indexer-contract
 
 metal-dense-scratch-test: tests/test_metal_dense_scratch
 	./tests/test_metal_dense_scratch

@@ -11,6 +11,8 @@
 /tests/test_glm_router_parity
 /tests/test_glm_short_matmul_parity
 /tests/test_ds4_hot_rewind
+/tests/test_ds4_indexer_threshold
+/tests/test_ds4_indexer_live
 /ds4flash.gguf
 /TODO.md
 /gguf/

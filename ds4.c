@@ -21516,15 +21516,20 @@ static uint32_t metal_graph_decode_indexer_sparse_threshold(const ds4_gpu_graph 
         }
 #endif
     }
+#if defined(__APPLE__)
+    /* Dense attention is equivalent only while every compressed row fits in
+     * the model's top-k. Delaying selection beyond that point exposes keys
+     * the indexer would exclude, changing the model rather than its kernel.
+     * Keep legacy overrides bounded by this contract; the caller also checks
+     * that the index cache contains more than top-k rows. */
+    if (parsed > 0 && cached < DS4_N_INDEXER_TOP_K) return cached;
+    return DS4_N_INDEXER_TOP_K;
+#else
+    /* This validated correction is Metal-only; retain the other backends'
+     * existing policy until their sparse paths can be tested separately. */
     if (parsed > 0) return cached;
-
-    /* Keep dense attention longer than the legacy 512-row window by default.
-     * Around the 2K frontier the sparse path's score/top-k setup dominates
-     * the smaller attention scan, while larger contexts benefit from sparse
-     * indexed attention.  This threshold changes only the implementation used
-     * to consume the compressed rows; it must not lower the 512-row indexer
-     * selection defined by DS4_N_INDEXER_TOP_K. */
     return 1024u;
+#endif
 }
 
 /* =========================================================================
