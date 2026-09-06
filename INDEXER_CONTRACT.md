@@ -2,6 +2,9 @@
 
 This is a correctness correction, not a throughput optimization.
 
+Follow-up: [validated M5 barrier-reduction kernels](M5_INDEXER_KERNELS.md)
+recover a small amount of decode throughput without changing this contract.
+
 ## Cause and scope
 
 Scalar Metal decode previously delayed indexer selection until more than

@@ -17832,7 +17832,12 @@ int ds4_gpu_indexer_score_one_tensor(
         }
 
         if (n_head == 64 && head_dim == 128) {
+            /* M5: keep the head-order sum, but publish independent head
+             * contributions together instead of synchronizing 16 times. */
+            const bool staged = ds4_gpu_device_name_contains("M5") &&
+                getenv("DS4_METAL_DISABLE_INDEXER_STAGED_SCORE") == NULL;
             id<MTLComputePipelineState> direct_pipeline =
+                staged ? ds4_gpu_get_pipeline("kernel_dsv4_indexer_score_one_staged") :
                 ds4_gpu_hot_pipeline(g_dsv4_indexer_score_one_direct_pipeline,
                                         "kernel_dsv4_indexer_score_one_direct");
             if (!direct_pipeline) return 0;
@@ -17862,7 +17867,7 @@ int ds4_gpu_indexer_score_one_tensor(
             [enc setBuffer:wbuf offset:ds4_gpu_tensor_offset(weights) atIndex:2];
             [enc setBuffer:compbuf offset:ds4_gpu_tensor_offset(index_comp) atIndex:3];
             [enc setBuffer:scorebuf offset:ds4_gpu_tensor_offset(scores) atIndex:4];
-            [enc setThreadgroupMemoryLength:(128u + 4u) * sizeof(float) atIndex:0];
+            [enc setThreadgroupMemoryLength:(128u + (staged ? 64u : 4u)) * sizeof(float) atIndex:0];
             [enc dispatchThreadgroups:MTLSizeMake(n_comp, 1, 1)
                  threadsPerThreadgroup:MTLSizeMake(32, 4, 1)];
             ds4_gpu_end_compute_encoder(cb, enc);
@@ -18162,6 +18167,15 @@ int ds4_gpu_indexer_topk_tensor(
             return ds4_gpu_finish_command_buffer(cb, owned, "indexer fused top-k");
         }
         NSUInteger max_threads = g_argsort_f32_i32_desc_pipeline.maxTotalThreadsPerThreadgroup;
+        id<MTLComputePipelineState> short_pipeline = nil;
+        if (top_k == 512u && n_tokens == 1u && n_comp > 512u &&
+            n_comp <= 1024u && max_threads >= 1024u &&
+            ds4_gpu_device_name_contains("M5") &&
+            getenv("DS4_METAL_DISABLE_SHORT_TOPK_SHUFFLE") == NULL) {
+            short_pipeline = ds4_gpu_get_pipeline("kernel_topk_short_shuffle");
+            if (short_pipeline.maxTotalThreadsPerThreadgroup < 1024u)
+                short_pipeline = nil;
+        }
         if (max_threads == 0) max_threads = 256;
         int32_t nth = 1;
         while ((uint32_t)nth < n_comp && (uint64_t)2u * (uint64_t)nth <= (uint64_t)max_threads) {
@@ -18211,7 +18225,7 @@ int ds4_gpu_indexer_topk_tensor(
         if (!cb) return 0;
 
         id<MTLComputeCommandEncoder> enc = ds4_gpu_compute_encoder(cb);
-        [enc setComputePipelineState:g_argsort_f32_i32_desc_pipeline];
+        [enc setComputePipelineState:short_pipeline ?: g_argsort_f32_i32_desc_pipeline];
         [enc setBytes:&args length:sizeof(args) atIndex:0];
         [enc setBuffer:scorebuf offset:ds4_gpu_tensor_offset(scores) atIndex:1];
         [enc setBuffer:one_pass ? selbuf : g_indexer_topk_buffer[g_ds4_stream]

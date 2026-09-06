@@ -13,6 +13,8 @@
 /tests/test_ds4_hot_rewind
 /tests/test_ds4_indexer_threshold
 /tests/test_ds4_indexer_live
+/tests/test_indexer_staged
+/tests/test_indexer_live_parity
 /ds4flash.gguf
 /TODO.md
 /gguf/

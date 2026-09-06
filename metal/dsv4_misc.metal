@@ -494,6 +494,53 @@ kernel void kernel_dsv4_indexer_score_one_direct(
     }
 }
 
+// Preserve each dot product and head-order accumulation, but
+// publish all 64 independent contributions before the single final reduction.
+kernel void kernel_dsv4_indexer_score_one_staged(
+        constant ds4_metal_args_dsv4_indexer_scores_fused & args,
+        device const char *q,
+        device const char *weights,
+        device const char *index_comp,
+        device char *scores,
+        threadgroup float *shared [[threadgroup(0)]],
+        uint row [[threadgroup_position_in_grid]],
+        ushort tid [[thread_index_in_threadgroup]],
+        ushort lane [[thread_index_in_simdgroup]],
+        ushort sg [[simdgroup_index_in_threadgroup]]) {
+    if (row >= args.n_comp || args.n_head != 64u || args.head_dim != 128u) return;
+    threadgroup float *ktg = shared;
+    threadgroup float *contribution = ktg + 128u;
+    if (tid < 128u) {
+        device const float *krow = (device const float *)(index_comp +
+                (uint64_t)row * args.index_row_stride);
+        ktg[tid] = krow[tid];
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    for (uint head0 = 0; head0 < 64u; head0 += 4u) {
+        const uint head = head0 + (uint)sg;
+        device const float4 *q4 = (device const float4 *)(q +
+                (uint64_t)head * args.q_head_stride);
+        threadgroup const float4 *k4 = (threadgroup const float4 *)ktg;
+        float s = dot(q4[lane], k4[lane]);
+        s = simd_sum(s);
+        if (lane == 0) {
+            device const float *w = (device const float *)weights;
+            contribution[head] = max(s, 0.0f) * (w[head] * args.scale);
+        }
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    if (tid == 0) {
+        float acc = 0.0f;
+        for (uint head = 0; head < 64u; head += 4u) {
+            acc += contribution[head];
+            acc += contribution[head + 1u];
+            acc += contribution[head + 2u];
+            acc += contribution[head + 3u];
+        }
+        ((device float *)scores)[row] = acc;
+    }
+}
+
 // Decode router post-processing for one token. The selected expert ids are
 // already known; this gathers their probabilities, normalizes by the selected
 // sum, clamps the denominator like the reference path, and applies DS4's 1.5

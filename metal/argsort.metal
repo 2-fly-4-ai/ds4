@@ -116,6 +116,46 @@ kernel void kernel_argsort_f32_i32(
 // Host-visible sort variant used by DS4 top-k selection.
 template [[host_name("kernel_argsort_f32_i32_desc")]] kernel argsort_t kernel_argsort_f32_i32<DS4_SORT_ORDER_DESC>;
 
+// M5 short decode lane: the same 1024-wide bitonic comparator
+// network, with register shuffles for comparisons inside one SIMD group.
+kernel void kernel_topk_short_shuffle(
+        constant ds4_metal_args_argsort &args [[buffer(0)]],
+        device const float *scores [[buffer(1)]],
+        device int32_t *selected [[buffer(2)]],
+        threadgroup int32_t *shared [[threadgroup(0)]],
+        uint tid [[thread_index_in_threadgroup]]) {
+    threadgroup float *shared_value = (threadgroup float *)(shared + 1024u);
+    int32_t idx = (int32_t)tid;
+    float value = tid < (uint)args.ne00 ? scores[tid] : 0.0f;
+    for (uint k = 2u; k <= 1024u; k <<= 1u) {
+        for (uint j = k >> 1u; j > 0u; j >>= 1u) {
+            int32_t other_idx;
+            float other_value;
+            if (j < 32u) {
+                other_idx = simd_shuffle_xor(idx, j);
+                other_value = simd_shuffle_xor(value, j);
+            } else {
+                shared[tid] = idx;
+                shared_value[tid] = value;
+                threadgroup_barrier(mem_flags::mem_threadgroup);
+                other_idx = shared[tid ^ j];
+                other_value = shared_value[tid ^ j];
+                // Finish peer reads before the next cross-group publication.
+                threadgroup_barrier(mem_flags::mem_threadgroup);
+            }
+            const bool lower = (tid & j) == 0u;
+            const int32_t lhs = lower ? idx : other_idx, rhs = lower ? other_idx : idx;
+            const float lv = lower ? value : other_value, rv = lower ? other_value : value;
+            // Strict comparisons retain the original network's tie order.
+            const bool swap = (tid & k) == 0u ?
+                (lhs >= args.ne00 || (rhs < args.ne00 && lv < rv)) :
+                (rhs >= args.ne00 || (lhs < args.ne00 && lv > rv));
+            if (swap) { idx = other_idx; value = other_value; }
+        }
+    }
+    if (tid < 512u) selected[tid] = idx;
+}
+
 typedef void (argsort_merge_t)(
         constant   ds4_metal_args_argsort_merge & args,
         device const char    * src0,
