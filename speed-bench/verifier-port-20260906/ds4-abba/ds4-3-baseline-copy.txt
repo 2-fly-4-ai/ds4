@@ -1,0 +1,7 @@
+The copper observatory records every signal in a circular ledger. Each record contains a timestamp, a sequence number, a checksum, and a short payload. Writers publish the payload before advancing the visible cursor. Readers validate the checksum before acknowledging the sequence. If validation fails, the reader retries without changing shared state. This protocol keeps recovery deterministic during concurrent updates.
+
+The copper observatory records every signal in a circular ledger. Each record contains a timestamp, a sequence number, a checksum, and a short payload. Writers publish the payload before advancing the visible cursor. Readers validate the checksum before acknowledging the sequence. If validation fails, the reader retries without changing shared state. This protocol keeps recovery deterministic during concurrent updates.
+
+The copper observatory records every signal in a circular ledger. Each record contains a timestamp, a sequence number, a checksum, and a short payload. Writers publish the payload before advancing the visible cursor. Readers validate the checksum before acknowledging the sequence. If validation fails, the reader retries without changing shared state. This protocol keeps recovery deterministic during concurrent updates.
+
+The copper observatory records every signal in a circular ledger. Each record contains a timestamp, a sequence number, a checksum, and a short payload. Writers publish the payload before advancing

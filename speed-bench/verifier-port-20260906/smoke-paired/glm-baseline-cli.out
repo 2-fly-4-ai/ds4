@@ -1,0 +1,22 @@
+Here's a Python function to add two integers:
+
+```python
+def add_integers(a, b):
+    """Return the sum of two integers."""
+    return a + b
+```
+
+**Brief explanation:**
+
+- The function `add_integers` takes two parameters, `a` and `b`.
+- The `return a + b` statement computes the sum using the `+` operator and returns the result.
+- The docstring briefly describes what the function does.
+
+**Example usage:**
+
+```python
+result = add_integers(3, 5)
+print(result)  # Output: 8
+```
+
+You

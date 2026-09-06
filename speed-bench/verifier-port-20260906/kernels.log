@@ -1,0 +1,35 @@
+./tests/test_glm_short_matmul_parity
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 0.033 ms, residency requested in 0.929 ms, warmup 2.375 ms (mapped 64.00 MiB from offset 0.00 MiB)
+ds4: Metal mapped mmaped model as 1 overlapping shared buffers
+SHORT_MATMUL type=30 k=16384 m=24 rows=1 different=0
+SHORT_MATMUL type=30 k=16384 m=24 rows=2 different=0
+SHORT_MATMUL type=30 k=16384 m=24 rows=4 different=0
+SHORT_MATMUL type=30 k=16384 m=24 rows=8 different=0
+SHORT_MATMUL type=30 k=16384 m=24 rows=9 different=0
+SHORT_MATMUL type=30 k=16384 m=24 rows=15 different=0
+SHORT_MATMUL type=30 k=16384 m=24 rows=16 different=0
+SHORT_MATMUL type=12 k=4096 m=128 rows=1 different=0
+SHORT_MATMUL type=12 k=4096 m=128 rows=2 different=0
+SHORT_MATMUL type=12 k=4096 m=128 rows=4 different=0
+SHORT_MATMUL type=12 k=4096 m=128 rows=8 different=0
+SHORT_MATMUL type=12 k=4096 m=128 rows=9 different=0
+SHORT_MATMUL type=12 k=4096 m=128 rows=15 different=0
+SHORT_MATMUL type=12 k=4096 m=128 rows=16 different=0
+SHORT_MATMUL type=12 k=8192 m=4096 rows=1 different=0
+SHORT_MATMUL type=12 k=8192 m=4096 rows=2 different=0
+SHORT_MATMUL type=12 k=8192 m=4096 rows=4 different=0
+SHORT_MATMUL type=12 k=8192 m=4096 rows=8 different=0
+SHORT_MATMUL type=12 k=8192 m=4096 rows=9 different=0
+SHORT_MATMUL type=12 k=8192 m=4096 rows=15 different=0
+SHORT_MATMUL type=12 k=8192 m=4096 rows=16 different=0
+SHORT_MATMUL_COMPLETE failures=0
+./tests/test_glm_pool_prefix
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 0.022 ms, residency requested in 0.091 ms, warmup 2.467 ms (mapped 1.00 MiB from offset 0.00 MiB)
+ds4: Metal mapped mmaped model as 1 overlapping shared buffers
+POOL_COMPLETE cases=528 failures=0

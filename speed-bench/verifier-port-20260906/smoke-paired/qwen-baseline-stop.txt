@@ -1,0 +1,4 @@
+```python
+def add_two_integers(a: int, b: int) -> int:
+    """
+    Adds two integers and 

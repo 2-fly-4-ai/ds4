@@ -1,0 +1,23 @@
+Here's a Python function to add two integers:
+
+```python
+def add(a, b):
+    """
+    Add two integers and return their sum.
+    
+    Args:
+        a (int): First integer
+        b (int): Second integer
+    
+    Returns:
+        int: The sum of a and b
+    """
+    return a + b
+```
+
+**Brief explanation:**
+
+- The function `add(a, b)` takes two parameters `a` and `b`.
+- It uses the `+` operator to add them together.
+- The result is returned directly.
+- The docstring provides documentation about the function's purpose, parameters

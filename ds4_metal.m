@@ -19131,62 +19131,19 @@ static int ds4_gpu_matmul_quant_impl_tensor(
         id<MTLCommandBuffer> cb = ds4_gpu_command_buffer(&owned);
         if (!cb) return 0;
 
-        /* GLM-5.3 prompt verification commonly evaluates 15 drafts plus the
-         * replacement row.  The generic 64x32 tile duplicates its second
-         * 16-row half at N=16 and discards it.  This exact-N16 TensorOps tile
-         * reads the RHS directly and double-buffers each dequantized Q4_K
-         * weight tile, avoiding that duplicate work. */
-        if (weight_type == DS4_METAL_TENSOR_Q4_K &&
-            n_tok == 16u &&
-            (in_dim == 16384u || in_dim == 8192u) && out_dim == 4096u &&
-            g_glm_model_mode && !g_ssd_streaming_mode &&
-            !ds4_gpu_tp_world_is_two() &&
-            ds4_gpu_device_is_m5_apple_silicon() &&
-            ds4_gpu_mpp_available() &&
-            getenv("DS4_METAL_DISABLE_M5_GLM_ATTN_Q4_MPP_N16") == NULL) {
-            id<MTLComputePipelineState> pipeline =
-                ds4_gpu_get_mul_mm_pipeline(
-                    "kernel_mul_mm_q4_K_f32_nax_direct_rhs_n16", false, false);
-            if (pipeline) {
-                static int q4_mpp_n16_trace_once;
-                if (!q4_mpp_n16_trace_once &&
-                    getenv("DS4_METAL_TRACE_M5_GLM_ATTN_Q4_MPP_N16") != NULL) {
-                    q4_mpp_n16_trace_once = 1;
-                    fprintf(stderr,
-                            "ds4: M5 GLM exact-N16 TensorOps Q4 attention projection active K=%llu M=%llu\n",
-                            (unsigned long long)in_dim,
-                            (unsigned long long)out_dim);
-                }
-                ds4_gpu_mul_mm_args args =
-                    ds4_gpu_make_mm_args(in_dim, out_dim, n_tok, row_bytes);
-                id<MTLComputeCommandEncoder> enc = ds4_gpu_compute_encoder(cb);
-                [enc setComputePipelineState:pipeline];
-                [enc setBytes:&args length:sizeof(args) atIndex:0];
-                [enc setBuffer:wbuf offset:(NSUInteger)inner_offset atIndex:1];
-                [enc setBuffer:xbuf offset:ds4_gpu_tensor_offset(x) atIndex:2];
-                [enc setBuffer:outbuf offset:ds4_gpu_tensor_offset(out) atIndex:3];
-                [enc setThreadgroupMemoryLength:8192u atIndex:0];
-                [enc dispatchThreadgroups:MTLSizeMake(1u,
-                                                      (NSUInteger)out_dim / 64u,
-                                                      1u)
-                     threadsPerThreadgroup:MTLSizeMake(128u, 1u, 1u)];
-                ds4_gpu_end_compute_encoder(cb, enc);
-                if (!ds4_gpu_finish_command_buffer(cb, owned,
-                                                   "M5 GLM exact-N16 Q4 MPP matmul")) {
-                    return 0;
-                }
-                return 1;
-            }
-        }
-
         /*
          * Small-batch Q4_K goes to the classic (llama.cpp-style) matvec:
          * the mul_mv_ext family tops out around 220 GB/s on M5 for the GLM
          * DenseQ4 decode shapes while this impl streams 530-650 GB/s
          * (misc/q4mv_bench.m). Falls through to ext when unavailable.
+         * GLM lookup also needs this reduction through 16 rows: matrix
+         * tiles (including the former exact-N16 TensorOps dispatch) change
+         * rounding and diverge from scalar verification. Large prefill
+         * still uses matrix tiles.
          */
         if (weight_type == DS4_METAL_TENSOR_Q4_K &&
-            (n_tok <= 8u || ds4_gpu_pl_mv16_enabled(n_tok)) &&
+            (n_tok <= 8u || (g_glm_model_mode && n_tok <= 16u) ||
+             ds4_gpu_pl_mv16_enabled(n_tok)) &&
             (in_dim % 256u) == 0 &&
             getenv("DS4_METAL_DISABLE_Q4_MV_CLASSIC") == NULL) {
             const int16_t nsg = 2;
@@ -35967,6 +35924,32 @@ static int ds4_gpu_glm_indexer_scores_batch_grouped_tensor(
             return 0;
         }
 
+        /* Short GLM-5.3 verifier rows must rank pools using decode's exact
+         * reduction order. Tree-reduced batch scores can swap near-tied
+         * pools, changing attention's summation order even for the same set.
+         * Keep large prefill tiles and non-pooled models on their own path. */
+        if (row_group_size == 4u && n_tokens <= 16u) {
+            for (uint32_t t = 0; t < n_tokens; t++) {
+                const uint32_t visible = (pos0 + t + 1u) / row_group_size;
+                ds4_gpu_tensor *sv = ds4_gpu_tensor_view(scores,
+                    (uint64_t)t * n_rows * sizeof(float), (uint64_t)n_rows * sizeof(float));
+                ds4_gpu_tensor *qv = ds4_gpu_tensor_view(q,
+                    (uint64_t)t * n_head * head_dim * sizeof(float),
+                    (uint64_t)n_head * head_dim * sizeof(float));
+                ds4_gpu_tensor *wv = ds4_gpu_tensor_view(weights,
+                    (uint64_t)t * n_head * sizeof(float), (uint64_t)n_head * sizeof(float));
+                const union { uint32_t bits; float value; } masked = { .bits = 0xff800000u };
+                bool ok = sv && qv && wv &&
+                    ds4_gpu_tensor_fill_f32(sv, masked.value, n_rows);
+                if (ok && visible) ok = ds4_gpu_glm_indexer_score_one_tensor(
+                    sv, qv, wv, indexer_key_cache, visible, n_head, head_dim, scale, cache_f16);
+                ds4_gpu_tensor_free(sv);
+                ds4_gpu_tensor_free(qv);
+                ds4_gpu_tensor_free(wv);
+                if (!ok) return 0;
+            }
+            return 1;
+        }
         const bool force_scalar = g_quality_mode;
         const bool use_tiled_f32 = false;
         const bool use_tiled = !force_scalar && n_tokens >= 8u &&
@@ -46276,7 +46259,9 @@ int ds4_gpu_glm53_matmul_bf16(
             model_map, model_size, weight_offset, weights * sizeof(uint16_t),
             &inner, "BF16 matrix");
         if (!weightbuf) return 0;
-        const bool use_mv = n_rows <= 8u;
+        /* Lookup verifies up to 16 rows. Keep its BF16 HC mixing on the
+         * decode reduction; the matrix kernel has different rounding. */
+        const bool use_mv = n_rows <= 16u;
         const bool bc_inp = (in_dim % 32u) != 0u;
         const bool bc_out = (out_dim % 64u) != 0u || (n_rows % 32u) != 0u;
         id<MTLComputePipelineState> pipeline = use_mv
@@ -47350,6 +47335,37 @@ static int ds4_gpu_glm53_kda_prefill_impl(
         !glm53_gpu_tensor_has(recurrent_state_out, state_elements, sizeof(float))) {
         fprintf(stderr, "ds4: GLM-5.3 KDA prefill received invalid buffers\n");
         return 0;
+    }
+
+    /* Short shadow-state verification through the existing
+     * scalar kernel, preserving its arithmetic and prefix-one rollback. */
+    if (recurrent_state_out != recurrent_state && n_tokens <= 16u) {
+        if (!ds4_gpu_tensor_copy_f32_inline(recurrent_state_out, 0,
+                recurrent_state, 0, state_elements * sizeof(float))) return 0;
+        for (uint32_t row = 0; row < n_tokens; row++) {
+            const ds4_gpu_tensor *src[] = {out,q,k,v,raw_gate,raw_beta,output_gate};
+            ds4_gpu_tensor *views[7] = {0};
+            bool ok = true;
+            for (int j = 0; j < 7; j++) {
+                uint64_t width = j == 5 ? n_heads : projection;
+                views[j] = ds4_gpu_tensor_view(src[j], row * width * sizeof(float), width * sizeof(float));
+                ok = ok && views[j] != NULL;
+            }
+            if (ok) ok = ds4_gpu_glm53_kda_decode(views[0], conv_state_out,
+                recurrent_state_out, views[1], views[2], views[3], views[4], views[5], views[6],
+                model_map, model_size, q_conv_offset, k_conv_offset, v_conv_offset,
+                a_log_offset, dt_bias_offset, output_norm_offset, n_heads, 1,
+                gate_lower_bound, norm_eps) != 0;
+            for (int j = 0; j < 7; j++) ds4_gpu_tensor_free(views[j]);
+            if (ok && keep_prefix1 && row == 0) {
+                ok = ds4_gpu_tensor_copy_f32_inline((ds4_gpu_tensor *)conv_state,
+                    0, conv_state_out, 0, conv_elements * sizeof(float)) &&
+                     ds4_gpu_tensor_copy_f32_inline((ds4_gpu_tensor *)recurrent_state,
+                    0, recurrent_state_out, 0, state_elements * sizeof(float));
+            }
+            if (!ok) return 0;
+        }
+        return 1;
     }
 
     uint64_t conv_bytes = 0, dt_bytes = 0;

@@ -1,0 +1,17 @@
+```python
+def add(a, b):
+    return a + b
+```
+
+**Explanation:**
+- The function `add` takes two parameters, `a` and `b`.
+- It returns their sum using the `+` operator.
+- Example: `add(3, 5)` returns `8`.
+
+If you want to ensure only integers are accepted, you can add type checking:
+
+```python
+def add(a: int, b: int) -> int:
+    if not isinstance(a, int) or not isinstance(b, int):
+        raise TypeError("Both arguments must be integers")
+    return a + b

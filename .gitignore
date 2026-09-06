@@ -7,6 +7,9 @@
 /ds4_agent_test
 /ds4_server_test
 /ds4_test
+/tests/test_glm_pool_prefix
+/tests/test_glm_router_parity
+/tests/test_glm_short_matmul_parity
 /ds4flash.gguf
 /TODO.md
 /gguf/

@@ -56,6 +56,30 @@ int main(void) {
             release(a);release(b);
         }
     }
-    ds4_gpu_tensor_free(k);ds4_gpu_tensor_free(g);
+    /* Lookup can reject across multiple pools, unlike the native two-row
+     * case above. Preserve only the live pre-block tail, then replay the
+     * accepted prefix. This covers every acceptance length through 16. */
+    ds4_gpu_tensor *backup=ds4_gpu_tensor_alloc(8*D*4);ck(backup!=NULL);
+    for(int half=0;half<2;half++)for(int pos=0;pos<8;pos++)for(int n=4;n<=16;n*=2){
+        for(int accepted=1;accepted<=n;accepted++){
+            state a=alloc_state(),b=alloc_state();
+            for(int t=0;t<pos;t++){update(a,map,k,g,t,1,half);update(b,map,k,g,t,1,half);}
+            size_t tail=(pos%4)*D*4;
+            if(tail){ck(ds4_gpu_begin_commands());ck(ds4_gpu_tensor_copy(backup,0,a.key,0,tail));ck(ds4_gpu_tensor_copy(backup,4*D*4,a.gate,0,tail));ck(ds4_gpu_end_commands());}
+            update(a,map,k,g,pos,n,half);
+            if(accepted<n){
+                if(tail){ck(ds4_gpu_begin_commands());ck(ds4_gpu_tensor_copy(a.key,0,backup,0,tail));ck(ds4_gpu_tensor_copy(a.gate,0,backup,4*D*4,tail));ck(ds4_gpu_end_commands());}
+                for(int t=pos;t<pos+accepted;t++)update(a,map,k,g,t,1,half);
+            }
+            int end=pos+accepted;
+            for(int t=pos;t<end;t++)update(b,map,k,g,t,1,half);
+            ck(ds4_gpu_synchronize());
+            bool ok=equal(a.cache,b.cache,(end/4)*D*(half?2:4))&&
+                equal(a.key,b.key,(end%4)*D*4)&&equal(a.gate,b.gate,(end%4)*D*4);
+            cases++;if(!ok){failures++;printf("LOOKUP_POOL_FAIL half=%d pos=%d n=%d accepted=%d\n",half,pos,n,accepted);}
+            release(a);release(b);
+        }
+    }
+    ds4_gpu_tensor_free(backup);ds4_gpu_tensor_free(k);ds4_gpu_tensor_free(g);
     printf("POOL_COMPLETE cases=%d failures=%d\n",cases,failures);return failures?1:0;
 }
