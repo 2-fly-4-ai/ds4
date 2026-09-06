@@ -598,8 +598,9 @@ bool ds4_session_prompt_lookup_supported(const ds4_session *s);
  * prompt-lookup router.  Used by frontends to select a session decode path. */
 bool ds4_engine_prompt_lookup_supported(const ds4_engine *e);
 void ds4_session_invalidate(ds4_session *s);
-/* Save/restore the compact GLM-5.3 recurrent state at a hot API prompt
- * boundary. Other backends return false and keep their existing rewind path. */
+/* Save mutable state and logits at a hot API prompt boundary: GLM-5.3
+ * recurrent state, or single-device Metal DeepSeek SWA/compressor state.
+ * Completed compressed KV is shared, not copied. Unsupported backends return false. */
 bool ds4_session_mark_rewind_point(ds4_session *s);
 bool ds4_session_can_rewind_to(const ds4_session *s, int pos);
 void ds4_session_rewind(ds4_session *s, int pos);

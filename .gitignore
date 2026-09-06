@@ -10,6 +10,7 @@
 /tests/test_glm_pool_prefix
 /tests/test_glm_router_parity
 /tests/test_glm_short_matmul_parity
+/tests/test_ds4_hot_rewind
 /ds4flash.gguf
 /TODO.md
 /gguf/

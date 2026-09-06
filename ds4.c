@@ -57319,6 +57319,13 @@ struct ds4_session {
     float *glm_mtp_hc;
     float *glm_mtp_logits0;
     float *glm_rewind_logits;
+    /* Hot DeepSeek rewind retains mutable SWA/compressors and exact logits;
+     * completed compressed KV remains shared while extending this prefix. */
+    ds4_gpu_tensor *ds4_rewind_state;
+    float *ds4_rewind_logits;
+    uint32_t ds4_rewind_comp[DS4_MAX_LAYER], ds4_rewind_index[DS4_MAX_LAYER];
+    int ds4_rewind_pos;
+    bool ds4_rewind_valid;
     int glm_rewind_pos;
     uint32_t glm_rewind_dense_len;
     bool glm_rewind_valid;
@@ -60050,6 +60057,9 @@ int ds4_session_save_payload(ds4_session *s, FILE *fp, char *err, size_t errlen)
 }
 
 int ds4_session_load_payload(ds4_session *s, FILE *fp, uint64_t payload_bytes, char *err, size_t errlen) {
+#ifndef DS4_NO_GPU
+    if (s) s->ds4_rewind_valid = false;
+#endif
     if (!s || !fp) {
         payload_set_err(err, errlen, "invalid session payload load");
         return 1;
@@ -69524,6 +69534,8 @@ void ds4_session_free(ds4_session *s) {
     free(s->glm_mtp_hc);
     free(s->glm_mtp_logits0);
     free(s->glm_rewind_logits);
+    free(s->ds4_rewind_logits);
+    ds4_gpu_tensor_free(s->ds4_rewind_state);
 #endif
     free(s->mtp_logits);
 #ifndef DS4_NO_GPU
@@ -71275,6 +71287,10 @@ static bool ds4_session_store_vision_identities(ds4_session *s) {
  * once its matching prefill completes, surfacing worker-side failures
  * here instead of as a gate timeout mid-decode. */
 int ds4_session_sync(ds4_session *s, const ds4_tokens *prompt, char *err, size_t errlen) {
+#ifndef DS4_NO_GPU
+    if (s && (!s->checkpoint_valid || !prompt ||
+              !ds4_tokens_starts_with(prompt, &s->checkpoint))) s->ds4_rewind_valid = false;
+#endif
     if (s && !ds4_session_vision_prefix_matches(
                      s, s->sync_images, s->sync_image_count)) {
         ds4_session_invalidate(s);
@@ -81306,6 +81322,9 @@ int ds4_session_eval_speculative(ds4_session *s, int first_token,
 
 void ds4_session_invalidate(ds4_session *s) {
     if (!s) return;
+#ifndef DS4_NO_GPU
+    s->ds4_rewind_valid = false;
+#endif
     if (ds4_session_tp_leader(s) &&
         !ds4_tp_failed(s->engine->tp.ctx)) {
         (void)ds4_tp_send_invalidate(s->engine->tp.ctx, s->tp_session_id);
@@ -81322,11 +81341,83 @@ void ds4_session_invalidate(ds4_session *s) {
 #endif
 }
 
+#ifndef DS4_NO_GPU
+static bool session_ds4_hot_rewind_supported(const ds4_session *s) {
+#if defined(__APPLE__)
+    return s && s->engine && s->engine->backend == DS4_BACKEND_METAL &&
+        !ds4_session_is_glm(s) && !ds4_session_is_qwen4(s) &&
+        !s->distributed && !s->engine->tp.active && !s->graph.placement &&
+        s->graph.raw_cap > 0;
+#else
+    (void)s;
+    return false;
+#endif
+}
+
+static bool session_ds4_copy_hot_rewind(ds4_session *s, bool save) {
+    ds4_gpu_graph *g = &s->graph;
+    const uint32_t pos = save ? (uint32_t)s->checkpoint.len : (uint32_t)s->ds4_rewind_pos;
+    const uint32_t rows = session_raw_live_rows(g, pos);
+    const uint64_t row_bytes = (uint64_t)DS4_N_HEAD_DIM * sizeof(float);
+    uint64_t bytes = (uint64_t)DS4_N_LAYER * rows * row_bytes;
+    for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
+        bytes += ds4_gpu_tensor_bytes(g->layer_attn_state_kv[il]) +
+                 ds4_gpu_tensor_bytes(g->layer_attn_state_score[il]) +
+                 ds4_gpu_tensor_bytes(g->layer_index_state_kv[il]) +
+                 ds4_gpu_tensor_bytes(g->layer_index_state_score[il]);
+    }
+    if (save && (!s->ds4_rewind_state || ds4_gpu_tensor_bytes(s->ds4_rewind_state) < bytes)) {
+        ds4_gpu_tensor_free(s->ds4_rewind_state);
+        s->ds4_rewind_state = ds4_gpu_tensor_alloc(bytes);
+    }
+    if (!s->ds4_rewind_state || ds4_gpu_tensor_bytes(s->ds4_rewind_state) < bytes) return false;
+    bool ok = ds4_gpu_begin_commands() != 0;
+    uint64_t offset = 0;
+    for (uint32_t il = 0; ok && il < DS4_N_LAYER; il++) {
+        const uint32_t start = (pos - rows) % g->raw_cap;
+        const uint32_t first = rows < g->raw_cap - start ? rows : g->raw_cap - start;
+        ds4_gpu_tensor *tensors[] = {g->layer_raw_cache[il],g->layer_raw_cache[il],
+            g->layer_attn_state_kv[il],g->layer_attn_state_score[il],
+            g->layer_index_state_kv[il],g->layer_index_state_score[il]};
+        for (int j = 0; ok && j < 6; j++) {
+            const uint64_t n = j == 0 ? first * row_bytes : j == 1 ? (rows-first) * row_bytes : ds4_gpu_tensor_bytes(tensors[j]);
+            const uint64_t at = j == 0 ? start * row_bytes : 0;
+            if (!n) continue;
+            ok = save ? ds4_gpu_tensor_copy(s->ds4_rewind_state,offset,tensors[j],at,n) != 0 :
+                        ds4_gpu_tensor_copy(tensors[j],at,s->ds4_rewind_state,offset,n) != 0;
+            offset += n;
+        }
+    }
+    if (ok) ok = ds4_gpu_end_commands() != 0;
+    else (void)ds4_gpu_synchronize();
+    if (ok) for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
+        if (save) {
+            s->ds4_rewind_comp[il] = g->layer_n_comp[il];
+            s->ds4_rewind_index[il] = g->layer_n_index_comp[il];
+        } else {
+            g->layer_n_comp[il] = s->ds4_rewind_comp[il];
+            g->layer_n_index_comp[il] = s->ds4_rewind_index[il];
+        }
+    }
+    return ok;
+}
+#endif
+
 bool ds4_session_mark_rewind_point(ds4_session *s) {
 #ifdef DS4_NO_GPU
     (void)s;
     return false;
 #else
+    if (session_ds4_hot_rewind_supported(s)) {
+        s->ds4_rewind_valid = false;
+        if (!s->checkpoint_valid || s->checkpoint.len <= 0) return false;
+        if (!s->ds4_rewind_logits) s->ds4_rewind_logits = malloc((size_t)DS4_N_VOCAB * sizeof(float));
+        if (!s->ds4_rewind_logits || !session_ds4_copy_hot_rewind(s, true)) return false;
+        memcpy(s->ds4_rewind_logits,s->logits,(size_t)DS4_N_VOCAB * sizeof(float));
+        s->ds4_rewind_pos = s->checkpoint.len;
+        s->ds4_rewind_valid = true;
+        return true;
+    }
     if (!s || !s->checkpoint_valid || !s->glm_graph.glm53 ||
         s->checkpoint.len <= 0) {
         return false;
@@ -81361,6 +81452,9 @@ bool ds4_session_can_rewind_to(const ds4_session *s, int pos) {
     (void)pos;
     return false;
 #else
+    if (session_ds4_hot_rewind_supported(s))
+        return s->checkpoint_valid && s->ds4_rewind_valid &&
+            pos == s->ds4_rewind_pos && pos <= s->checkpoint.len;
     return s && s->glm_rewind_valid && s->glm_graph.glm53 &&
            pos == s->glm_rewind_pos;
 #endif
@@ -81374,6 +81468,16 @@ void ds4_session_rewind(ds4_session *s, int pos) {
     if (pos < 0) pos = 0;
     if (pos > s->checkpoint.len) pos = s->checkpoint.len;
 #ifndef DS4_NO_GPU
+    if (session_ds4_hot_rewind_supported(s) && pos < s->checkpoint.len) {
+        if (ds4_session_can_rewind_to(s,pos) && session_ds4_copy_hot_rewind(s,false)) {
+            memcpy(s->logits,s->ds4_rewind_logits,(size_t)DS4_N_VOCAB * sizeof(float));
+        } else {
+            /* Trimming tokens cannot restore compressors or evicted SWA rows.
+             * Without a matching frontier, rebuild instead of reusing stale KV. */
+            s->checkpoint_valid = false;
+            s->ds4_rewind_valid = false;
+        }
+    }
     if (ds4_session_is_qwen4(s) && pos < s->checkpoint.len) {
         /* the verify snapshot rewinds exactly one token; anything else resets
          * the recurrent state and the kept tokens are replayed on the next eval */

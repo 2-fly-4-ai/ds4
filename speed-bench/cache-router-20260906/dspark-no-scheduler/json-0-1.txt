@@ -1,0 +1,12 @@
+```json
+[
+  {"id": 1, "name": "Widget", "quantity": 10, "price": 5.99},
+  {"id": 2, "name": "Gadget", "quantity": 5, "price": 12.49},
+  {"id": 3, "name": "Sprocket", "quantity": 20, "price": 3.75},
+  {"id": 4, "name": "Bolt", "quantity": 100, "price": 0.99},
+  {"id": 5, "name": "Nut", "quantity": 150, "price": 0.49},
+  {"id": 6, "name": "Screw", "quantity": 200, "price": 0.29},
+  {"id": 7, "name": "Bracket", "quantity": 15, "price": 8.50},
+  {"id": 8, "name": "Hinge", "quantity": 12, "price": 6.75}
+]
+```

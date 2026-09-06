@@ -1,0 +1,32 @@
+ds4: DSpark support model detected: /Users/brianfarley/Desktop/ds4/gguf/DeepSeek-V4-Flash-Vision-Exp-DSpark-support.gguf (stages=3 block=5 markov_rank=256 tensors=81 missing=0 invalid=0 metadata_errors=0); use --dspark to enable experimental runtime decode
+ds4: DSpark direct verifier-state commits enabled; output may differ from one-token decode due to batched floating-point operation order
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 2.471 ms, residency requested in 508.547 ms, warmup 4.046 ms (mapped 82185.67 MiB from offset 5.09 MiB)
+ds4: Metal mapped mmaped model as 1 overlapping shared buffers
+ds4: Metal model views created in 0.351 ms, residency requested in 509.010 ms, warmup 0.774 ms (mapped 5711.67 MiB from offset 0.01 MiB)
+ds4: Metal mapped mmaped model as 2 overlapping shared buffers
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 0.42 GiB (raw 0.36 + compressed 0.06) + buffers 0.06 GiB + resident model 80.26 GiB = 80.74 GiB planned
+ds4: memory detail: ctx=8192 prefill_cap=4096 raw_kv_rows=4352 compressed_kv_rows=2050 backend=metal
+0906 12:39:23 ds4-server: context buffers 495.92 MiB (ctx=8192, backend=metal, prefill_chunk=4096, raw_kv_rows=4352, compressed_kv_rows=2050)
+ds4: DSpark target-hidden capture enabled: layers=40,41,42
+0906 12:39:23 ds4-server: listening on http://127.0.0.1:62117
+0906 12:39:24 ds4-server: chat ctx=0..17:17 prompt start
+0906 12:39:24 ds4-server: chat ctx=0..17:17 prompt done 0.317s
+0906 12:39:25 ds4-server: chat ctx=17..67:50 gen=50 decoding chunk=48.48 t/s avg=48.48 t/s 1.031s
+0906 12:39:26 ds4-server: chat ctx=67..117:50 gen=100 decoding chunk=44.73 t/s avg=46.53 t/s 2.149s
+0906 12:39:27 ds4-server: chat ctx=117..167:50 gen=150 decoding chunk=45.57 t/s avg=46.21 t/s 3.246s
+0906 12:39:28 ds4-server: chat ctx=167..217:50 gen=200 decoding chunk=46.15 t/s avg=46.19 t/s 4.330s
+0906 12:39:29 ds4-server: chat ctx=217..242:25 gen=225 decoding chunk=33.48 t/s avg=44.32 t/s 5.076s
+0906 12:39:29 ds4-server: chat ctx=0..17:17 gen=225 finish=stop 5.394s
+0906 12:39:29 ds4-server: live kv cache rewind-hit live=243 prompt=17 common=17 reused=16
+0906 12:39:29 ds4-server: chat ctx=16..17:1 prompt start
+0906 12:39:29 ds4-server: chat ctx=16..17:1 prompt done 0.022s
+0906 12:39:30 ds4-server: chat ctx=17..67:50 gen=50 decoding chunk=45.53 t/s avg=45.53 t/s 1.098s
+0906 12:39:31 ds4-server: chat ctx=67..117:50 gen=100 decoding chunk=41.22 t/s avg=43.27 t/s 2.311s
+0906 12:39:32 ds4-server: chat ctx=117..167:50 gen=150 decoding chunk=41.46 t/s avg=42.65 t/s 3.517s
+0906 12:39:33 ds4-server: chat ctx=167..214:47 gen=197 decoding chunk=48.20 t/s avg=43.85 t/s 4.492s
+0906 12:39:33 ds4-server: chat ctx=16..17:1 gen=197 finish=stop 4.514s
+0906 12:39:33 ds4-server: shutdown requested, draining requests

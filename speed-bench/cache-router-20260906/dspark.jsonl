@@ -1,0 +1,8 @@
+{"case": "code", "temp": 0, "repeat": 0, "usage": {"prompt_tokens": 17, "completion_tokens": 225, "total_tokens": 242, "prompt_tokens_details": {"cached_tokens": 0, "cache_write_tokens": 17}}, "wall_s": 5.397427292, "first_s": 0.41159958299999966, "sha256": "5ac7458e95ccc9c4fe3459280de2f138a064d67f983adf8752c15bbe294f1e78"}
+{"case": "code", "temp": 0, "repeat": 1, "usage": {"prompt_tokens": 17, "completion_tokens": 225, "total_tokens": 242, "prompt_tokens_details": {"cached_tokens": 17, "cache_write_tokens": 0}}, "wall_s": 5.0538384579999995, "first_s": 0.09306733299999959, "sha256": "5ac7458e95ccc9c4fe3459280de2f138a064d67f983adf8752c15bbe294f1e78"}
+{"case": "story", "temp": 0, "repeat": 0, "usage": {"prompt_tokens": 19, "completion_tokens": 256, "total_tokens": 275, "prompt_tokens_details": {"cached_tokens": 0, "cache_write_tokens": 19}}, "wall_s": 7.0892612920000015, "first_s": 0.2704766670000005, "sha256": "c267628ff0ef533d62821b226c646faaa442ce0264165fb2c3755ce1d090a95f"}
+{"case": "story", "temp": 0, "repeat": 1, "usage": {"prompt_tokens": 19, "completion_tokens": 256, "total_tokens": 275, "prompt_tokens_details": {"cached_tokens": 19, "cache_write_tokens": 0}}, "wall_s": 6.977547124999997, "first_s": 0.02735591699999773, "sha256": "c07dff78a6fc819e9050a16ddf70d73194f8fe887a7d155f71ca58a643d9c605"}
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-cache-router/tests/test_hot_rewind_api.py", line 59, in <module>
+    assert hashes[0]==hashes[1], (label,temp,'cold/cached mismatch')
+AssertionError: ('story', 0, 'cold/cached mismatch')

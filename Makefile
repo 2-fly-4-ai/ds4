@@ -380,6 +380,9 @@ tests/test_glm_short_matmul_parity tests/test_glm_pool_prefix: %: %.c ds4_metal.
 tests/test_glm_router_parity: tests/test_glm_router_parity.c ds4.c ds4.h ds4_gpu.h ds4_image.o ds4_distributed.o ds4_tp.o ds4_ssd.o ds4_metal.o ds4_layer_pack.o
 	$(CC) $(CFLAGS) -fno-finite-math-only -I. -o $@ $< ds4_image.o ds4_distributed.o ds4_tp.o ds4_ssd.o ds4_metal.o ds4_layer_pack.o $(METAL_LDLIBS)
 
+tests/test_ds4_hot_rewind: tests/test_ds4_hot_rewind.c ds4.c ds4.h ds4_gpu.h ds4_image.o ds4_distributed.o ds4_tp.o ds4_ssd.o ds4_metal.o ds4_layer_pack.o
+	$(CC) $(CFLAGS) -fno-finite-math-only -I. -o $@ $< ds4_image.o ds4_distributed.o ds4_tp.o ds4_ssd.o ds4_metal.o ds4_layer_pack.o $(METAL_LDLIBS)
+
 .PHONY: glm-verifier-kernel-test
 glm-verifier-kernel-test: tests/test_glm_short_matmul_parity tests/test_glm_pool_prefix
 	./tests/test_glm_short_matmul_parity

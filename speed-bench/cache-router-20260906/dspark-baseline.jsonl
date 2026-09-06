@@ -1,0 +1,6 @@
+{"case": "code", "temp": 0, "repeat": 0, "usage": {"prompt_tokens": 17, "completion_tokens": 225, "total_tokens": 242, "prompt_tokens_details": {"cached_tokens": 0, "cache_write_tokens": 17}}, "wall_s": 5.39501725, "first_s": 0.42486099999999993, "sha256": "5ac7458e95ccc9c4fe3459280de2f138a064d67f983adf8752c15bbe294f1e78"}
+{"case": "code", "temp": 0, "repeat": 1, "usage": {"prompt_tokens": 17, "completion_tokens": 197, "total_tokens": 214, "prompt_tokens_details": {"cached_tokens": 16, "cache_write_tokens": 1}}, "wall_s": 4.514619583999999, "first_s": 0.11366020899999985, "sha256": "cc83fc4bc329dd9107e9cddd4e6092a1cd1ed5a83732afe3677ba32da0056e84"}
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-cache-router/tests/test_hot_rewind_api.py", line 59, in <module>
+    assert hashes[0]==hashes[1], (label,temp,'cold/cached mismatch')
+AssertionError: ('code', 0, 'cold/cached mismatch')

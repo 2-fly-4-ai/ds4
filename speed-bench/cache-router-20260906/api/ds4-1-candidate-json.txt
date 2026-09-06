@@ -1,0 +1,7 @@
+```json
+[
+  {"id": 1, "name": "Widget", "quantity": 25, "price": 10.99},
+  {"id": 2, "name": "Gadget", "quantity": 10, "price": 25.50},
+  {"id": 3, "name": "Sprocket", "quantity": 50, "price": 5.75},
+  {"id": 4, "name": "Bolt", "quantity": 100, "price": 0.99},
+  {"id": 5, "name": "

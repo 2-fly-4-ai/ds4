@@ -9574,7 +9574,7 @@ struct server_slot {
     char *live_text;
     size_t live_text_len;
     int live_text_pos;              /* checkpoint.len at render time; 0 = stale */
-    int hot_rewind_pos;             /* published GLM KDA prompt snapshot */
+    int hot_rewind_pos;             /* published engine-owned prompt frontier */
 
     job *assigned;
     job *running;
@@ -11022,6 +11022,8 @@ static slot_reuse slot_probe_reuse_locked(server *s, server_slot *slot,
         rewind_to = kv_rewind_reuse_target(
             live_pos, req->prompt.len, common, rewind_min,
             !(rr && strcmp(rr, "0") == 0));
+        if (!(rr && strcmp(rr, "0") == 0) && common == req->prompt.len &&
+            live_pos > common && slot->hot_rewind_pos == common) rewind_to = common;
         /* A tiny strict-prefix match is ambiguous across resident batched
          * sessions (often only a shared system header). Do not sacrifice a
          * conversation slot for it; single-session exact-repeat reuse stays
@@ -12822,9 +12824,9 @@ static uint64_t server_next_sequence(server *s) {
  * handled by the caller and never reaches here.  Two miss shapes are
  * recoverable:
  *   - prompt is a strict prefix of live (exact repeat, regenerate, branch
- *     from live): rewind one token before the prompt frontier so the sync
- *     re-evals a single token, restoring frontier logits and leaving the
- *     session in the same state as a completed prefill.
+ *     from live): prefer the engine's marked prompt frontier and exact
+ *     logits. The legacy target below replays the final token; an engine
+ *     without safe state for that target can invalidate and rebuild.
  *   - prompt diverges from live after a substantial shared prefix (edited
  *     history): rewind to the shared prefix and let the sync prefill only
  *     the suffix.  Small prefixes are not worth skipping the disk cache
@@ -13229,7 +13231,7 @@ static void generate_job_inner(server *s, server_slot *slot, job *j) {
     ds4_session_set_progress(slot->session, NULL, NULL);
     ds4_session_set_display_progress(slot->session, NULL, NULL);
     if (!multimodal) kv_cache_maybe_store_continued(s, slot);
-    if (!multimodal && s->engine && ds4_engine_is_glm_dsa(s->engine) &&
+    if (!multimodal && s->engine && !ds4_engine_is_qwen4(s->engine) &&
         prompt_for_sync->len > 1 && j->req.max_tokens > 0 &&
         server_prefill_enter(s, slot)) {
         const bool marked = ds4_session_mark_rewind_point(slot->session);
@@ -13239,7 +13241,7 @@ static void generate_job_inner(server *s, server_slot *slot, job *j) {
         pthread_mutex_unlock(&s->tool_mu);
         if (!marked) {
             server_log(DS4_LOG_WARNING,
-                       "ds4-server: GLM hot prompt rewind snapshot unavailable at %d tokens",
+                       "ds4-server: hot prompt rewind snapshot unavailable at %d tokens",
                        prompt_for_sync->len);
         }
     }
