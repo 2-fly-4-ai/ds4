@@ -71448,9 +71448,10 @@ int ds4_engine_first_token_test(ds4_engine *e, const ds4_tokens *prompt) {
     return 0;
 }
 
-static bool ds4_engine_configure_streaming_auto_cache(ds4_engine *e) {
+static bool ds4_engine_configure_streaming_auto_cache(ds4_engine *e, int ctx_size) {
 #ifdef DS4_NO_GPU
     (void)e;
+    (void)ctx_size;
     return true;
 #else
     if (!e ||
@@ -71507,7 +71508,22 @@ static bool ds4_engine_configure_streaming_auto_cache(ds4_engine *e) {
         return false;
     }
     ds4_ssd_cache_plan plan;
+    uint64_t model_limit = 0;
+    uint32_t cache_percent = 80;
+#ifdef __APPLE__
+    /* More cached experts help only if the fixed weights stay resident too.
+     * Share the static-pinning budget, including the requested context. */
+    model_limit = ds4_streaming_manual_cache_safe_bytes(
+            e->backend, ctx_size > 0 ? ctx_size : 4096,
+            e->prefill_chunk, true);
+    /* GLM's larger fixed tensors and streaming windows need more margin. */
+    if (DS4_MODEL_FAMILY != DS4_MODEL_FAMILY_GLM_DSA) cache_percent = 86;
+#else
+    (void)ctx_size;
+#endif
     if (!ds4_ssd_auto_cache_plan(recommended,
+                                 cache_percent,
+                                 model_limit,
                                  non_routed_bytes,
                                  per_expert_bytes,
                                  max_model_experts,
@@ -71669,7 +71685,7 @@ static bool ds4_engine_configure_streaming_auto_cache(ds4_engine *e) {
 #endif
     if (plan.model_target_bytes <= non_routed_bytes) {
         fprintf(stderr,
-                "ds4:   note: non-routed weights already fill the 80%% target; keeping a one-expert cache\n");
+                "ds4:   note: non-routed weights already fill the target; keeping a one-expert cache\n");
     }
     return true;
 #endif
@@ -74754,7 +74770,7 @@ static int ds4_engine_open_internal(ds4_engine **out,
         ds4_gpu_set_quality(e->quality);
         ds4_gpu_set_glm_model(DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_GLM_DSA);
         ds4_gpu_set_ssd_streaming(e->ssd_streaming);
-        if (!ds4_engine_configure_streaming_auto_cache(e)) {
+        if (!ds4_engine_configure_streaming_auto_cache(e, opt->context_size)) {
             ds4_engine_close(e);
             *out = NULL;
             return 1;
