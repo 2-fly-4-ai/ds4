@@ -1,0 +1,15 @@
+START v8-story-2048-t0-lookup0
+PASS v8-story-2048-t0-lookup0
+START v8-json-2048-t0.7-lookup0
+PASS v8-json-2048-t0.7-lookup0
+START v8-copy-2048-t0-lookup1
+PASS v8-copy-2048-t0-lookup1
+START v8-edit-2048-t0-lookup1
+PASS v8-edit-2048-t0-lookup1
+START v8-code-8192-t0-lookup0
+PASS v8-code-8192-t0-lookup0
+START v8-edit-8192-t0-lookup1
+PASS v8-edit-8192-t0-lookup1
+START v8-code-32768-t0-lookup0
+PASS v8-code-32768-t0-lookup0
+FAILURES []

@@ -1,0 +1,26 @@
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 0.110 ms, residency requested in 36.363 ms, warmup 2.987 ms (mapped 1536.00 MiB from offset 0.00 MiB)
+ds4: Metal mapped mmaped model as 1 overlapping shared buffers
+hc E=72 rank=8 T=2 f16: lowrank: max|d| 1.700e-04 (rel 2.126e-04) at 6: got -0.338452 ref -0.338282
+hyper-connections
+  hc E=2560 rank=320 T=3 f16: xn               ok  max|d|=2.93e-07 (scale 2.59e+00)
+  hc E=2560 rank=320 T=3 f16: lowrank          ok  max|d|=4.07e-06 (scale 1.10e+01)
+  hc E=2560 rank=320 T=3 f16: inject partials  ok  max|d|=1.81e-07 (scale 1.98e+00)
+  hc E=2560 rank=320 T=3 f16: mixed            ok  max|d|=2.24e-07 (scale 1.05e+00)
+  hc E=2560 rank=320 T=3 f16: combine          ok  max|d|=1.97e-07 (scale 2.59e+00)
+  HC_PAIR_EXACT E=2560 rank=320 type=1 floats=5120
+  hc E=2560 rank=320 T=2 f16: xn               ok  max|d|=3.32e-07 (scale 2.61e+00)
+  hc E=2560 rank=320 T=2 f16: lowrank          ok  max|d|=2.38e-06 (scale 1.17e+01)
+  hc E=2560 rank=320 T=2 f16: inject partials  ok  max|d|=2.01e-07 (scale 1.78e+00)
+  hc E=2560 rank=320 T=2 f16: mixed            ok  max|d|=1.97e-07 (scale 1.20e+00)
+  hc E=2560 rank=320 T=2 f16: combine          ok  max|d|=1.75e-07 (scale 2.14e+00)
+  HC_PAIR_EXACT E=2560 rank=320 type=0 floats=5120
+  hc E=2560 rank=320 T=2 f32: xn               ok  max|d|=2.93e-07 (scale 2.57e+00)
+  hc E=2560 rank=320 T=2 f32: lowrank          ok  max|d|=2.46e-06 (scale 1.16e+01)
+  hc E=2560 rank=320 T=2 f32: inject partials  ok  max|d|=1.81e-07 (scale 1.84e+00)
+  hc E=2560 rank=320 T=2 f32: mixed            ok  max|d|=1.99e-07 (scale 1.06e+00)
+  hc E=2560 rank=320 T=2 f32: combine          ok  max|d|=2.21e-07 (scale 2.40e+00)
+  HC_PAIR_EXACT E=72 rank=8 type=1 floats=144
+  hc E=72 rank=8 T=2 f16: xn                   ok  max|d|=1.85e-07 (scale 2.51e+00)

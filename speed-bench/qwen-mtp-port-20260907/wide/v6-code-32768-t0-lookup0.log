@@ -1,0 +1,22 @@
+ds4: warming mapped tensor pages: 101.09 GiB
+ds4: warmed tensor pages in 7.961s (checksum=850678604)
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Qwen PLE remains CPU-mapped; Metal residency restricted to 2 model spans (71.29 GiB)
+ds4: Metal model views created in 2.219 ms, residency requested in 498.375 ms, warmup 3.172 ms (mapped 73000.62 MiB from offset 10.52 MiB)
+ds4: Metal mapped mmaped model as 2 disjoint shared buffers across 2 tensor spans
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 1.07 GiB (raw 0.84 + compressed 0.24) + buffers 7.43 GiB + resident model 71.29 GiB = 79.79 GiB planned
+ds4: memory detail: ctx=33792 prefill_cap=8192 raw_kv_rows=33792 compressed_kv_rows=8449 backend=metal
+QWEN_PORT_ARM variant=6 arm=0 prompt=32768 temp=0 neural=68 lookup=0 cycles=67 accepted=60
+QWEN_PORT_ARM variant=6 arm=1 prompt=32768 temp=0 neural=68 lookup=0 cycles=67 accepted=60
+QWEN_PORT_PARITY_PASS variant=6 tokens=128 prompt=32768 snapshot=1241838172
+QWEN_PORT_TIMING variant=6 mode=0 repeat=0 prompt=32768 tokens=128 ms=2892.4210 tps=44.2536 cycles=67 accepted=60
+QWEN_PORT_TIMING variant=6 mode=1 repeat=1 prompt=32768 tokens=128 ms=2805.8550 tps=45.6189 cycles=67 accepted=60
+QWEN_PORT_TIMING variant=6 mode=1 repeat=2 prompt=32768 tokens=128 ms=2866.4480 tps=44.6546 cycles=67 accepted=60
+QWEN_PORT_TIMING variant=6 mode=0 repeat=3 prompt=32768 tokens=128 ms=3023.6260 tps=42.3333 cycles=67 accepted=60
+QWEN_PORT_TIMING variant=6 mode=1 repeat=4 prompt=32768 tokens=128 ms=2788.2700 tps=45.9066 cycles=67 accepted=60
+QWEN_PORT_TIMING variant=6 mode=0 repeat=5 prompt=32768 tokens=128 ms=2939.2860 tps=43.5480 cycles=67 accepted=60
+QWEN_PORT_TIMING variant=6 mode=0 repeat=6 prompt=32768 tokens=128 ms=2918.4780 tps=43.8585 cycles=67 accepted=60
+QWEN_PORT_TIMING variant=6 mode=1 repeat=7 prompt=32768 tokens=128 ms=2846.4390 tps=44.9685 cycles=67 accepted=60

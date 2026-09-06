@@ -55703,7 +55703,8 @@ static bool qwen4_graph_alloc(ds4_qwen4_gpu_graph *g, const ds4_weights *w, uint
     QWEN4_ALLOC(hc_lo_act, T * DS4_N_HC_LOWRANK);
     QWEN4_ALLOC(logits, (uint64_t)g->n_logit_rows * DS4_N_VOCAB);
     if (mtp) {
-        QWEN4_ALLOC(mtp_e, E);
+        /* An accepted predictor pair stages both embeddings before encoding. */
+        QWEN4_ALLOC(mtp_e, 2u * E);
         QWEN4_ALLOC(mtp_cat, (hc + 1u) * 2u * E);
         QWEN4_ALLOC(mtp_proj, (hc + 1u) * E);
         QWEN4_ALLOC(mtp_R, hc_dim);
@@ -56265,6 +56266,58 @@ static bool qwen4_graph_mtp_step(ds4_qwen4_gpu_graph *g, const ds4_model *m, con
         if (ok && draft_out) *draft_out = sample_argmax(dst, DS4_N_VOCAB);
     }
     if (ok) g->mtp_pos = idx + 1u;
+    return ok;
+}
+
+/* Preserve the two scalar predictor routes, but encode both into one ordered
+ * command batch. Stage embeddings in distinct rows before submission so the
+ * second token cannot overwrite an input still needed by the first pass. */
+static bool qwen4_graph_mtp_pair_serial(ds4_qwen4_gpu_graph *g, const ds4_model *m,
+        const ds4_weights *w, uint32_t row, const int next_tokens[2], uint32_t idx,
+        int *draft_out) {
+    if (!g->mtp_R || idx > g->ctx_cap || g->ctx_cap - idx < 2u ||
+        row > g->cap_tokens || g->cap_tokens - row < 2u) return false;
+    const uint32_t E = DS4_N_EMBD, hc = DS4_N_HC, hc_dim = E * hc;
+    const uint32_t il = DS4_N_LAYER - 1u;
+    const uint64_t emb_bytes = (uint64_t)E * sizeof(float);
+    const ds4_layer_weights *l = &w->layer[il];
+    for (uint32_t t = 0; t < 2u; t++) {
+        if (next_tokens[t] < 0 || next_tokens[t] >= (int)DS4_N_VOCAB) return false;
+        qwen4_ref_row(m, w->token_embd, (uint64_t)next_tokens[t], g->host_row + (uint64_t)t * E);
+    }
+    if (!ds4_gpu_tensor_write(g->mtp_e, 0, g->host_row, 2u * emb_bytes) ||
+        !glm_graph_begin_commands_if_needed()) return false;
+    ds4_gpu_tensor *R_save = g->R;
+    bool ok = true;
+    for (uint32_t t = 0; t < 2u && ok; t++) {
+        ds4_gpu_tensor *e_row = ds4_gpu_tensor_view(g->mtp_e, t * emb_bytes, emb_bytes);
+        ds4_gpu_tensor *R_row = ds4_gpu_tensor_view(R_save, (uint64_t)(row + t) * hc_dim * sizeof(float),
+                                                  (uint64_t)hc_dim * sizeof(float));
+        ok = e_row && R_row &&
+             ds4_gpu_qwen4_mtp_stage_tensor(g->mtp_cat, e_row, R_row, m->map, m->size,
+                 l->nextn_enorm->abs_offset, l->nextn_hnorm->abs_offset, E, hc, DS4_RMS_EPS) &&
+             qwen4_gemv(g, g->mtp_proj, m, l->nextn_eh_proj, g->mtp_cat, hc + 1u) &&
+             ds4_gpu_qwen4_mtp_combine_tensor(g->mtp_R, g->mtp_proj, E, hc);
+        g->R = g->mtp_R;
+        if (ok) ok = qwen4_graph_hc_mix(g, m, l->hc_attn_norm, l->hc_attn_down, l->hc_attn_up, l->hc_attn_inject, 1);
+        if (ok) ok = qwen4_graph_attention(g, m, l, il, idx + t, 1);
+        if (ok) ok = ds4_gpu_qwen4_hc_combine_tensor(g->R, g->blk, g->inj, 1, E, hc) != 0;
+        if (ok) ok = qwen4_graph_hc_mix(g, m, l->hc_ffn_norm, l->hc_ffn_down, l->hc_ffn_up, l->hc_ffn_inject, 1);
+        if (ok) ok = qwen4_graph_moe(g, m, l, 1);
+        if (ok && t == 1u) {
+            ok = qwen4_graph_hc_mix(g, m, l->nextn_hc_head_norm, l->nextn_hc_head_down, l->nextn_hc_head_up, NULL, 1) &&
+                 qwen4_gemv(g, g->logits, m, w->output, g->mixed, 1);
+        }
+        g->R = R_save;
+        ds4_gpu_tensor_free(e_row);
+        ds4_gpu_tensor_free(R_row);
+    }
+    if (!ds4_gpu_end_commands()) ok = false;
+    if (ok) ok = ds4_gpu_tensor_read(g->logits, 0, g->host_logits, (uint64_t)DS4_N_VOCAB * sizeof(float)) != 0;
+    if (ok) {
+        *draft_out = sample_argmax(g->host_logits, DS4_N_VOCAB);
+        g->mtp_pos = idx + 2u;
+    }
     return ok;
 }
 
@@ -70605,7 +70658,21 @@ static int ds4_session_qwen4_spec_cycle(ds4_session *s, int first_token, float t
     if (accept) {
         token_vec_push(&s->checkpoint, d);
         memcpy(s->logits, rows + V, (size_t)V * sizeof(float));
-        if (qwen4_graph_mtp_step(g, m, w, 0, d, pos, false, NULL, NULL)) {
+        s->glm_mtp_have = 0;
+        if (g->pipeline_enabled && !s->engine->quality &&
+            !getenv("DS4_QWEN_MTP_SERIAL_DISABLE")) {
+            const int parent = sample_argmax(s->logits, V);
+            const int next_tokens[2] = {d, parent};
+            int draft = -1;
+            if (!qwen4_graph_mtp_pair_serial(g, m, w, 0, next_tokens, pos, &draft)) {
+                if (errlen) snprintf(err, errlen, "Qwen3.8 mtp: serial predictor pair failed");
+                s->checkpoint_valid = false;
+                return -1;
+            }
+            s->glm_mtp_draft = draft;
+            s->glm_mtp_parent = parent;
+            s->glm_mtp_have = 1;
+        } else if (qwen4_graph_mtp_step(g, m, w, 0, d, pos, false, NULL, NULL)) {
             qwen4_session_draft(s, 1, sample_argmax(s->logits, V), pos + 1u);
         }
         s->qwen4_spec_accepted++;

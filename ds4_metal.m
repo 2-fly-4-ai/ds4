@@ -47602,9 +47602,15 @@ enum {
     QWEN4_K_HC_NORM_F16 = 0,
     QWEN4_K_HC_NORM_F32,
     QWEN4_K_HC_NORM_Q8,
+    QWEN4_K_HC_NORM_REUSE_F16,
+    QWEN4_K_HC_NORM_REUSE_F32,
+    QWEN4_K_HC_NORM_REUSE_Q8,
     QWEN4_K_HC_GATE_MIX_F16,
     QWEN4_K_HC_GATE_MIX_F32,
     QWEN4_K_HC_GATE_MIX_Q8,
+    QWEN4_K_HC_GATE_MIX_PAIR_F16,
+    QWEN4_K_HC_GATE_MIX_PAIR_F32,
+    QWEN4_K_HC_GATE_MIX_PAIR_Q8,
     QWEN4_K_MULTI_GEMV,
     QWEN4_K_HC_COMBINE,
     QWEN4_K_CONV_STREAM,
@@ -47655,9 +47661,15 @@ static const char *const qwen4_kernel_names[QWEN4_K_COUNT] = {
     "kernel_qwen4_hc_norm_f16",
     "kernel_qwen4_hc_norm_f32",
     "kernel_qwen4_hc_norm_q8",
+    "kernel_qwen4_hc_norm_reuse_f16",
+    "kernel_qwen4_hc_norm_reuse_f32",
+    "kernel_qwen4_hc_norm_reuse_q8",
     "kernel_qwen4_hc_gate_mix_f16",
     "kernel_qwen4_hc_gate_mix_f32",
     "kernel_qwen4_hc_gate_mix_q8",
+    "kernel_qwen4_hc_gate_mix_pair_f16",
+    "kernel_qwen4_hc_gate_mix_pair_f32",
+    "kernel_qwen4_hc_gate_mix_pair_q8",
     "kernel_qwen4_multi_gemv",
     "kernel_qwen4_hc_combine",
     "kernel_qwen4_conv_stream",
@@ -47783,9 +47795,15 @@ int ds4_gpu_qwen4_hc_norm_tensor(
         b[2] = b[1];
         b[4] = b[3];
     }
-    const int kernel = qwen4_hc_kernel(weight_type, QWEN4_K_HC_NORM_F16, QWEN4_K_HC_NORM_F32, QWEN4_K_HC_NORM_Q8);
+    /* Large Qwen batches amortize one RMS reduction across all eight chunks.
+     * Keep small rows, quality mode and unmeasured devices on the old route. */
+    const bool reuse = n_tokens >= 2048u && n_embd == 2560u && n_hc == 4u &&
+        !g_quality_mode && ds4_gpu_device_is_m5_apple_silicon() &&
+        !getenv("DS4_QWEN_NORM_REUSE_DISABLE");
+    const int kernel = reuse ? qwen4_hc_kernel(weight_type, QWEN4_K_HC_NORM_REUSE_F16, QWEN4_K_HC_NORM_REUSE_F32, QWEN4_K_HC_NORM_REUSE_Q8) :
+        qwen4_hc_kernel(weight_type, QWEN4_K_HC_NORM_F16, QWEN4_K_HC_NORM_F32, QWEN4_K_HC_NORM_Q8);
     return qwen4_dispatch(kernel, &args, sizeof(args), b, 5,
-                          MTLSizeMake(n_hc * DS4_QWEN4_HC_CHUNKS, n_tokens, 1), MTLSizeMake(128, 1, 1), 0);
+                          MTLSizeMake(reuse ? n_hc : n_hc * DS4_QWEN4_HC_CHUNKS, n_tokens, 1), MTLSizeMake(128, 1, 1), 0);
 }
 
 int ds4_gpu_qwen4_hc_gate_mix_tensor(
@@ -47803,10 +47821,14 @@ int ds4_gpu_qwen4_hc_gate_mix_tensor(
         !qwen4_bind_tensor(&b[3], mixed, (uint64_t)n_tokens * n_embd * sizeof(float), "hc mixed")) {
         return 0;
     }
-    const int kernel = qwen4_hc_kernel(weight_type, QWEN4_K_HC_GATE_MIX_F16, QWEN4_K_HC_GATE_MIX_F32,
+    const bool pair = n_tokens == 2u && !g_quality_mode && ds4_gpu_device_is_m5_apple_silicon() &&
+        !getenv("DS4_QWEN_HC_PAIR_DISABLE");
+    const int kernel = pair ? qwen4_hc_kernel(weight_type, QWEN4_K_HC_GATE_MIX_PAIR_F16,
+                                              QWEN4_K_HC_GATE_MIX_PAIR_F32, QWEN4_K_HC_GATE_MIX_PAIR_Q8)
+                            : qwen4_hc_kernel(weight_type, QWEN4_K_HC_GATE_MIX_F16, QWEN4_K_HC_GATE_MIX_F32,
                                        QWEN4_K_HC_GATE_MIX_Q8);
     return qwen4_dispatch(kernel, &args, sizeof(args), b, 4,
-                          MTLSizeMake((n_embd + 3) / 4, n_tokens, 1), MTLSizeMake(128, 1, 1), 0);
+                          MTLSizeMake((n_embd + 3) / 4, pair ? 1u : n_tokens, 1), MTLSizeMake(128, 1, 1), 0);
 }
 
 int ds4_gpu_qwen4_hc_combine_tensor(
@@ -47886,7 +47908,11 @@ int ds4_gpu_qwen4_gdn_scan_tensor(
     } else {
         bd[5] = bd[3];
     }
-    if (head_dim == 128u && n_tokens > (g_prompt_verifier_mv16_active ? 16u : 8u)) {
+    /* Reuse K/Q loads across four state columns; preserve the 16-row lookup
+     * verifier's existing numerical route at intermediate batch widths. */
+    const bool decode_r4 = n_tokens <= 2u && !g_quality_mode && ds4_gpu_device_is_m5_apple_silicon() &&
+        !getenv("DS4_QWEN_GDN_R4_DISABLE");
+    if (head_dim == 128u && (n_tokens > (g_prompt_verifier_mv16_active ? 16u : 8u) || decode_r4)) {
         return qwen4_dispatch(QWEN4_K_GDN_SCAN_R4, &args, sizeof(args), bd, 6,
                               MTLSizeMake(head_dim / 4, n_v_head, 1), MTLSizeMake(32, 1, 1), 0);
     }

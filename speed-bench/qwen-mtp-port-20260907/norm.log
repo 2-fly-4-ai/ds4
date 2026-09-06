@@ -1,0 +1,54 @@
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 0.031 ms, residency requested in 0.955 ms, warmup 2.579 ms (mapped 64.00 MiB from offset 0.00 MiB)
+ds4: Metal mapped mmaped model as 1 overlapping shared buffers
+QWEN_NORM type=0 T=2048 mode=0 repeat=0 ms=1.96225 exact=1
+QWEN_NORM type=0 T=2048 mode=1 repeat=1 ms=5.10450 exact=1
+QWEN_NORM type=0 T=2048 mode=1 repeat=2 ms=0.51887 exact=1
+QWEN_NORM type=0 T=2048 mode=0 repeat=3 ms=0.69425 exact=1
+QWEN_NORM type=0 T=2048 mode=1 repeat=4 ms=0.44075 exact=1
+QWEN_NORM type=0 T=2048 mode=0 repeat=5 ms=0.86688 exact=1
+QWEN_NORM type=0 T=2048 mode=0 repeat=6 ms=0.69112 exact=1
+QWEN_NORM type=0 T=2048 mode=1 repeat=7 ms=0.43638 exact=1
+QWEN_NORM type=0 T=8192 mode=0 repeat=0 ms=4.58087 exact=1
+QWEN_NORM type=0 T=8192 mode=1 repeat=1 ms=1.84225 exact=1
+QWEN_NORM type=0 T=8192 mode=1 repeat=2 ms=1.58700 exact=1
+QWEN_NORM type=0 T=8192 mode=0 repeat=3 ms=3.91425 exact=1
+QWEN_NORM type=0 T=8192 mode=1 repeat=4 ms=1.80275 exact=1
+QWEN_NORM type=0 T=8192 mode=0 repeat=5 ms=3.97812 exact=1
+QWEN_NORM type=0 T=8192 mode=0 repeat=6 ms=3.80625 exact=1
+QWEN_NORM type=0 T=8192 mode=1 repeat=7 ms=1.61088 exact=1
+QWEN_NORM type=1 T=2048 mode=0 repeat=0 ms=0.95550 exact=1
+QWEN_NORM type=1 T=2048 mode=1 repeat=1 ms=2.72263 exact=1
+QWEN_NORM type=1 T=2048 mode=1 repeat=2 ms=0.64425 exact=1
+QWEN_NORM type=1 T=2048 mode=0 repeat=3 ms=0.90650 exact=1
+QWEN_NORM type=1 T=2048 mode=1 repeat=4 ms=0.47637 exact=1
+QWEN_NORM type=1 T=2048 mode=0 repeat=5 ms=0.90738 exact=1
+QWEN_NORM type=1 T=2048 mode=0 repeat=6 ms=0.71650 exact=1
+QWEN_NORM type=1 T=2048 mode=1 repeat=7 ms=0.45138 exact=1
+QWEN_NORM type=1 T=8192 mode=0 repeat=0 ms=4.29688 exact=1
+QWEN_NORM type=1 T=8192 mode=1 repeat=1 ms=1.59862 exact=1
+QWEN_NORM type=1 T=8192 mode=1 repeat=2 ms=1.60375 exact=1
+QWEN_NORM type=1 T=8192 mode=0 repeat=3 ms=3.92475 exact=1
+QWEN_NORM type=1 T=8192 mode=1 repeat=4 ms=1.81313 exact=1
+QWEN_NORM type=1 T=8192 mode=0 repeat=5 ms=3.94687 exact=1
+QWEN_NORM type=1 T=8192 mode=0 repeat=6 ms=3.76875 exact=1
+QWEN_NORM type=1 T=8192 mode=1 repeat=7 ms=1.63338 exact=1
+QWEN_NORM type=8 T=2048 mode=0 repeat=0 ms=1.21775 exact=1
+QWEN_NORM type=8 T=2048 mode=1 repeat=1 ms=2.28525 exact=1
+QWEN_NORM type=8 T=2048 mode=1 repeat=2 ms=0.53775 exact=1
+QWEN_NORM type=8 T=2048 mode=0 repeat=3 ms=0.93800 exact=1
+QWEN_NORM type=8 T=2048 mode=1 repeat=4 ms=0.51900 exact=1
+QWEN_NORM type=8 T=2048 mode=0 repeat=5 ms=0.76938 exact=1
+QWEN_NORM type=8 T=2048 mode=0 repeat=6 ms=0.79238 exact=1
+QWEN_NORM type=8 T=2048 mode=1 repeat=7 ms=0.57550 exact=1
+QWEN_NORM type=8 T=8192 mode=0 repeat=0 ms=4.69375 exact=1
+QWEN_NORM type=8 T=8192 mode=1 repeat=1 ms=2.21188 exact=1
+QWEN_NORM type=8 T=8192 mode=1 repeat=2 ms=2.12925 exact=1
+QWEN_NORM type=8 T=8192 mode=0 repeat=3 ms=4.16300 exact=1
+QWEN_NORM type=8 T=8192 mode=1 repeat=4 ms=2.15125 exact=1
+QWEN_NORM type=8 T=8192 mode=0 repeat=5 ms=4.19700 exact=1
+QWEN_NORM type=8 T=8192 mode=0 repeat=6 ms=4.11362 exact=1
+QWEN_NORM type=8 T=8192 mode=1 repeat=7 ms=2.22538 exact=1
+QWEN_NORM_PORT_PASS

@@ -1,0 +1,391 @@
+diff --git a/ds4.c b/ds4.c
+index 734eb09..3de0226 100644
+--- a/ds4.c
++++ b/ds4.c
+@@ -55703,10 +55703,10 @@ static bool qwen4_graph_alloc(ds4_qwen4_gpu_graph *g, const ds4_weights *w, uint
+     QWEN4_ALLOC(hc_lo_act, T * DS4_N_HC_LOWRANK);
+     QWEN4_ALLOC(logits, (uint64_t)g->n_logit_rows * DS4_N_VOCAB);
+     if (mtp) {
+-        QWEN4_ALLOC(mtp_e, E);
+-        QWEN4_ALLOC(mtp_cat, (hc + 1u) * 2u * E);
+-        QWEN4_ALLOC(mtp_proj, (hc + 1u) * E);
+-        QWEN4_ALLOC(mtp_R, hc_dim);
++        QWEN4_ALLOC(mtp_e, 2u * E);
++        QWEN4_ALLOC(mtp_cat, 2u * (hc + 1u) * 2u * E);
++        QWEN4_ALLOC(mtp_proj, 2u * (hc + 1u) * E);
++        QWEN4_ALLOC(mtp_R, 2u * hc_dim);
+     }
+     if (snapshot) {
+         QWEN4_ALLOC(snap_ple_hist, (uint64_t)(DS4_N_PLE_CONV - 1u) * DS4_N_PLE_NGRAM * hc_dim);
+@@ -56220,6 +56220,82 @@ static bool qwen4_graph_state_copy(ds4_qwen4_gpu_graph *g, bool save) {
+     return ok;
+ }
+ 
++/* One or two causal predictor steps at idx, using consecutive rows of the
++ * trunk's pre-mixer streams and the embeddings of their following tokens.
++ * The nextn layer runs on its own residual; want_logits returns the last
++ * row only. Batching catches up an accepted draft and predicts again with
++ * one command submission and one set of weight reads. */
++static bool qwen4_graph_mtp_steps(ds4_qwen4_gpu_graph *g, const ds4_model *m, const ds4_weights *w,
++                                 uint32_t row, const int *next_tokens, uint32_t T, uint32_t idx, bool want_logits,
++                                 float *logits_out, int *draft_out) {
++    if (!g->mtp_R || T == 0u || T > 2u || idx > g->ctx_cap || T > g->ctx_cap - idx ||
++        row > g->cap_tokens || T > g->cap_tokens - row) return false;
++    const uint32_t E = DS4_N_EMBD, hc = DS4_N_HC;
++    const uint32_t il = DS4_N_LAYER - 1u;
++    const ds4_layer_weights *l = &w->layer[il];
++    for (uint32_t t = 0; t < T; t++) {
++        if (next_tokens[t] < 0 || next_tokens[t] >= (int)DS4_N_VOCAB) return false;
++        qwen4_ref_row(m, w->token_embd, (uint64_t)next_tokens[t], g->host_row + (uint64_t)t * E);
++    }
++    if (!ds4_gpu_tensor_write(g->mtp_e, 0, g->host_row, (uint64_t)T * E * sizeof(float)) ||
++        !glm_graph_begin_commands_if_needed()) return false;
++    ds4_gpu_tensor *R_save = g->R;
++    bool ok = true;
++    const uint64_t emb_bytes = (uint64_t)E * sizeof(float);
++    const uint64_t cat_bytes = (hc + 1u) * 2u * emb_bytes;
++    const uint64_t proj_bytes = (hc + 1u) * emb_bytes;
++    for (uint32_t t = 0; t < T && ok; t++) {
++        ds4_gpu_tensor *e_row = ds4_gpu_tensor_view(g->mtp_e, t * emb_bytes, emb_bytes);
++        ds4_gpu_tensor *R_row = ds4_gpu_tensor_view(R_save, (uint64_t)(row + t) * hc * emb_bytes, hc * emb_bytes);
++        ds4_gpu_tensor *cat_row = ds4_gpu_tensor_view(g->mtp_cat, t * cat_bytes, cat_bytes);
++        ok = e_row && R_row && cat_row &&
++             ds4_gpu_qwen4_mtp_stage_tensor(cat_row, e_row, R_row, m->map, m->size,
++                                             l->nextn_enorm->abs_offset, l->nextn_hnorm->abs_offset,
++                                             E, hc, DS4_RMS_EPS);
++        ds4_gpu_tensor_free(cat_row);
++        ds4_gpu_tensor_free(R_row);
++        ds4_gpu_tensor_free(e_row);
++    }
++    if (getenv("DS4_EXP_QWEN_MTP_EH_SPLIT")) {
++        for (uint32_t t = 0; t < T && ok; t++) {
++            ds4_gpu_tensor *cat_row = ds4_gpu_tensor_view(g->mtp_cat, t * cat_bytes, cat_bytes);
++            ds4_gpu_tensor *proj_row = ds4_gpu_tensor_view(g->mtp_proj, t * proj_bytes, proj_bytes);
++            ok = cat_row && proj_row && qwen4_gemv(g, proj_row, m, l->nextn_eh_proj, cat_row, hc + 1u);
++            ds4_gpu_tensor_free(cat_row); ds4_gpu_tensor_free(proj_row);
++        }
++    } else if (ok) ok = qwen4_gemv(g, g->mtp_proj, m, l->nextn_eh_proj, g->mtp_cat, T * (hc + 1u));
++    for (uint32_t t = 0; t < T && ok; t++) {
++        ds4_gpu_tensor *proj_row = ds4_gpu_tensor_view(g->mtp_proj, t * proj_bytes, proj_bytes);
++        ds4_gpu_tensor *R_row = ds4_gpu_tensor_view(g->mtp_R, t * hc * emb_bytes, hc * emb_bytes);
++        ok = proj_row && R_row && ds4_gpu_qwen4_mtp_combine_tensor(R_row, proj_row, E, hc);
++        ds4_gpu_tensor_free(R_row);
++        ds4_gpu_tensor_free(proj_row);
++    }
++    g->R = g->mtp_R;
++    if (ok) ok = qwen4_graph_hc_mix(g, m, l->hc_attn_norm, l->hc_attn_down, l->hc_attn_up, l->hc_attn_inject, T);
++    if (ok) ok = qwen4_graph_attention(g, m, l, il, idx, T);
++    if (ok) ok = ds4_gpu_qwen4_hc_combine_tensor(g->R, g->blk, g->inj, T, E, hc) != 0;
++    if (ok) ok = qwen4_graph_hc_mix(g, m, l->hc_ffn_norm, l->hc_ffn_down, l->hc_ffn_up, l->hc_ffn_inject, T);
++    if (ok) ok = qwen4_graph_moe(g, m, l, T);
++    ds4_gpu_tensor *last = NULL;
++    if (ok && want_logits) {
++        last = ds4_gpu_tensor_view(g->mtp_R, (T - 1u) * hc * emb_bytes, hc * emb_bytes);
++        g->R = last;
++        ok = last && qwen4_graph_hc_mix(g, m, l->nextn_hc_head_norm, l->nextn_hc_head_down, l->nextn_hc_head_up, NULL, 1) &&
++             qwen4_gemv(g, g->logits, m, w->output, g->mixed, 1);
++    }
++    g->R = R_save;
++    if (!ds4_gpu_end_commands()) ok = false;
++    ds4_gpu_tensor_free(last);
++    if (ok && want_logits) {
++        float *dst = logits_out ? logits_out : g->host_logits;
++        ok = ds4_gpu_tensor_read(g->logits, 0, dst, (uint64_t)DS4_N_VOCAB * sizeof(float)) != 0;
++        if (ok && draft_out) *draft_out = sample_argmax(dst, DS4_N_VOCAB);
++    }
++    if (ok) g->mtp_pos = idx + T;
++    return ok;
++}
++
+ /* One predictor step at MTP index idx from row `row` of g->R (the trunk's
+  * pre-mixer streams at that position) and the embedding of the token that
+  * follows.  The nextn layer runs on its own residual; with want_logits the
+@@ -56268,6 +56344,48 @@ static bool qwen4_graph_mtp_step(ds4_qwen4_gpu_graph *g, const ds4_model *m, con
+     return ok;
+ }
+ 
++/* Preserve the two scalar predictor routes, but encode both into one ordered
++ * command batch. Stage embeddings in distinct rows before submission so the
++ * second token cannot overwrite an input still needed by the first pass. */
++static bool qwen4_graph_mtp_pair_serial(ds4_qwen4_gpu_graph *g, const ds4_model *m,
++        const ds4_weights *w, uint32_t row, const int next_tokens[2], uint32_t idx,
++        int *draft_out) {
++    if (!g->mtp_R || idx > g->ctx_cap || g->ctx_cap - idx < 2u ||
++        row > g->cap_tokens || g->cap_tokens - row < 2u) return false;
++    const uint32_t E=DS4_N_EMBD, hc=DS4_N_HC, hc_dim=E*hc, il=DS4_N_LAYER-1u;
++    const ds4_layer_weights *l=&w->layer[il];
++    for(uint32_t t=0;t<2u;t++) {
++        if(next_tokens[t]<0 || next_tokens[t]>=(int)DS4_N_VOCAB)return false;
++        qwen4_ref_row(m,w->token_embd,(uint64_t)next_tokens[t],g->host_row+(uint64_t)t*E);
++    }
++    if(!ds4_gpu_tensor_write(g->mtp_e,0,g->host_row,2ull*E*sizeof(float)) ||
++       !glm_graph_begin_commands_if_needed())return false;
++    ds4_gpu_tensor *R_save=g->R;
++    bool ok=true;
++    for(uint32_t t=0;t<2u && ok;t++) {
++        ds4_gpu_tensor *e_row=ds4_gpu_tensor_view(g->mtp_e,(uint64_t)t*E*sizeof(float),(uint64_t)E*sizeof(float));
++        ds4_gpu_tensor *R_row=ds4_gpu_tensor_view(R_save,(uint64_t)(row+t)*hc_dim*sizeof(float),(uint64_t)hc_dim*sizeof(float));
++        ok=e_row && R_row && ds4_gpu_qwen4_mtp_stage_tensor(g->mtp_cat,e_row,R_row,m->map,m->size,
++            l->nextn_enorm->abs_offset,l->nextn_hnorm->abs_offset,E,hc,DS4_RMS_EPS) &&
++            qwen4_gemv(g,g->mtp_proj,m,l->nextn_eh_proj,g->mtp_cat,hc+1u) &&
++            ds4_gpu_qwen4_mtp_combine_tensor(g->mtp_R,g->mtp_proj,E,hc);
++        g->R=g->mtp_R;
++        if(ok)ok=qwen4_graph_hc_mix(g,m,l->hc_attn_norm,l->hc_attn_down,l->hc_attn_up,l->hc_attn_inject,1);
++        if(ok)ok=qwen4_graph_attention(g,m,l,il,idx+t,1);
++        if(ok)ok=ds4_gpu_qwen4_hc_combine_tensor(g->R,g->blk,g->inj,1,E,hc)!=0;
++        if(ok)ok=qwen4_graph_hc_mix(g,m,l->hc_ffn_norm,l->hc_ffn_down,l->hc_ffn_up,l->hc_ffn_inject,1);
++        if(ok)ok=qwen4_graph_moe(g,m,l,1);
++        if(ok && t==1u)ok=qwen4_graph_hc_mix(g,m,l->nextn_hc_head_norm,l->nextn_hc_head_down,l->nextn_hc_head_up,NULL,1) &&
++            qwen4_gemv(g,g->logits,m,w->output,g->mixed,1);
++        g->R=R_save;
++        ds4_gpu_tensor_free(e_row);ds4_gpu_tensor_free(R_row);
++    }
++    if(!ds4_gpu_end_commands())ok=false;
++    if(ok)ok=ds4_gpu_tensor_read(g->logits,0,g->host_logits,(uint64_t)DS4_N_VOCAB*sizeof(float))!=0;
++    if(ok){*draft_out=sample_argmax(g->host_logits,DS4_N_VOCAB);g->mtp_pos=idx+2u;}
++    return ok;
++}
++
+ static int generate_qwen4_metal_argmax(
+         const ds4_model   * model,
+         const ds4_vocab   * vocab,
+@@ -70605,7 +70723,22 @@ static int ds4_session_qwen4_spec_cycle(ds4_session *s, int first_token, float t
+     if (accept) {
+         token_vec_push(&s->checkpoint, d);
+         memcpy(s->logits, rows + V, (size_t)V * sizeof(float));
+-        if (qwen4_graph_mtp_step(g, m, w, 0, d, pos, false, NULL, NULL)) {
++        if (getenv("DS4_EXP_QWEN_MTP_SERIAL")) {
++            const int parent=sample_argmax(s->logits,V);
++            const int next_tokens[2]={d,parent};int draft=-1;
++            if(qwen4_graph_mtp_pair_serial(g,m,w,0,next_tokens,pos,&draft)) {
++                s->glm_mtp_draft=draft;s->glm_mtp_parent=parent;s->glm_mtp_have=1;
++            }
++        } else if (getenv("DS4_EXP_QWEN_MTP_BATCH")) {
++            const int parent = sample_argmax(s->logits, V);
++            const int next_tokens[2] = {d, parent};
++            int draft = -1;
++            if (qwen4_graph_mtp_steps(g, m, w, 0, next_tokens, 2u, pos, true, NULL, &draft)) {
++                s->glm_mtp_draft = draft;
++                s->glm_mtp_parent = parent;
++                s->glm_mtp_have = 1;
++            }
++        } else if (qwen4_graph_mtp_step(g, m, w, 0, d, pos, false, NULL, NULL)) {
+             qwen4_session_draft(s, 1, sample_argmax(s->logits, V), pos + 1u);
+         }
+         s->qwen4_spec_accepted++;
+diff --git a/ds4_metal.m b/ds4_metal.m
+index e7a8432..3a748f8 100644
+--- a/ds4_metal.m
++++ b/ds4_metal.m
+@@ -47602,9 +47602,15 @@ static bool qwen4_bind_weight(qwen4_bind *b, const void *map, uint64_t size,
+     QWEN4_K_HC_NORM_F16 = 0,
+     QWEN4_K_HC_NORM_F32,
+     QWEN4_K_HC_NORM_Q8,
++    QWEN4_K_HC_NORM_REUSE_F16,
++    QWEN4_K_HC_NORM_REUSE_F32,
++    QWEN4_K_HC_NORM_REUSE_Q8,
+     QWEN4_K_HC_GATE_MIX_F16,
+     QWEN4_K_HC_GATE_MIX_F32,
+     QWEN4_K_HC_GATE_MIX_Q8,
++    QWEN4_K_HC_GATE_MIX_PAIR_F16,
++    QWEN4_K_HC_GATE_MIX_PAIR_F32,
++    QWEN4_K_HC_GATE_MIX_PAIR_Q8,
+     QWEN4_K_MULTI_GEMV,
+     QWEN4_K_HC_COMBINE,
+     QWEN4_K_CONV_STREAM,
+@@ -47655,9 +47661,15 @@ static bool qwen4_bind_weight(qwen4_bind *b, const void *map, uint64_t size,
+     "kernel_qwen4_hc_norm_f16",
+     "kernel_qwen4_hc_norm_f32",
+     "kernel_qwen4_hc_norm_q8",
++    "kernel_qwen4_hc_norm_reuse_f16",
++    "kernel_qwen4_hc_norm_reuse_f32",
++    "kernel_qwen4_hc_norm_reuse_q8",
+     "kernel_qwen4_hc_gate_mix_f16",
+     "kernel_qwen4_hc_gate_mix_f32",
+     "kernel_qwen4_hc_gate_mix_q8",
++    "kernel_qwen4_hc_gate_mix_pair_f16",
++    "kernel_qwen4_hc_gate_mix_pair_f32",
++    "kernel_qwen4_hc_gate_mix_pair_q8",
+     "kernel_qwen4_multi_gemv",
+     "kernel_qwen4_hc_combine",
+     "kernel_qwen4_conv_stream",
+@@ -47783,9 +47795,11 @@ int ds4_gpu_qwen4_hc_norm_tensor(
+         b[2] = b[1];
+         b[4] = b[3];
+     }
+-    const int kernel = qwen4_hc_kernel(weight_type, QWEN4_K_HC_NORM_F16, QWEN4_K_HC_NORM_F32, QWEN4_K_HC_NORM_Q8);
++    const bool reuse = n_tokens > 2u && getenv("DS4_EXP_QWEN_NORM_REUSE") != NULL;
++    const int kernel = reuse ? qwen4_hc_kernel(weight_type,QWEN4_K_HC_NORM_REUSE_F16,QWEN4_K_HC_NORM_REUSE_F32,QWEN4_K_HC_NORM_REUSE_Q8) :
++        qwen4_hc_kernel(weight_type, QWEN4_K_HC_NORM_F16, QWEN4_K_HC_NORM_F32, QWEN4_K_HC_NORM_Q8);
+     return qwen4_dispatch(kernel, &args, sizeof(args), b, 5,
+-                          MTLSizeMake(n_hc * DS4_QWEN4_HC_CHUNKS, n_tokens, 1), MTLSizeMake(128, 1, 1), 0);
++                          MTLSizeMake(reuse ? n_hc : n_hc * DS4_QWEN4_HC_CHUNKS, n_tokens, 1), MTLSizeMake(128, 1, 1), 0);
+ }
+ 
+ int ds4_gpu_qwen4_hc_gate_mix_tensor(
+@@ -47803,10 +47817,14 @@ int ds4_gpu_qwen4_hc_gate_mix_tensor(
+         !qwen4_bind_tensor(&b[3], mixed, (uint64_t)n_tokens * n_embd * sizeof(float), "hc mixed")) {
+         return 0;
+     }
+-    const int kernel = qwen4_hc_kernel(weight_type, QWEN4_K_HC_GATE_MIX_F16, QWEN4_K_HC_GATE_MIX_F32,
++    const bool pair = n_tokens == 2u && getenv("DS4_EXP_QWEN_HC_PAIR") != NULL;
++    const int kernel = pair ? qwen4_hc_kernel(weight_type, QWEN4_K_HC_GATE_MIX_PAIR_F16,
++                                              QWEN4_K_HC_GATE_MIX_PAIR_F32, QWEN4_K_HC_GATE_MIX_PAIR_Q8)
++                            : qwen4_hc_kernel(weight_type, QWEN4_K_HC_GATE_MIX_F16, QWEN4_K_HC_GATE_MIX_F32,
+                                        QWEN4_K_HC_GATE_MIX_Q8);
+     return qwen4_dispatch(kernel, &args, sizeof(args), b, 4,
+-                          MTLSizeMake((n_embd + 3) / 4, n_tokens, 1), MTLSizeMake(128, 1, 1), 0);
++                          MTLSizeMake((n_embd + 3) / 4, pair ? 1u : n_tokens, 1), MTLSizeMake(128, 1, 1),
++                          pair ? (NSUInteger)n_rank * 2u * sizeof(float) : 0u);
+ }
+ 
+ int ds4_gpu_qwen4_hc_combine_tensor(
+@@ -47886,7 +47904,8 @@ int ds4_gpu_qwen4_gdn_scan_tensor(
+     } else {
+         bd[5] = bd[3];
+     }
+-    if (head_dim == 128u && n_tokens > (g_prompt_verifier_mv16_active ? 16u : 8u)) {
++    const bool decode_r4 = n_tokens <= 2u && getenv("DS4_EXP_QWEN_GDN_R4") != NULL;
++    if (head_dim == 128u && (n_tokens > (g_prompt_verifier_mv16_active ? 16u : 8u) || decode_r4)) {
+         return qwen4_dispatch(QWEN4_K_GDN_SCAN_R4, &args, sizeof(args), bd, 6,
+                               MTLSizeMake(head_dim / 4, n_v_head, 1), MTLSizeMake(32, 1, 1), 0);
+     }
+diff --git a/metal/qwen4.metal b/metal/qwen4.metal
+index 9d4b56e..30910ef 100644
+--- a/metal/qwen4.metal
++++ b/metal/qwen4.metal
+@@ -129,6 +129,77 @@ QWEN4_HC_NORM_INSTANCE(f16, qwen4_w_f16)
+ QWEN4_HC_NORM_INSTANCE(f32, qwen4_w_f32)
+ QWEN4_HC_NORM_INSTANCE(q8, qwen4_w_q8)
+ 
++/* Large batches have enough (token, stream) groups to compute the stream RMS
++ * once and reuse it for all eight chunks.  Keep the 128-thread RMS reduction,
++ * each chunk's injection reduction, and the partial layout identical to the
++ * original kernel: combining the chunk dots would change rounding. */
++template <typename W>
++kernel void kernel_qwen4_hc_norm_reuse(
++        constant ds4_metal_args_qwen4_hc_norm & args,
++        device const float *R,
++        device const float *gamma,
++        device const char  *w_inject,
++        device float       *xn,
++        device float       *inj_part,
++        uint3 tgpig [[threadgroup_position_in_grid]],
++        ushort tid [[thread_index_in_threadgroup]],
++        ushort3 ntg [[threads_per_threadgroup]],
++        ushort sgitg [[simdgroup_index_in_threadgroup]],
++        ushort tiisg [[thread_index_in_simdgroup]]) {
++    const uint s = tgpig.x;
++    const uint tok = tgpig.y;
++    if (s >= args.n_hc || tok >= args.n_tokens) return;
++    const uint E = args.n_embd, dim = E * args.n_hc;
++    const uint nth = ntg.x, nsg = nth / 32;
++    threadgroup float red[32];
++    /* This kernel uses 128 threads. Keep each chunk's four SIMD partials
++     * separate so its readers need no barrier before the next chunk writes. */
++    threadgroup float inject_red[QWEN4_HC_CHUNKS][4][4];
++    device const float *r = R + ((uint64_t)tok * args.n_hc + s) * E;
++    device const float *g = gamma + s * E;
++    device float *o = xn + ((uint64_t)tok * args.n_hc + s) * E;
++    const W w(w_inject);
++    float ss = 0.0f;
++    for (uint i = tid; i < E; i += nth) ss += r[i] * r[i];
++    ss = simd_sum(ss);
++    if (tiisg == 0) red[sgitg] = ss;
++    threadgroup_barrier(mem_flags::mem_threadgroup);
++    float tot = 0.0f;
++    for (uint q = 0; q < nsg; q++) tot += red[q];
++    const float inv = rsqrt(tot / (float)E + args.eps);
++    const uint per = (E + QWEN4_HC_CHUNKS - 1) / QWEN4_HC_CHUNKS;
++    for (uint chunk = 0; chunk < QWEN4_HC_CHUNKS; chunk++) {
++        const uint i0 = chunk * per, i1 = min(E, i0 + per);
++        float acc[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
++        for (uint i = i0 + tid; i < i1; i += nth) {
++            const float v = r[i] * inv * g[i];
++            o[i] = v;
++            for (uint j = 0; j < 4; j++) {
++                if (j < args.n_inject) acc[j] += w.at((uint64_t)j * dim + s * E + i) * v;
++            }
++        }
++        for (uint j = 0; j < 4; j++) {
++            if (j >= args.n_inject) break;
++            const float a = simd_sum(acc[j]);
++            if (tiisg == 0) inject_red[chunk][j][sgitg] = a;
++        }
++        threadgroup_barrier(mem_flags::mem_threadgroup);
++        if (tid < args.n_inject) {
++            float a = 0.0f;
++            for (uint q = 0; q < nsg; q++) a += inject_red[chunk][tid][q];
++            inj_part[((uint64_t)tok * args.n_hc * QWEN4_HC_CHUNKS + s * QWEN4_HC_CHUNKS + chunk) * args.n_inject + tid] = a;
++        }
++    }
++}
++
++#define QWEN4_HC_NORM_REUSE_INSTANCE(SUFFIX, W) \
++template [[host_name("kernel_qwen4_hc_norm_reuse_" #SUFFIX)]] \
++kernel void kernel_qwen4_hc_norm_reuse<W>(constant ds4_metal_args_qwen4_hc_norm &, device const float *, \
++        device const float *, device const char *, device float *, device float *, uint3, ushort, ushort3, ushort, ushort);
++QWEN4_HC_NORM_REUSE_INSTANCE(f16, qwen4_w_f16)
++QWEN4_HC_NORM_REUSE_INSTANCE(f32, qwen4_w_f32)
++QWEN4_HC_NORM_REUSE_INSTANCE(q8, qwen4_w_q8)
++
+ /* 2*sigmoid(inj/hc) with inj[s] = sum of the hc*chunks norm partials for s */
+ static inline float qwen4_hc_inject_weight(device const float *inj_part, uint hc, uint s) {
+     float a = 0.0f;
+@@ -188,6 +259,56 @@ QWEN4_HC_MIX_INSTANCE(f16, qwen4_w_f16)
+ QWEN4_HC_MIX_INSTANCE(f32, qwen4_w_f32)
+ QWEN4_HC_MIX_INSTANCE(q8, qwen4_w_q8)
+ 
++/* Two-token MTP verification: reuse each up-projection weight for both
++ * rows, and activate the low-rank inputs once per threadgroup. */
++template <typename W>
++kernel void kernel_qwen4_hc_gate_mix_pair(
++        constant ds4_metal_args_qwen4_hc_gate_mix & args,
++        device const float *xn,
++        device const float *lo,
++        device const char *w_up,
++        device float *mixed,
++        threadgroup float2 *activated [[threadgroup(0)]],
++        uint3 tgpig [[threadgroup_position_in_grid]],
++        ushort tid [[thread_index_in_threadgroup]],
++        ushort3 ntg [[threads_per_threadgroup]],
++        ushort sgitg [[simdgroup_index_in_threadgroup]],
++        ushort tiisg [[thread_index_in_simdgroup]]) {
++    const uint E = args.n_embd, hc = args.n_hc, rank = args.n_rank;
++    const uint d = tgpig.x * (ntg.x / 32) + sgitg;
++    if (d >= E) return;
++    const uint s = tiisg / 8, lane = tiisg % 8;
++    const W w(w_up);
++    const uint64_t row = (uint64_t)(s * E + d) * rank;
++    // Materializing SiLU in shared memory changes fast-math contraction on
++    // M5. Keep each row's original scalar expression while sharing weights.
++    float a0 = 0.0f, a1 = 0.0f;
++    for (uint r = lane; r < rank; r += 8) {
++        const float weight = w.at(row + r);
++        a0 += weight * qwen4_silu(lo[r] / (float)hc);
++        a1 += weight * qwen4_silu(lo[rank + r] / (float)hc);
++    }
++    a0 += simd_shuffle_xor(a0, 1); a1 += simd_shuffle_xor(a1, 1);
++    a0 += simd_shuffle_xor(a0, 2); a1 += simd_shuffle_xor(a1, 2);
++    a0 += simd_shuffle_xor(a0, 4); a1 += simd_shuffle_xor(a1, 4);
++    float v0 = qwen4_sigmoid(a0) * xn[s * E + d];
++    float v1 = qwen4_sigmoid(a1) * xn[E * hc + s * E + d];
++    v0 += simd_shuffle_xor(v0, 8); v1 += simd_shuffle_xor(v1, 8);
++    v0 += simd_shuffle_xor(v0, 16); v1 += simd_shuffle_xor(v1, 16);
++    if (tiisg == 0) {
++        mixed[d] = v0 / (float)hc;
++        mixed[E + d] = v1 / (float)hc;
++    }
++}
++
++#define QWEN4_HC_MIX_PAIR_INSTANCE(SUFFIX, W) \
++template [[host_name("kernel_qwen4_hc_gate_mix_pair_" #SUFFIX)]] \
++kernel void kernel_qwen4_hc_gate_mix_pair<W>(constant ds4_metal_args_qwen4_hc_gate_mix &, device const float *, \
++        device const float *, device const char *, device float *, threadgroup float2 *, uint3, ushort, ushort3, ushort, ushort);
++QWEN4_HC_MIX_PAIR_INSTANCE(f16, qwen4_w_f16)
++QWEN4_HC_MIX_PAIR_INSTANCE(f32, qwen4_w_f32)
++QWEN4_HC_MIX_PAIR_INSTANCE(q8, qwen4_w_q8)
++
+ struct ds4_metal_args_qwen4_hc_combine {
+     uint32_t n_tokens;
+     uint32_t n_embd;

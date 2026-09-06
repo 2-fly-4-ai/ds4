@@ -1,0 +1,18 @@
+ds4: warming mapped tensor pages: 101.09 GiB
+ds4: warmed tensor pages in 10.077s (checksum=850678604)
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Qwen PLE remains CPU-mapped; Metal residency restricted to 2 model spans (71.29 GiB)
+ds4: Metal model views created in 2.096 ms, residency requested in 502.634 ms, warmup 9.804 ms (mapped 73000.62 MiB from offset 10.52 MiB)
+ds4: Metal mapped mmaped model as 2 disjoint shared buffers across 2 tensor spans
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 1.05 GiB (raw 0.82 + compressed 0.23) + buffers 7.42 GiB + resident model 71.29 GiB = 79.76 GiB planned
+ds4: memory detail: ctx=33024 prefill_cap=8192 raw_kv_rows=33024 compressed_kv_rows=8257 backend=metal
+QWEN_PREFILL_WARMUP mode=0 repeat=0 prompt=32768 ms=46464.5620 tps=705.2256 exact=1
+QWEN_PREFILL_WARMUP mode=1 repeat=1 prompt=32768 ms=47305.8250 tps=692.6843 exact=1
+QWEN_PREFILL_TIMING mode=1 repeat=2 prompt=32768 ms=47991.5150 tps=682.7874 exact=1
+QWEN_PREFILL_TIMING mode=0 repeat=3 prompt=32768 ms=50066.7770 tps=654.4859 exact=1
+QWEN_PREFILL_TIMING mode=1 repeat=4 prompt=32768 ms=50458.9640 tps=649.3990 exact=1
+QWEN_PREFILL_TIMING mode=0 repeat=5 prompt=32768 ms=51668.0650 tps=634.2022 exact=1
+QWEN_PREFILL_PORT_PASS

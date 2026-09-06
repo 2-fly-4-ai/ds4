@@ -1,0 +1,8 @@
+### Explanation of Changes
+
+1.  **Macro Renaming/Value Change**:
+    *   `#define BUFFER_CAPACITY 64` was changed to `#define BUFFER_CAPACITY 128`. This increases the size of the internal array `values` from 64 to 128 integers, allowing the ring buffer to hold more data before wrapping around or becoming full.
+
+2.  **Function Renaming**:
+    *   The function `enqueue` was renamed to `ring_push` in its definition.
+    *   *Note*: In the provided source code, `enqueue` was only defined but

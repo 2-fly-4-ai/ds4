@@ -129,6 +129,77 @@ QWEN4_HC_NORM_INSTANCE(f16, qwen4_w_f16)
 QWEN4_HC_NORM_INSTANCE(f32, qwen4_w_f32)
 QWEN4_HC_NORM_INSTANCE(q8, qwen4_w_q8)
 
+/* Large batches have enough (token, stream) groups to compute the stream RMS
+ * once and reuse it for all eight chunks.  Keep the 128-thread RMS reduction,
+ * each chunk's injection reduction, and the partial layout identical to the
+ * original kernel: combining the chunk dots would change rounding. */
+template <typename W>
+kernel void kernel_qwen4_hc_norm_reuse(
+        constant ds4_metal_args_qwen4_hc_norm & args,
+        device const float *R,
+        device const float *gamma,
+        device const char  *w_inject,
+        device float       *xn,
+        device float       *inj_part,
+        uint3 tgpig [[threadgroup_position_in_grid]],
+        ushort tid [[thread_index_in_threadgroup]],
+        ushort3 ntg [[threads_per_threadgroup]],
+        ushort sgitg [[simdgroup_index_in_threadgroup]],
+        ushort tiisg [[thread_index_in_simdgroup]]) {
+    const uint s = tgpig.x;
+    const uint tok = tgpig.y;
+    if (s >= args.n_hc || tok >= args.n_tokens) return;
+    const uint E = args.n_embd, dim = E * args.n_hc;
+    const uint nth = ntg.x, nsg = nth / 32;
+    threadgroup float red[32];
+    /* This kernel uses 128 threads. Keep each chunk's four SIMD partials
+     * separate so its readers need no barrier before the next chunk writes. */
+    threadgroup float inject_red[QWEN4_HC_CHUNKS][4][4];
+    device const float *r = R + ((uint64_t)tok * args.n_hc + s) * E;
+    device const float *g = gamma + s * E;
+    device float *o = xn + ((uint64_t)tok * args.n_hc + s) * E;
+    const W w(w_inject);
+    float ss = 0.0f;
+    for (uint i = tid; i < E; i += nth) ss += r[i] * r[i];
+    ss = simd_sum(ss);
+    if (tiisg == 0) red[sgitg] = ss;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    float tot = 0.0f;
+    for (uint q = 0; q < nsg; q++) tot += red[q];
+    const float inv = rsqrt(tot / (float)E + args.eps);
+    const uint per = (E + QWEN4_HC_CHUNKS - 1) / QWEN4_HC_CHUNKS;
+    for (uint chunk = 0; chunk < QWEN4_HC_CHUNKS; chunk++) {
+        const uint i0 = chunk * per, i1 = min(E, i0 + per);
+        float acc[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+        for (uint i = i0 + tid; i < i1; i += nth) {
+            const float v = r[i] * inv * g[i];
+            o[i] = v;
+            for (uint j = 0; j < 4; j++) {
+                if (j < args.n_inject) acc[j] += w.at((uint64_t)j * dim + s * E + i) * v;
+            }
+        }
+        for (uint j = 0; j < 4; j++) {
+            if (j >= args.n_inject) break;
+            const float a = simd_sum(acc[j]);
+            if (tiisg == 0) inject_red[chunk][j][sgitg] = a;
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        if (tid < args.n_inject) {
+            float a = 0.0f;
+            for (uint q = 0; q < nsg; q++) a += inject_red[chunk][tid][q];
+            inj_part[((uint64_t)tok * args.n_hc * QWEN4_HC_CHUNKS + s * QWEN4_HC_CHUNKS + chunk) * args.n_inject + tid] = a;
+        }
+    }
+}
+
+#define QWEN4_HC_NORM_REUSE_INSTANCE(SUFFIX, W) \
+template [[host_name("kernel_qwen4_hc_norm_reuse_" #SUFFIX)]] \
+kernel void kernel_qwen4_hc_norm_reuse<W>(constant ds4_metal_args_qwen4_hc_norm &, device const float *, \
+        device const float *, device const char *, device float *, device float *, uint3, ushort, ushort3, ushort, ushort);
+QWEN4_HC_NORM_REUSE_INSTANCE(f16, qwen4_w_f16)
+QWEN4_HC_NORM_REUSE_INSTANCE(f32, qwen4_w_f32)
+QWEN4_HC_NORM_REUSE_INSTANCE(q8, qwen4_w_q8)
+
 /* 2*sigmoid(inj/hc) with inj[s] = sum of the hc*chunks norm partials for s */
 static inline float qwen4_hc_inject_weight(device const float *inj_part, uint hc, uint s) {
     float a = 0.0f;
@@ -187,6 +258,54 @@ kernel void kernel_qwen4_hc_gate_mix<W>(constant ds4_metal_args_qwen4_hc_gate_mi
 QWEN4_HC_MIX_INSTANCE(f16, qwen4_w_f16)
 QWEN4_HC_MIX_INSTANCE(f32, qwen4_w_f32)
 QWEN4_HC_MIX_INSTANCE(q8, qwen4_w_q8)
+
+/* Two-token verification: reuse each up-projection weight for both rows,
+ * retaining the scalar expressions and reductions of the one-row kernel. */
+template <typename W>
+kernel void kernel_qwen4_hc_gate_mix_pair(
+        constant ds4_metal_args_qwen4_hc_gate_mix & args,
+        device const float *xn,
+        device const float *lo,
+        device const char *w_up,
+        device float *mixed,
+        uint3 tgpig [[threadgroup_position_in_grid]],
+        ushort3 ntg [[threads_per_threadgroup]],
+        ushort sgitg [[simdgroup_index_in_threadgroup]],
+        ushort tiisg [[thread_index_in_simdgroup]]) {
+    const uint E = args.n_embd, hc = args.n_hc, rank = args.n_rank;
+    const uint d = tgpig.x * (ntg.x / 32) + sgitg;
+    if (d >= E) return;
+    const uint s = tiisg / 8, lane = tiisg % 8;
+    const W w(w_up);
+    const uint64_t row = (uint64_t)(s * E + d) * rank;
+    // The upstream shared-activation form failed exact M5 comparisons.
+    // Keep each row's original scalar expression while sharing weights.
+    float a0 = 0.0f, a1 = 0.0f;
+    for (uint r = lane; r < rank; r += 8) {
+        const float weight = w.at(row + r);
+        a0 += weight * qwen4_silu(lo[r] / (float)hc);
+        a1 += weight * qwen4_silu(lo[rank + r] / (float)hc);
+    }
+    a0 += simd_shuffle_xor(a0, 1); a1 += simd_shuffle_xor(a1, 1);
+    a0 += simd_shuffle_xor(a0, 2); a1 += simd_shuffle_xor(a1, 2);
+    a0 += simd_shuffle_xor(a0, 4); a1 += simd_shuffle_xor(a1, 4);
+    float v0 = qwen4_sigmoid(a0) * xn[s * E + d];
+    float v1 = qwen4_sigmoid(a1) * xn[E * hc + s * E + d];
+    v0 += simd_shuffle_xor(v0, 8); v1 += simd_shuffle_xor(v1, 8);
+    v0 += simd_shuffle_xor(v0, 16); v1 += simd_shuffle_xor(v1, 16);
+    if (tiisg == 0) {
+        mixed[d] = v0 / (float)hc;
+        mixed[E + d] = v1 / (float)hc;
+    }
+}
+
+#define QWEN4_HC_MIX_PAIR_INSTANCE(SUFFIX, W) \
+template [[host_name("kernel_qwen4_hc_gate_mix_pair_" #SUFFIX)]] \
+kernel void kernel_qwen4_hc_gate_mix_pair<W>(constant ds4_metal_args_qwen4_hc_gate_mix &, device const float *, \
+        device const float *, device const char *, device float *, uint3, ushort3, ushort, ushort);
+QWEN4_HC_MIX_PAIR_INSTANCE(f16, qwen4_w_f16)
+QWEN4_HC_MIX_PAIR_INSTANCE(f32, qwen4_w_f32)
+QWEN4_HC_MIX_PAIR_INSTANCE(q8, qwen4_w_q8)
 
 struct ds4_metal_args_qwen4_hc_combine {
     uint32_t n_tokens;

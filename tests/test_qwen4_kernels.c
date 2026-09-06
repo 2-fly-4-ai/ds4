@@ -524,6 +524,20 @@ static void test_hc(arena_t *a, uint32_t E, uint32_t rank, uint32_t T, uint32_t 
                    : ds4_gpu_matmul_f32_tensor(glo, a->base, a->size, down_off, dim, rank, gxn, T), "hc down gemv");
     require_ok(ds4_gpu_qwen4_hc_gate_mix_tensor(gmixed, gxn, glo, a->base, a->size, up_off, up_type, T, E, hc, rank),
                "hc gate mix");
+    if (T == 2u) {
+        const char *flag=getenv("DS4_QWEN_HC_PAIR_DISABLE"); bool was_off=flag!=NULL;
+        float *ref=malloc((size_t)T*E*4), *got=malloc((size_t)T*E*4);
+        require_ok(ref&&got,"HC exact allocation");
+        setenv("DS4_QWEN_HC_PAIR_DISABLE","1",1);
+        require_ok(ds4_gpu_qwen4_hc_gate_mix_tensor(gmixed,gxn,glo,a->base,a->size,up_off,up_type,T,E,hc,rank),"HC original");
+        require_ok(ds4_gpu_tensor_read(gmixed,0,ref,(size_t)T*E*4),"HC original read");
+        unsetenv("DS4_QWEN_HC_PAIR_DISABLE");
+        require_ok(ds4_gpu_qwen4_hc_gate_mix_tensor(gmixed,gxn,glo,a->base,a->size,up_off,up_type,T,E,hc,rank),"HC paired");
+        require_ok(ds4_gpu_tensor_read(gmixed,0,got,(size_t)T*E*4),"HC pair read");
+        require_ok(!memcmp(ref,got,(size_t)T*E*4),"HC pair bit exact");
+        printf("  HC_PAIR_EXACT E=%u rank=%u type=%u floats=%u\n",E,rank,up_type,T*E);
+        if(was_off)setenv("DS4_QWEN_HC_PAIR_DISABLE","1",1);free(ref);free(got);
+    }
     require_ok(ds4_gpu_qwen4_hc_combine_tensor(gR, gblk, ginj, T, E, hc), "hc combine");
     char name[96];
     const char *tname = q8 ? "q8_0" : f16 ? "f16" : "f32";
@@ -662,7 +676,24 @@ static void test_gdn(arena_t *a, uint32_t Hk, uint32_t Hv, uint32_t D, uint32_t 
                 require_ok(ds4_gpu_qwen4_conv_stream_tensor(vqkv, ghist, a->base, a->size, conv_off, step, C, K, true), "gdn conv");
                 require_ok(ds4_gpu_qwen4_gdn_prep_tensor(vqkv, va, vb, a->base, a->size, a_off, dt_off, step, Hk, Hv, D), "gdn prep");
             }
-            require_ok(ds4_gpu_qwen4_gdn_scan_tensor(vout, gstate, vqkv, va, vb, step, Hk, Hv, D, NULL, 0u), "gdn scan");
+            if (D==128u && step<=2u) {
+                const size_t sb=(size_t)Hv*D*D*4, ob=(size_t)step*Hv*D*4;
+                float *initial=malloc(sb),*states[2]={malloc(sb),malloc(sb)},*outs[2]={malloc(ob),malloc(ob)},*snaps[2]={malloc(sb),malloc(sb)};
+                require_ok(initial&&states[0]&&states[1]&&outs[0]&&outs[1]&&snaps[0]&&snaps[1],"GDN exact allocation");
+                ds4_gpu_tensor *snap=ds4_gpu_tensor_alloc(sb);require_ok(snap!=NULL,"GDN snapshot");
+                require_ok(ds4_gpu_tensor_read(gstate,0,initial,sb),"GDN initial read");
+                bool was_off=getenv("DS4_QWEN_GDN_R4_DISABLE")!=NULL;
+                for(int arm=0;arm<2;arm++) {
+                    require_ok(ds4_gpu_tensor_write(gstate,0,initial,sb),"GDN initial restore");
+                    if(arm)unsetenv("DS4_QWEN_GDN_R4_DISABLE");else setenv("DS4_QWEN_GDN_R4_DISABLE","1",1);
+                    require_ok(ds4_gpu_qwen4_gdn_scan_tensor(vout,gstate,vqkv,va,vb,step,Hk,Hv,D,snap,0u),"GDN paired scan");
+                    require_ok(ds4_gpu_tensor_read(gstate,0,states[arm],sb)&&ds4_gpu_tensor_read(vout,0,outs[arm],ob)&&ds4_gpu_tensor_read(snap,0,snaps[arm],sb),"GDN paired read");
+                }
+                require_ok(!memcmp(states[0],states[1],sb)&&!memcmp(outs[0],outs[1],ob)&&!memcmp(snaps[0],snaps[1],sb),"GDN exact state/output/first snapshot");
+                if(was_off)setenv("DS4_QWEN_GDN_R4_DISABLE","1",1);
+                printf("  GDN_R4_EXACT Hk=%u Hv=%u T=%u\n",Hk,Hv,step);
+                free(initial);for(int arm=0;arm<2;arm++){free(states[arm]);free(outs[arm]);free(snaps[arm]);}ds4_gpu_tensor_free(snap);
+            } else require_ok(ds4_gpu_qwen4_gdn_scan_tensor(vout, gstate, vqkv, va, vb, step, Hk, Hv, D, NULL, 0u), "gdn scan");
             require_ok(ds4_gpu_qwen4_gdn_out_tensor(vout, vz, a->base, a->size, norm_off, step, Hv, D, 1e-6f), "gdn out");
             ds4_gpu_tensor_free(vout); ds4_gpu_tensor_free(vz); ds4_gpu_tensor_free(vb); ds4_gpu_tensor_free(va); ds4_gpu_tensor_free(vqkv);
         }
@@ -1818,6 +1849,9 @@ int main(void) {
     printf("mtp\n");
     test_mtp(&arena, 2560, 4);
     test_mtp(&arena, 64, 4);
+    test_hc(&arena, 2560, 320, 2, 1u);
+    test_hc(&arena, 2560, 320, 2, 0u);
+    test_hc(&arena, 72, 8, 2, 0u);
     printf("all qwen4 kernel tests passed\n");
     return 0;
 }

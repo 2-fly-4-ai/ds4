@@ -1,0 +1,31 @@
+ds4: warming mapped tensor pages: 101.09 GiB
+ds4: warmed tensor pages in 7.817s (checksum=850678604)
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Qwen PLE remains CPU-mapped; Metal residency restricted to 2 model spans (71.29 GiB)
+ds4: Metal model views created in 2.235 ms, residency requested in 501.142 ms, warmup 11.037 ms (mapped 73000.62 MiB from offset 10.52 MiB)
+ds4: Metal mapped mmaped model as 2 disjoint shared buffers across 2 tensor spans
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 0.29 GiB (raw 0.23 + compressed 0.06) + buffers 7.05 GiB + resident model 71.29 GiB = 78.64 GiB planned
+ds4: memory detail: ctx=9216 prefill_cap=8192 raw_kv_rows=9216 compressed_kv_rows=2305 backend=metal
+QWEN_PORT_ARM variant=8 arm=0 prompt=8192 temp=0 neural=21 lookup=13 cycles=17 accepted=12
+QWEN_PORT_ARM variant=8 arm=1 prompt=8192 temp=0 neural=21 lookup=13 cycles=17 accepted=12
+QWEN_PORT_PARITY_PASS variant=8 tokens=128 prompt=8192 snapshot=402954844
+QWEN_PORT_WARMUP variant=8 mode=0 repeat=-8 prompt=8192 tokens=128 ms=2034.1470 tps=62.9256 cycles=17 accepted=12
+QWEN_PORT_WARMUP variant=8 mode=1 repeat=-7 prompt=8192 tokens=128 ms=2059.9450 tps=62.1376 cycles=17 accepted=12
+QWEN_PORT_WARMUP variant=8 mode=1 repeat=-6 prompt=8192 tokens=128 ms=2010.6770 tps=63.6602 cycles=17 accepted=12
+QWEN_PORT_WARMUP variant=8 mode=0 repeat=-5 prompt=8192 tokens=128 ms=2072.4300 tps=61.7632 cycles=17 accepted=12
+QWEN_PORT_WARMUP variant=8 mode=1 repeat=-4 prompt=8192 tokens=128 ms=2004.8500 tps=63.8452 cycles=17 accepted=12
+QWEN_PORT_WARMUP variant=8 mode=0 repeat=-3 prompt=8192 tokens=128 ms=2060.9580 tps=62.1070 cycles=17 accepted=12
+QWEN_PORT_WARMUP variant=8 mode=0 repeat=-2 prompt=8192 tokens=128 ms=2047.4900 tps=62.5156 cycles=17 accepted=12
+QWEN_PORT_WARMUP variant=8 mode=1 repeat=-1 prompt=8192 tokens=128 ms=2022.5840 tps=63.2854 cycles=17 accepted=12
+QWEN_PORT_TIMING variant=8 mode=0 repeat=0 prompt=8192 tokens=128 ms=2035.2850 tps=62.8905 cycles=17 accepted=12
+QWEN_PORT_TIMING variant=8 mode=1 repeat=1 prompt=8192 tokens=128 ms=2068.9390 tps=61.8675 cycles=17 accepted=12
+QWEN_PORT_TIMING variant=8 mode=1 repeat=2 prompt=8192 tokens=128 ms=2017.2730 tps=63.4520 cycles=17 accepted=12
+QWEN_PORT_TIMING variant=8 mode=0 repeat=3 prompt=8192 tokens=128 ms=2038.5250 tps=62.7905 cycles=17 accepted=12
+QWEN_PORT_TIMING variant=8 mode=1 repeat=4 prompt=8192 tokens=128 ms=2025.0260 tps=63.2091 cycles=17 accepted=12
+QWEN_PORT_TIMING variant=8 mode=0 repeat=5 prompt=8192 tokens=128 ms=2043.9910 tps=62.6226 cycles=17 accepted=12
+QWEN_PORT_TIMING variant=8 mode=0 repeat=6 prompt=8192 tokens=128 ms=2034.6360 tps=62.9105 cycles=17 accepted=12
+QWEN_PORT_TIMING variant=8 mode=1 repeat=7 prompt=8192 tokens=128 ms=2070.5000 tps=61.8208 cycles=17 accepted=12
+ds4: prompt-lookup summary: attempts=234 no_match=0 first_miss=0 verify_passes=234 drafted=1584 committed=1476 accept=93.2% tokens/pass=6.31 scan=2.34 ms total gate_skips=144 gate_partials=18 gate_ambiguous=0 parity_replays=0

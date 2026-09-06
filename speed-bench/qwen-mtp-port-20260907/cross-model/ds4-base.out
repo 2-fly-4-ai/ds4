@@ -1,0 +1,6 @@
+Here's a Python function to add two integers, along with a brief explanation:
+
+```python
+def add(a, b):
+    """
+    Adds two integers and

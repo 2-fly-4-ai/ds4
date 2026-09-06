@@ -1,0 +1,22 @@
+glm53-continued-prefill:
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 2.812 ms, residency requested in 10750.707 ms, warmup 3.123 ms (mapped 90220.81 MiB from offset 9.07 MiB)
+ds4: Metal mapped mmaped model as 2 overlapping shared buffers
+ds4: metal backend initialized for graph diagnostics
+ds4: GLM session ctx=4292 (model max=1048576); full-attention prefill/work cap=4096; compact indexed decode is used beyond the cap
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=4292 logical_ctx=4292 kv_layers=45 indexer_layers=11 f16 0.05 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=16.77 MiB
+ds4-test: continued prefill +1: 28.74 ms, 34.8 t/s, chunk=1 display=0 intermediate=0
+ds4-test: continued prefill +3: 48.99 ms, 61.2 t/s, chunk=1 display=3 intermediate=1
+ds4-test: continued prefill +2048: 3364.09 ms, 608.8 t/s, chunk=1 display=5 intermediate=3
+ds4-test: continued prefill +2048: 4042.77 ms, 506.6 t/s, chunk=1 display=5 intermediate=3
+ds4: GLM session ctx=4292 (model max=1048576); full-attention prefill/work cap=4096; compact indexed decode is used beyond the cap
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=4292 logical_ctx=4292 kv_layers=45 indexer_layers=11 f16 0.05 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=16.77 MiB
+ds4-test: continued/cold final top token 39058/39058, same-rank top8=6, max same-rank logit delta=0.54696
+glm53-continued-prefill: OK
+ds4 tests: ok

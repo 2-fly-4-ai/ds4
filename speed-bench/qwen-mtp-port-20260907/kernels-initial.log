@@ -1,0 +1,12 @@
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 0.111 ms, residency requested in 38.029 ms, warmup 3.192 ms (mapped 1536.00 MiB from offset 0.00 MiB)
+ds4: Metal mapped mmaped model as 1 overlapping shared buffers
+HC pair bit exact failed
+hyper-connections
+  hc E=2560 rank=320 T=3 f16: xn               ok  max|d|=2.93e-07 (scale 2.59e+00)
+  hc E=2560 rank=320 T=3 f16: lowrank          ok  max|d|=4.07e-06 (scale 1.10e+01)
+  hc E=2560 rank=320 T=3 f16: inject partials  ok  max|d|=1.81e-07 (scale 1.98e+00)
+  hc E=2560 rank=320 T=3 f16: mixed            ok  max|d|=2.24e-07 (scale 1.05e+00)
+  hc E=2560 rank=320 T=3 f16: combine          ok  max|d|=1.97e-07 (scale 2.59e+00)

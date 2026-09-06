@@ -1,0 +1,803 @@
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 0.139 ms, residency requested in 37.156 ms, warmup 3.096 ms (mapped 1536.00 MiB from offset 0.00 MiB)
+ds4: Metal mapped mmaped model as 1 overlapping shared buffers
+hyper-connections
+  hc E=2560 rank=320 T=3 f16: xn               ok  max|d|=2.93e-07 (scale 2.59e+00)
+  hc E=2560 rank=320 T=3 f16: lowrank          ok  max|d|=4.07e-06 (scale 1.10e+01)
+  hc E=2560 rank=320 T=3 f16: inject partials  ok  max|d|=1.81e-07 (scale 1.98e+00)
+  hc E=2560 rank=320 T=3 f16: mixed            ok  max|d|=2.24e-07 (scale 1.05e+00)
+  hc E=2560 rank=320 T=3 f16: combine          ok  max|d|=1.97e-07 (scale 2.59e+00)
+  hc E=2560 rank=320 T=1 f32: xn               ok  max|d|=3.32e-07 (scale 2.58e+00)
+  hc E=2560 rank=320 T=1 f32: lowrank          ok  max|d|=1.28e-06 (scale 9.48e+00)
+  hc E=2560 rank=320 T=1 f32: inject partials  ok  max|d|=1.46e-07 (scale 1.71e+00)
+  hc E=2560 rank=320 T=1 f32: mixed            ok  max|d|=1.32e-07 (scale 1.20e+00)
+  hc E=2560 rank=320 T=1 f32: combine          ok  max|d|=1.46e-07 (scale 1.83e+00)
+  HC_PAIR_EXACT E=2560 rank=320 type=8 floats=5120
+  hc E=2560 rank=320 T=2 q8_0: xn              ok  max|d|=2.53e-07 (scale 2.58e+00)
+  hc E=2560 rank=320 T=2 q8_0: lowrank         ok  max|d|=2.14e-06 (scale 1.05e+01)
+  hc E=2560 rank=320 T=2 q8_0: inject partials ok  max|d|=1.71e-07 (scale 1.38e+00)
+  hc E=2560 rank=320 T=2 q8_0: mixed           ok  max|d|=2.45e-07 (scale 1.19e+00)
+  hc E=2560 rank=320 T=2 q8_0: combine         ok  max|d|=1.62e-07 (scale 2.37e+00)
+  hc E=2560 rank=320 T=1 q8_0: xn              ok  max|d|=3.33e-07 (scale 2.56e+00)
+  hc E=2560 rank=320 T=1 q8_0: lowrank         ok  max|d|=1.12e-06 (scale 8.42e+00)
+  hc E=2560 rank=320 T=1 q8_0: inject partials ok  max|d|=1.67e-07 (scale 1.69e+00)
+  hc E=2560 rank=320 T=1 q8_0: mixed           ok  max|d|=1.41e-07 (scale 1.08e+00)
+  hc E=2560 rank=320 T=1 q8_0: combine         ok  max|d|=2.07e-07 (scale 2.61e+00)
+  hc E=64 rank=8 T=5 f16: xn                   ok  max|d|=2.58e-07 (scale 2.61e+00)
+  hc E=64 rank=8 T=5 f16: lowrank              ok  max|d|=1.10e-07 (scale 1.32e+00)
+  hc E=64 rank=8 T=5 f16: inject partials      ok  max|d|=2.48e-08 (scale 3.12e-01)
+  hc E=64 rank=8 T=5 f16: mixed                ok  max|d|=6.06e-08 (scale 8.10e-01)
+  hc E=64 rank=8 T=5 f16: combine              ok  max|d|=1.53e-07 (scale 1.97e+00)
+  HC_PAIR_EXACT E=64 rank=8 type=0 floats=128
+  hc E=64 rank=8 T=2 f32: xn                   ok  max|d|=2.52e-07 (scale 2.57e+00)
+  hc E=64 rank=8 T=2 f32: lowrank              ok  max|d|=1.40e-07 (scale 8.81e-01)
+  hc E=64 rank=8 T=2 f32: inject partials      ok  max|d|=2.20e-08 (scale 2.41e-01)
+  hc E=64 rank=8 T=2 f32: mixed                ok  max|d|=7.16e-08 (scale 7.41e-01)
+  hc E=64 rank=8 T=2 f32: combine              ok  max|d|=1.43e-07 (scale 1.95e+00)
+  hc E=64 rank=8 T=1 q8_0: xn                  ok  max|d|=2.74e-07 (scale 2.57e+00)
+  hc E=64 rank=8 T=1 q8_0: lowrank             ok  max|d|=8.43e-08 (scale 7.67e-01)
+  hc E=64 rank=8 T=1 q8_0: inject partials     ok  max|d|=2.49e-08 (scale 2.37e-01)
+  hc E=64 rank=8 T=1 q8_0: mixed               ok  max|d|=7.83e-08 (scale 6.54e-01)
+  hc E=64 rank=8 T=1 q8_0: combine             ok  max|d|=1.08e-07 (scale 1.91e+00)
+  hc E=64 rank=8 T=3 q8_0: xn                  ok  max|d|=2.48e-07 (scale 2.42e+00)
+  hc E=64 rank=8 T=3 q8_0: lowrank             ok  max|d|=1.37e-07 (scale 1.12e+00)
+  hc E=64 rank=8 T=3 q8_0: inject partials     ok  max|d|=3.56e-08 (scale 3.04e-01)
+  hc E=64 rank=8 T=3 q8_0: mixed               ok  max|d|=5.95e-08 (scale 9.11e-01)
+  hc E=64 rank=8 T=3 q8_0: combine             ok  max|d|=1.12e-07 (scale 1.84e+00)
+gated delta net
+  gdn 16/48/128 T=5 chunk: output              ok  max|d|=7.29e-07 (scale 2.90e+00)
+  gdn 16/48/128 T=5 chunk: state               ok  max|d|=4.12e-08 (scale 2.57e-01)
+  gdn 16/48/128 T=5 chunk: conv history        ok  max|d|=0.00e+00 (scale 1.00e+00)
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  gdn 16/48/128 T=5 decode: output             ok  max|d|=7.29e-07 (scale 2.90e+00)
+  gdn 16/48/128 T=5 decode: state              ok  max|d|=4.12e-08 (scale 2.57e-01)
+  gdn 16/48/128 T=5 decode: conv history       ok  max|d|=0.00e+00 (scale 1.00e+00)
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  gdn 16/48/128 T=5 fused: output              ok  max|d|=6.48e-07 (scale 2.90e+00)
+  gdn 16/48/128 T=5 fused: state               ok  max|d|=4.12e-08 (scale 2.57e-01)
+  gdn 16/48/128 T=5 fused: conv history        ok  max|d|=0.00e+00 (scale 1.00e+00)
+  gdn 16/48/128 T=9 chunk: output              ok  max|d|=7.45e-07 (scale 2.38e+00)
+  gdn 16/48/128 T=9 chunk: state               ok  max|d|=4.46e-08 (scale 1.81e-01)
+  gdn 16/48/128 T=9 chunk: conv history        ok  max|d|=0.00e+00 (scale 1.00e+00)
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  gdn 16/48/128 T=9 decode: output             ok  max|d|=7.45e-07 (scale 2.38e+00)
+  gdn 16/48/128 T=9 decode: state              ok  max|d|=4.46e-08 (scale 1.81e-01)
+  gdn 16/48/128 T=9 decode: conv history       ok  max|d|=0.00e+00 (scale 1.00e+00)
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  gdn 16/48/128 T=9 fused: output              ok  max|d|=9.31e-07 (scale 2.38e+00)
+  gdn 16/48/128 T=9 fused: state               ok  max|d|=4.46e-08 (scale 1.81e-01)
+  gdn 16/48/128 T=9 fused: conv history        ok  max|d|=0.00e+00 (scale 1.00e+00)
+  gdn 16/48/128 T=10 chunk: output             ok  max|d|=6.27e-07 (scale 2.82e+00)
+  gdn 16/48/128 T=10 chunk: state              ok  max|d|=6.71e-08 (scale 2.50e-01)
+  gdn 16/48/128 T=10 chunk: conv history       ok  max|d|=0.00e+00 (scale 1.00e+00)
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  gdn 16/48/128 T=10 decode: output            ok  max|d|=6.27e-07 (scale 2.82e+00)
+  gdn 16/48/128 T=10 decode: state             ok  max|d|=6.71e-08 (scale 2.50e-01)
+  gdn 16/48/128 T=10 decode: conv history      ok  max|d|=0.00e+00 (scale 1.00e+00)
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  gdn 16/48/128 T=10 fused: output             ok  max|d|=6.50e-07 (scale 2.82e+00)
+  gdn 16/48/128 T=10 fused: state              ok  max|d|=6.71e-08 (scale 2.50e-01)
+  gdn 16/48/128 T=10 fused: conv history       ok  max|d|=0.00e+00 (scale 1.00e+00)
+  gdn 16/48/128 T=11 chunk: output             ok  max|d|=8.00e-07 (scale 2.45e+00)
+  gdn 16/48/128 T=11 chunk: state              ok  max|d|=3.90e-08 (scale 1.96e-01)
+  gdn 16/48/128 T=11 chunk: conv history       ok  max|d|=0.00e+00 (scale 1.00e+00)
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  gdn 16/48/128 T=11 decode: output            ok  max|d|=8.00e-07 (scale 2.45e+00)
+  gdn 16/48/128 T=11 decode: state             ok  max|d|=3.90e-08 (scale 1.96e-01)
+  gdn 16/48/128 T=11 decode: conv history      ok  max|d|=0.00e+00 (scale 1.00e+00)
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  gdn 16/48/128 T=11 fused: output             ok  max|d|=8.00e-07 (scale 2.45e+00)
+  gdn 16/48/128 T=11 fused: state              ok  max|d|=3.68e-08 (scale 1.96e-01)
+  gdn 16/48/128 T=11 fused: conv history       ok  max|d|=0.00e+00 (scale 1.00e+00)
+  gdn 16/48/128 T=12 chunk: output             ok  max|d|=7.13e-07 (scale 3.16e+00)
+  gdn 16/48/128 T=12 chunk: state              ok  max|d|=3.67e-08 (scale 3.09e-01)
+  gdn 16/48/128 T=12 chunk: conv history       ok  max|d|=0.00e+00 (scale 1.00e+00)
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  gdn 16/48/128 T=12 decode: output            ok  max|d|=7.13e-07 (scale 3.16e+00)
+  gdn 16/48/128 T=12 decode: state             ok  max|d|=3.67e-08 (scale 3.09e-01)
+  gdn 16/48/128 T=12 decode: conv history      ok  max|d|=0.00e+00 (scale 1.00e+00)
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  gdn 16/48/128 T=12 fused: output             ok  max|d|=7.13e-07 (scale 3.16e+00)
+  gdn 16/48/128 T=12 fused: state              ok  max|d|=5.02e-08 (scale 3.09e-01)
+  gdn 16/48/128 T=12 fused: conv history       ok  max|d|=0.00e+00 (scale 1.00e+00)
+  gdn 16/48/128 T=13 chunk: output             ok  max|d|=5.95e-07 (scale 2.81e+00)
+  gdn 16/48/128 T=13 chunk: state              ok  max|d|=5.30e-08 (scale 2.47e-01)
+  gdn 16/48/128 T=13 chunk: conv history       ok  max|d|=0.00e+00 (scale 1.00e+00)
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  gdn 16/48/128 T=13 decode: output            ok  max|d|=5.95e-07 (scale 2.81e+00)
+  gdn 16/48/128 T=13 decode: state             ok  max|d|=5.30e-08 (scale 2.47e-01)
+  gdn 16/48/128 T=13 decode: conv history      ok  max|d|=0.00e+00 (scale 1.00e+00)
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  gdn 16/48/128 T=13 fused: output             ok  max|d|=7.07e-07 (scale 2.81e+00)
+  gdn 16/48/128 T=13 fused: state              ok  max|d|=5.30e-08 (scale 2.47e-01)
+  gdn 16/48/128 T=13 fused: conv history       ok  max|d|=0.00e+00 (scale 1.00e+00)
+  gdn 16/48/128 T=14 chunk: output             ok  max|d|=8.08e-07 (scale 2.70e+00)
+  gdn 16/48/128 T=14 chunk: state              ok  max|d|=3.91e-08 (scale 1.87e-01)
+  gdn 16/48/128 T=14 chunk: conv history       ok  max|d|=0.00e+00 (scale 1.00e+00)
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  gdn 16/48/128 T=14 decode: output            ok  max|d|=8.08e-07 (scale 2.70e+00)
+  gdn 16/48/128 T=14 decode: state             ok  max|d|=3.91e-08 (scale 1.87e-01)
+  gdn 16/48/128 T=14 decode: conv history      ok  max|d|=0.00e+00 (scale 1.00e+00)
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  gdn 16/48/128 T=14 fused: output             ok  max|d|=1.05e-06 (scale 2.70e+00)
+  gdn 16/48/128 T=14 fused: state              ok  max|d|=4.33e-08 (scale 1.87e-01)
+  gdn 16/48/128 T=14 fused: conv history       ok  max|d|=0.00e+00 (scale 1.00e+00)
+  gdn 16/48/128 T=15 chunk: output             ok  max|d|=6.47e-07 (scale 3.10e+00)
+  gdn 16/48/128 T=15 chunk: state              ok  max|d|=2.72e-08 (scale 1.93e-01)
+  gdn 16/48/128 T=15 chunk: conv history       ok  max|d|=0.00e+00 (scale 1.00e+00)
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  gdn 16/48/128 T=15 decode: output            ok  max|d|=6.47e-07 (scale 3.10e+00)
+  gdn 16/48/128 T=15 decode: state             ok  max|d|=2.72e-08 (scale 1.93e-01)
+  gdn 16/48/128 T=15 decode: conv history      ok  max|d|=0.00e+00 (scale 1.00e+00)
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  gdn 16/48/128 T=15 fused: output             ok  max|d|=7.29e-07 (scale 3.10e+00)
+  gdn 16/48/128 T=15 fused: state              ok  max|d|=3.33e-08 (scale 1.93e-01)
+  gdn 16/48/128 T=15 fused: conv history       ok  max|d|=0.00e+00 (scale 1.00e+00)
+  gdn 16/48/128 T=16 chunk: output             ok  max|d|=7.55e-07 (scale 2.99e+00)
+  gdn 16/48/128 T=16 chunk: state              ok  max|d|=3.86e-08 (scale 2.04e-01)
+  gdn 16/48/128 T=16 chunk: conv history       ok  max|d|=0.00e+00 (scale 1.00e+00)
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  gdn 16/48/128 T=16 decode: output            ok  max|d|=7.55e-07 (scale 2.99e+00)
+  gdn 16/48/128 T=16 decode: state             ok  max|d|=3.86e-08 (scale 2.04e-01)
+  gdn 16/48/128 T=16 decode: conv history      ok  max|d|=0.00e+00 (scale 1.00e+00)
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  gdn 16/48/128 T=16 fused: output             ok  max|d|=7.55e-07 (scale 2.99e+00)
+  gdn 16/48/128 T=16 fused: state              ok  max|d|=3.86e-08 (scale 2.04e-01)
+  gdn 16/48/128 T=16 fused: conv history       ok  max|d|=0.00e+00 (scale 1.00e+00)
+  gdn 16/48/128 T=40 chunk: output             ok  max|d|=1.04e-06 (scale 3.33e+00)
+  gdn 16/48/128 T=40 chunk: state              ok  max|d|=4.44e-08 (scale 2.42e-01)
+  gdn 16/48/128 T=40 chunk: conv history       ok  max|d|=0.00e+00 (scale 1.00e+00)
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  gdn 16/48/128 T=40 decode: output            ok  max|d|=1.04e-06 (scale 3.33e+00)
+  gdn 16/48/128 T=40 decode: state             ok  max|d|=4.44e-08 (scale 2.42e-01)
+  gdn 16/48/128 T=40 decode: conv history      ok  max|d|=0.00e+00 (scale 1.00e+00)
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  gdn 16/48/128 T=40 fused: output             ok  max|d|=1.04e-06 (scale 3.33e+00)
+  gdn 16/48/128 T=40 fused: state              ok  max|d|=4.14e-08 (scale 2.42e-01)
+  gdn 16/48/128 T=40 fused: conv history       ok  max|d|=0.00e+00 (scale 1.00e+00)
+  gdn 16/48/128 T=200 chunk: output            ok  max|d|=1.11e-06 (scale 3.48e+00)
+  gdn 16/48/128 T=200 chunk: state             ok  max|d|=3.42e-08 (scale 1.88e-01)
+  gdn 16/48/128 T=200 chunk: conv history      ok  max|d|=0.00e+00 (scale 1.00e+00)
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  GDN_R4_EXACT Hk=16 Hv=48 T=1
+  gdn 16/48/128 T=200 decode: output           ok  max|d|=1.11e-06 (scale 3.48e+00)
+  gdn 16/48/128 T=200 decode: state            ok  max|d|=3.42e-08 (scale 1.88e-01)
+  gdn 16/48/128 T=200 decode: conv history     ok  max|d|=0.00e+00 (scale 1.00e+00)
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  GDN_R4_EXACT Hk=16 Hv=48 T=2
+  gdn 16/48/128 T=200 fused: output            ok  max|d|=1.38e-06 (scale 3.48e+00)
+  gdn 16/48/128 T=200 fused: state             ok  max|d|=3.49e-08 (scale 1.88e-01)
+  gdn 16/48/128 T=200 fused: conv history      ok  max|d|=0.00e+00 (scale 1.00e+00)
+  idx score mm T=37 n=3001 pos0=11000          ok  max|d|=5.14e-03 (scale 3.25e+01)
+  idx score mm T=3 n=70 pos0=100               ok  max|d|=2.77e-03 (scale 2.03e+01)
+  idx select T=4 n=70001 k=512 visible=69000   ok
+  idx select T=3 n=600 k=512 visible=599       ok
+  idx select T=2 n=3000 k=512 visible=520      ok
+  attn mm T=40 pos0=0 dense                    ok  max|d|=2.08e-04 (scale 1.31e+00)
+  attn mm T=37 pos0=3000 sparse                ok  max|d|=1.12e-04 (scale 7.98e-01)
+  attn mm T=3 pos0=100 sparse                  ok  max|d|=9.05e-05 (scale 7.82e-01)
+  gdn 2/6/32 T=7 chunk: output                 ok  max|d|=1.21e-06 (scale 2.35e+00)
+  gdn 2/6/32 T=7 chunk: state                  ok  max|d|=1.84e-08 (scale 1.42e-01)
+  gdn 2/6/32 T=7 chunk: conv history           ok  max|d|=0.00e+00 (scale 9.99e-01)
+  gdn 2/6/32 T=7 decode: output                ok  max|d|=1.21e-06 (scale 2.35e+00)
+  gdn 2/6/32 T=7 decode: state                 ok  max|d|=1.84e-08 (scale 1.42e-01)
+  gdn 2/6/32 T=7 decode: conv history          ok  max|d|=0.00e+00 (scale 9.99e-01)
+  gdn 2/6/32 T=7 fused: output                 ok  max|d|=1.12e-06 (scale 2.35e+00)
+  gdn 2/6/32 T=7 fused: state                  ok  max|d|=1.84e-08 (scale 1.42e-01)
+  gdn 2/6/32 T=7 fused: conv history           ok  max|d|=0.00e+00 (scale 9.99e-01)
+ple
+  ple E=2560 T=3 chunk: residual               ok  max|d|=2.73e-07 (scale 2.28e+00)
+  ple E=2560 T=3 chunk: history                ok  max|d|=4.65e-07 (scale 2.60e+00)
+  ple E=2560 T=3 decode: residual              ok  max|d|=2.73e-07 (scale 2.28e+00)
+  ple E=2560 T=3 decode: history               ok  max|d|=4.65e-07 (scale 2.60e+00)
+  ple E=64 T=12 chunk: residual                ok  max|d|=2.50e-07 (scale 2.10e+00)
+  ple E=64 T=12 chunk: history                 ok  max|d|=3.04e-07 (scale 2.61e+00)
+  ple E=64 T=12 decode: residual               ok  max|d|=2.50e-07 (scale 2.10e+00)
+  ple E=64 T=12 decode: history                ok  max|d|=3.04e-07 (scale 2.61e+00)
+router
+  router NE=512 k=10 T=3: shared gate logit    ok  max|d|=1.25e-07 (scale 1.47e+00)
+  router NE=512 k=10 T=3: softmax top-k        ok  max|d|=1.19e-08
+  router NE=32 k=10 T=5: shared gate logit     ok  max|d|=7.70e-08 (scale 8.90e-01)
+  router NE=32 k=10 T=5: softmax top-k         ok  max|d|=1.74e-08
+attention
+  attention H=24/2 D=256 k=2 n=21              ok  max|d|=2.48e-04 (scale 7.21e-01)
+  attention H=4/2 D=32 k=2 n=30                ok  max|d|=9.61e-05 (scale 6.29e-01)
+routed experts
+  moe q8_0 E=2560 F=640 slots=10 T=2: reduce+combine ok  max|d|=8.69e-07 (scale 3.32e+00)
+  moe q8_0 E=2560 F=640 slots=10 T=2: mid (+shared) ok  max|d|=8.59e-07 (scale 6.00e+00)
+  moe q8_0 E=2560 F=640 slots=10 T=2: down (+shared) ok  max|d|=2.50e-07 (scale 1.36e+00)
+  moe q8_0 E=2560 F=640 slots=10 T=2: out      ok  max|d|=7.32e-07 (scale 3.19e+00)
+  moe mm q8_0 E=2560 F=640 slots=10 T=2: mid   ok  max|d|=1.82e-03 (scale 6.00e+00)
+  moe mm q8_0 E=2560 F=640 slots=10 T=2: down  ok  max|d|=6.25e-04 (scale 1.36e+00)
+  moe q4_0 E=2560 F=640 slots=10 T=37: reduce+combine ok  max|d|=1.01e-06 (scale 5.18e+00)
+  moe q4_0 E=2560 F=640 slots=10 T=37: mid (+shared) ok  max|d|=1.44e-06 (scale 6.38e+00)
+  moe q4_0 E=2560 F=640 slots=10 T=37: down (+shared) ok  max|d|=2.98e-07 (scale 1.64e+00)
+  moe q4_0 E=2560 F=640 slots=10 T=37: out     ok  max|d|=6.45e-07 (scale 3.40e+00)
+  half intermediate downstream bit parity: 947200 floats PASS
+  moe mm q4_0 E=2560 F=640 slots=10 T=37: mid  ok  max|d|=2.79e-03 (scale 6.38e+00)
+  moe mm q4_0 E=2560 F=640 slots=10 T=37: down ok  max|d|=8.13e-04 (scale 1.64e+00)
+  moe q8_0 E=2560 F=640 slots=10 T=37: reduce+combine ok  max|d|=1.05e-06 (scale 5.45e+00)
+  moe q4_0 E=2560 F=640 slots=10 T=37: mid (+shared) ok  max|d|=1.14e-06 (scale 6.97e+00)
+  moe q8_0 E=2560 F=640 slots=10 T=37: down (+shared) ok  max|d|=3.19e-07 (scale 1.63e+00)
+  moe q8_0 E=2560 F=640 slots=10 T=37: out     ok  max|d|=6.60e-07 (scale 3.04e+00)
+  moe mm q4_0 E=2560 F=640 slots=10 T=37: mid  ok  max|d|=1.94e-03 (scale 6.97e+00)
+  moe mm q4_0 E=2560 F=640 slots=10 T=37: down ok  max|d|=7.03e-04 (scale 1.63e+00)
+  moe q4_0 E=2560 F=640 slots=10 T=37: reduce+combine ok  max|d|=1.07e-06 (scale 5.44e+00)
+  moe q8_0 E=2560 F=640 slots=10 T=37: mid (+shared) ok  max|d|=1.39e-06 (scale 7.01e+00)
+  moe q4_0 E=2560 F=640 slots=10 T=37: down (+shared) ok  max|d|=2.85e-07 (scale 1.61e+00)
+  moe q4_0 E=2560 F=640 slots=10 T=37: out     ok  max|d|=6.33e-07 (scale 3.10e+00)
+  moe mm q8_0 E=2560 F=640 slots=10 T=37: mid  ok  max|d|=2.09e-03 (scale 7.01e+00)
+  moe mm q8_0 E=2560 F=640 slots=10 T=37: down ok  max|d|=7.37e-04 (scale 1.52e+00)
+  moe q8_0 E=2560 F=640 slots=10 T=37: reduce+combine ok  max|d|=5.75e-07 (scale 3.76e+00)
+  moe q4_K E=2560 F=640 slots=10 T=37: mid (+shared) ok  max|d|=8.56e-07 (scale 4.94e+00)
+  moe q8_0 E=2560 F=640 slots=10 T=37: down (+shared) ok  max|d|=3.01e-07 (scale 1.73e+00)
+  moe q8_0 E=2560 F=640 slots=10 T=37: out     ok  max|d|=4.19e-07 (scale 2.52e+00)
+  moe mm q4_K E=2560 F=640 slots=10 T=37: mid  ok  max|d|=5.63e-04 (scale 2.07e+00)
+  moe mm q4_K E=2560 F=640 slots=10 T=37: down ok  max|d|=5.47e-04 (scale 1.73e+00)
+  moe q8_0 E=2560 F=640 slots=10 T=100: reduce+combine ok  max|d|=7.09e-07 (scale 4.01e+00)
+  moe q4_K E=2560 F=640 slots=10 T=100: mid (+shared) ok  max|d|=1.30e-06 (scale 5.66e+00)
+  moe q8_0 E=2560 F=640 slots=10 T=100: down (+shared) ok  max|d|=2.76e-07 (scale 1.49e+00)
+  moe q8_0 E=2560 F=640 slots=10 T=100: out    ok  max|d|=4.05e-07 (scale 2.08e+00)
+  moe mm q4_K E=2560 F=640 slots=10 T=100: mid ok  max|d|=6.53e-04 (scale 1.89e+00)
+  moe mm q4_K E=2560 F=640 slots=10 T=100: down ok  max|d|=4.43e-04 (scale 1.08e+00)
+  moe q8_0 E=2560 F=640 slots=10 T=37: reduce+combine ok  max|d|=4.17e-07 (scale 2.34e+00)
+  moe q2_K E=2560 F=640 slots=10 T=37: mid (+shared) ok  max|d|=8.31e-07 (scale 4.81e+00)
+  moe q8_0 E=2560 F=640 slots=10 T=37: down (+shared) ok  max|d|=2.78e-07 (scale 1.29e+00)
+  moe q8_0 E=2560 F=640 slots=10 T=37: out     ok  max|d|=2.43e-07 (scale 1.02e+00)
+  moe mm q2_K E=2560 F=640 slots=10 T=37: mid  ok  max|d|=2.39e-04 (scale 7.26e-01)
+  moe mm q2_K E=2560 F=640 slots=10 T=37: down ok  max|d|=7.77e-05 (scale 1.69e-01)
+  moe q8_0 E=2560 F=640 slots=10 T=37: reduce+combine ok  max|d|=4.02e-05 (scale 2.04e+02)
+  moe iq2_xxs E=2560 F=640 slots=10 T=37: mid (+shared) ok  max|d|=4.77e-05 (scale 2.17e+02)
+  moe q8_0 E=2560 F=640 slots=10 T=37: down (+shared) ok  max|d|=1.09e-05 (scale 6.05e+01)
+  moe q8_0 E=2560 F=640 slots=10 T=37: out     ok  max|d|=2.44e-05 (scale 1.20e+02)
+  moe mm iq2_xxs E=2560 F=640 slots=10 T=37: mid ok  max|d|=8.43e-02 (scale 2.17e+02)
+  moe mm iq2_xxs E=2560 F=640 slots=10 T=37: down ok  max|d|=3.31e-02 (scale 6.05e+01)
+  moe f32 E=2560 F=640 slots=10 T=1: reduce+combine ok  max|d|=7.38e-07 (scale 3.15e+00)
+  moe f32 E=2560 F=640 slots=10 T=1: mid (+shared) ok  max|d|=8.54e-07 (scale 3.32e+00)
+  moe f32 E=2560 F=640 slots=10 T=1: down (+shared) ok  max|d|=3.60e-07 (scale 1.31e+00)
+  moe f32 E=2560 F=640 slots=10 T=1: out       ok  max|d|=6.48e-07 (scale 2.15e+00)
+  moe q8_0 E=64 F=32 slots=10 T=3: reduce+combine ok  max|d|=5.89e-08 (scale 1.00e+00)
+  moe q8_0 E=64 F=32 slots=10 T=3: mid (+shared) ok  max|d|=7.40e-09 (scale 5.01e-02)
+  moe q8_0 E=64 F=32 slots=10 T=3: down (+shared) ok  max|d|=1.02e-09 (scale 7.56e-03)
+  moe q8_0 E=64 F=32 slots=10 T=3: out         ok  max|d|=2.13e-09 (scale 8.73e-03)
+  moe f32 E=64 F=32 slots=10 T=3: reduce+combine ok  max|d|=3.10e-08 (scale 1.00e+00)
+  moe f32 E=64 F=32 slots=10 T=3: mid (+shared) ok  max|d|=7.80e-09 (scale 6.32e-02)
+  moe f32 E=64 F=32 slots=10 T=3: down (+shared) ok  max|d|=7.89e-10 (scale 5.99e-03)
+  moe f32 E=64 F=32 slots=10 T=3: out          ok  max|d|=1.50e-09 (scale 9.18e-03)
+dense mm
+  dense mm type 0 512x2560 T=37                ok  max|d|=7.07e-06 (scale 3.42e+00)
+  dense mm type 1 320x10240 T=33               ok  max|d|=2.00e-05 (scale 8.50e+00)
+  dense mm type 1 10240x320 T=40               ok  max|d|=9.23e-07 (scale 1.36e+00)
+  dense mm type 8 100x2560 T=9                 ok  max|d|=5.10e-06 (scale 2.87e+00)
+  dense mm type 0 32x64 T=70                   ok  max|d|=1.34e-07 (scale 5.05e-01)
+multi gemv
+  multi gemv out0 type 12 rows 64 T=2          ok  max|d|=2.08e-07 (scale 7.63e-01)
+  multi gemv out1 type 30 rows 48 T=2          ok  max|d|=4.43e-07 (scale 2.37e+00)
+  multi gemv out2 type 2 rows 32 T=2           ok  max|d|=2.55e-07 (scale 2.28e+00)
+  multi gemv out3 type 1 rows 16 T=2           ok  max|d|=5.03e-07 (scale 2.00e+00)
+  multi gemv out0 type 8 rows 64 T=3           ok  max|d|=2.58e-08 (scale 4.09e-01)
+  multi gemv out1 type 30 rows 48 T=3          ok  max|d|=3.48e-08 (scale 4.16e-01)
+  multi gemv out2 type 2 rows 32 T=3           ok  max|d|=2.51e-08 (scale 3.15e-01)
+  multi gemv out3 type 1 rows 16 T=3           ok  max|d|=2.36e-08 (scale 2.99e-01)
+mtp
+  mtp stage E=2560 hc=4                        ok  max|d|=2.88e-07 (scale 2.56e+00)
+  mtp combine E=2560 hc=4                      ok  max|d|=0.00e+00 (scale 1.99e+00)
+  mtp stage E=64 hc=4                          ok  max|d|=1.51e-07 (scale 2.59e+00)
+  mtp combine E=64 hc=4                        ok  max|d|=0.00e+00 (scale 1.91e+00)
+  HC_PAIR_EXACT E=2560 rank=320 type=1 floats=5120
+  hc E=2560 rank=320 T=2 f16: xn               ok  max|d|=3.13e-07 (scale 2.60e+00)
+  hc E=2560 rank=320 T=2 f16: lowrank          ok  max|d|=2.24e-06 (scale 8.76e+00)
+  hc E=2560 rank=320 T=2 f16: inject partials  ok  max|d|=2.30e-07 (scale 2.17e+00)
+  hc E=2560 rank=320 T=2 f16: mixed            ok  max|d|=1.50e-07 (scale 1.20e+00)
+  hc E=2560 rank=320 T=2 f16: combine          ok  max|d|=1.67e-07 (scale 2.33e+00)
+  HC_PAIR_EXACT E=2560 rank=320 type=0 floats=5120
+  hc E=2560 rank=320 T=2 f32: xn               ok  max|d|=2.87e-07 (scale 2.57e+00)
+  hc E=2560 rank=320 T=2 f32: lowrank          ok  max|d|=2.66e-06 (scale 1.06e+01)
+  hc E=2560 rank=320 T=2 f32: inject partials  ok  max|d|=1.80e-07 (scale 1.83e+00)
+  hc E=2560 rank=320 T=2 f32: mixed            ok  max|d|=1.65e-07 (scale 1.01e+00)
+  hc E=2560 rank=320 T=2 f32: combine          ok  max|d|=1.49e-07 (scale 2.43e+00)
+  HC_PAIR_EXACT E=72 rank=8 type=0 floats=144
+  hc E=72 rank=8 T=2 f32: xn                   ok  max|d|=3.56e-07 (scale 2.55e+00)
+  hc E=72 rank=8 T=2 f32: lowrank              ok  max|d|=2.12e-07 (scale 9.05e-01)
+  hc E=72 rank=8 T=2 f32: inject partials      ok  max|d|=3.48e-08 (scale 2.56e-01)
+  hc E=72 rank=8 T=2 f32: mixed                ok  max|d|=1.03e-07 (scale 8.39e-01)
+  hc E=72 rank=8 T=2 f32: combine              ok  max|d|=1.14e-07 (scale 1.96e+00)
+all qwen4 kernel tests passed

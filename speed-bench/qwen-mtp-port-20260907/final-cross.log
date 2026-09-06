@@ -1,0 +1,9 @@
+START ds4 base
+START ds4 candidate
+ds4: PASS 3b04e554e2873bffccce139b7a54578d4f20feadedb01f916aba247f61a92c05
+START glm base
+START glm candidate
+glm: PASS daf5f68e7428e1a1b15d796638f14de3b86236fcd367c66d46029fd7da860178
+START ds4-ssd base
+START ds4-ssd candidate
+ds4-ssd: PASS 3b04e554e2873bffccce139b7a54578d4f20feadedb01f916aba247f61a92c05
