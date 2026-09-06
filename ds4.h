@@ -599,7 +599,8 @@ bool ds4_session_prompt_lookup_supported(const ds4_session *s);
 bool ds4_engine_prompt_lookup_supported(const ds4_engine *e);
 void ds4_session_invalidate(ds4_session *s);
 /* Save mutable state and logits at a hot API prompt boundary: GLM-5.3
- * recurrent state, or single-device Metal DeepSeek SWA/compressor state.
+ * recurrent state, or single-device Metal DeepSeek SWA/compressor state,
+ * proposal capture/history and adaptive decode policy.
  * Completed compressed KV is shared, not copied. Unsupported backends return false. */
 bool ds4_session_mark_rewind_point(ds4_session *s);
 bool ds4_session_can_rewind_to(const ds4_session *s, int pos);

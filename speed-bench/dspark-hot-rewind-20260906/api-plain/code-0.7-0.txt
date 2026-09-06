@@ -1,0 +1,9 @@
+Here's a Python function to add two integers:
+
+```python
+def add(a: int, b: int) -> int:
+    """Return the sum of two integers."""
+    return a + b
+```
+
+**Explanation:** The function `add` takes two parameters `a` and `b` (both integers), and returns their sum using the `+` operator. Type hints (`int`) and the return annotation (`-> int`) clarify expected input/output types, though they're optional.

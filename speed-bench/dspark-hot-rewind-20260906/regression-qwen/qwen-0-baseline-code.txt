@@ -1,0 +1,17 @@
+```python
+def add_two_integers(a: int, b: int) -> int:
+    """
+    Adds two integers and returns their sum.
+    
+    Parameters:
+        a (int): The first integer.
+        b (int): The second integer.
+    
+    Returns:
+        int: The sum of a and b.
+    """
+    return a + b
+```
+
+**Explanation:**  
+This function takes two integer arguments `a` and `b`, adds them together using the `+` operator, and returns the result. The type hints (`int`) clarify that both inputs and

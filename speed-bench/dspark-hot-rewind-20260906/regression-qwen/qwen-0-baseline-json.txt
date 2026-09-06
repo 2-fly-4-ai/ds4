@@ -1,0 +1,18 @@
+[
+  {
+    "id": 1,
+    "name": "Wireless Mouse",
+    "quantity": 150,
+    "price": 25.99
+  },
+  {
+    "id": 2,
+    "name": "Mechanical Keyboard",
+    "quantity": 75,
+    "price": 89.99
+  },
+  {
+    "id": 3,
+    "name": "USB-C Cable",
+    "quantity": 300,
+    "price": 1

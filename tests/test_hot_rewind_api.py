@@ -30,6 +30,7 @@ with (out/'server.log').open('wb') as log:
         if os.environ.get('HOT_SSD'): cases = cases[:1]
         for label, prompt in cases:
             temps = [0] if os.environ.get('HOT_SSD') or os.environ.get('HOT_DSPARK') else [0, .7]
+            if os.environ.get('HOT_ALL_TEMPS'): temps = [0, .7]
             for temp in temps:
                 # Make the sampled variant a different prompt to exercise a
                 # fresh prefill, followed by its exact cached repeat.

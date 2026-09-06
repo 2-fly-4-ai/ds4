@@ -57228,6 +57228,19 @@ typedef struct {
     bool light;
 } ds4_spec_frontier;
 
+/* Policy state belongs to the decode frontier, not to a future continuation. */
+typedef struct {
+    uint32_t cycles, accepted, no_draft, skip, backoff, lifetime_accepted;
+    double life_extra_ms, life_saved_ms, extra_ms, saved_ms;
+    bool skipped_cycle, long_accept_seen;
+} ds4_dspark_schedule;
+
+typedef struct {
+    uint32_t cache_start, cache_token_start, cache_len;
+    uint32_t mask, checkpoint_len, batch_mask, batch_start, batch_tokens;
+    bool valid, batch_valid;
+} ds4_dspark_capture_checkpoint;
+
 typedef struct ds4_dspark_spec_stats {
     uint64_t cycles;
     uint64_t first_tokens;
@@ -57326,6 +57339,7 @@ struct ds4_session {
     uint32_t ds4_rewind_comp[DS4_MAX_LAYER], ds4_rewind_index[DS4_MAX_LAYER];
     int ds4_rewind_pos;
     bool ds4_rewind_valid;
+    uint32_t ds4_rewind_pl_skip, ds4_rewind_pl_streak;
     int glm_rewind_pos;
     uint32_t glm_rewind_dense_len;
     bool glm_rewind_valid;
@@ -57356,16 +57370,8 @@ struct ds4_session {
      * target forward ran; the fold cycle verifies it as batch row zero. */
     int dspark_draft_prev_token;
     uint32_t dspark_draft_len;
-    uint32_t dspark_sched_cycles;
-    uint32_t dspark_sched_accepted;
-    uint32_t dspark_sched_no_draft;
-    uint32_t dspark_sched_skip;
-    uint32_t dspark_sched_backoff;
-    uint32_t dspark_sched_lifetime_accepted;
-    double dspark_sched_life_extra_ms;
-    double dspark_sched_life_saved_ms;
-    double dspark_sched_extra_ms;
-    double dspark_sched_saved_ms;
+    ds4_dspark_schedule dspark_schedule, ds4_rewind_schedule;
+    ds4_dspark_capture_checkpoint ds4_rewind_capture;
     double dspark_last_target_eval_ms;
     double dspark_last_propose_ms;
     float dspark_last_confidence0;
@@ -57374,8 +57380,6 @@ struct ds4_session {
     bool dspark_draft_valid;
     bool dspark_draft_folded;
     bool dspark_stochastic_draft;
-    bool dspark_sched_skipped_cycle;
-    bool dspark_sched_long_accept_seen;
     bool dspark_last_confidence0_valid;
     ds4_dspark_spec_stats dspark_stats;
 #endif
@@ -57495,25 +57499,25 @@ static bool ds4_dspark_scheduler_timing_enabled(void) {
 
 static void ds4_session_dspark_scheduler_reset(ds4_session *s) {
     if (!s) return;
-    s->dspark_sched_cycles = 0;
-    s->dspark_sched_accepted = 0;
-    s->dspark_sched_no_draft = 0;
+    s->dspark_schedule.cycles = 0;
+    s->dspark_schedule.accepted = 0;
+    s->dspark_schedule.no_draft = 0;
     /* Window resets keep the pause backoff: only acceptance clears it. */
-    s->dspark_sched_extra_ms = 0.0;
-    s->dspark_sched_saved_ms = 0.0;
+    s->dspark_schedule.extra_ms = 0.0;
+    s->dspark_schedule.saved_ms = 0.0;
 }
 
 static bool ds4_session_dspark_scheduler_should_skip(ds4_session *s) {
     if (!s || !ds4_dspark_scheduler_enabled()) return false;
-    s->dspark_sched_skipped_cycle = false;
-    if (s->dspark_sched_skip == 0) return false;
-    s->dspark_sched_skip--;
-    s->dspark_sched_skipped_cycle = true;
+    s->dspark_schedule.skipped_cycle = false;
+    if (s->dspark_schedule.skip == 0) return false;
+    s->dspark_schedule.skip--;
+    s->dspark_schedule.skipped_cycle = true;
     s->dspark_stats.scheduler_skips++;
     if (getenv("DS4_DSPARK_SPEC_LOG") != NULL) {
         fprintf(stderr,
                 "ds4: DSpark scheduler skip remaining=%u\n",
-                s->dspark_sched_skip);
+                s->dspark_schedule.skip);
     }
     return true;
 }
@@ -57524,34 +57528,34 @@ static void ds4_session_dspark_scheduler_note(
         bool         no_draft,
         double       extra_ms) {
     if (!s || !ds4_dspark_scheduler_enabled()) return;
-    if (s->dspark_sched_skipped_cycle) {
-        s->dspark_sched_skipped_cycle = false;
+    if (s->dspark_schedule.skipped_cycle) {
+        s->dspark_schedule.skipped_cycle = false;
         return;
     }
 
-    s->dspark_sched_cycles++;
-    s->dspark_sched_accepted += accepted_drafts;
+    s->dspark_schedule.cycles++;
+    s->dspark_schedule.accepted += accepted_drafts;
     if (accepted_drafts != 0) {
-        if (s->dspark_sched_lifetime_accepted <=
+        if (s->dspark_schedule.lifetime_accepted <=
             UINT32_MAX - accepted_drafts) {
-            s->dspark_sched_lifetime_accepted += accepted_drafts;
+            s->dspark_schedule.lifetime_accepted += accepted_drafts;
         } else {
-            s->dspark_sched_lifetime_accepted = UINT32_MAX;
+            s->dspark_schedule.lifetime_accepted = UINT32_MAX;
         }
         if (accepted_drafts > 2u) {
-            s->dspark_sched_long_accept_seen = true;
+            s->dspark_schedule.long_accept_seen = true;
         }
     }
-    if (no_draft) s->dspark_sched_no_draft++;
+    if (no_draft) s->dspark_schedule.no_draft++;
     if (extra_ms > 0.0 && isfinite(extra_ms)) {
-        s->dspark_sched_extra_ms += extra_ms;
+        s->dspark_schedule.extra_ms += extra_ms;
     }
     if (accepted_drafts != 0 &&
         s->dspark_last_target_eval_ms > 0.0 &&
         isfinite(s->dspark_last_target_eval_ms)) {
         const double saved_ms =
             s->dspark_last_target_eval_ms * (double)accepted_drafts;
-        s->dspark_sched_saved_ms += saved_ms;
+        s->dspark_schedule.saved_ms += saved_ms;
         if (ds4_dspark_stats_enabled()) {
             s->dspark_stats.saved_ms += saved_ms;
         }
@@ -57566,18 +57570,18 @@ static void ds4_session_dspark_scheduler_note(
         sched_backoff_enabled =
             getenv("DS4_DSPARK_SCHEDULER_BACKOFF") != NULL;
     }
-    if (accepted_drafts > 0) s->dspark_sched_backoff = 0;
+    if (accepted_drafts > 0) s->dspark_schedule.backoff = 0;
 
     const uint32_t no_draft_skip =
         ds4_dspark_scheduler_no_draft_skip_cycles();
     if (no_draft && no_draft_skip != 0) {
         uint32_t skip = no_draft_skip;
-        if (s->dspark_sched_lifetime_accepted != 0 &&
-            !s->dspark_sched_long_accept_seen) {
+        if (s->dspark_schedule.lifetime_accepted != 0 &&
+            !s->dspark_schedule.long_accept_seen) {
             const uint32_t short_accept_skip =
                 ds4_dspark_scheduler_short_accept_no_draft_skip_cycles();
             if (skip < short_accept_skip) skip = short_accept_skip;
-        } else if (s->dspark_sched_lifetime_accepted == 0 &&
+        } else if (s->dspark_schedule.lifetime_accepted == 0 &&
                    s->dspark_last_confidence0_valid &&
                    s->dspark_last_confidence0 <=
                        ds4_dspark_scheduler_cold_low_confidence_threshold()) {
@@ -57586,20 +57590,20 @@ static void ds4_session_dspark_scheduler_note(
             if (skip < cold_low_conf_skip) skip = cold_low_conf_skip;
         }
         if (sched_backoff_enabled) {
-            skip <<= (s->dspark_sched_backoff < 3u
-                          ? s->dspark_sched_backoff : 3u);
-            if (s->dspark_sched_backoff < 8u) s->dspark_sched_backoff++;
+            skip <<= (s->dspark_schedule.backoff < 3u
+                          ? s->dspark_schedule.backoff : 3u);
+            if (s->dspark_schedule.backoff < 8u) s->dspark_schedule.backoff++;
         }
-        if (s->dspark_sched_skip < skip) {
-            s->dspark_sched_skip = skip;
+        if (s->dspark_schedule.skip < skip) {
+            s->dspark_schedule.skip = skip;
         }
         if (getenv("DS4_DSPARK_SPEC_LOG") != NULL) {
             fprintf(stderr,
                     "ds4: DSpark scheduler no-draft pause skip=%u "
                     "accepted_total=%u long_accept=%d confidence0=%s%.3f\n",
-                    s->dspark_sched_skip,
-                    s->dspark_sched_lifetime_accepted,
-                    s->dspark_sched_long_accept_seen ? 1 : 0,
+                    s->dspark_schedule.skip,
+                    s->dspark_schedule.lifetime_accepted,
+                    s->dspark_schedule.long_accept_seen ? 1 : 0,
                     s->dspark_last_confidence0_valid ? "" : "n/a:",
                     s->dspark_last_confidence0);
         }
@@ -57613,75 +57617,75 @@ static void ds4_session_dspark_scheduler_note(
         ds4_dspark_scheduler_max_extra_saved_ratio_milli();
     const bool measured_unprofitable =
         max_extra_saved_ratio_milli != 0 &&
-        s->dspark_sched_accepted != 0 &&
-        s->dspark_sched_saved_ms > 0.0 &&
-        s->dspark_sched_extra_ms * 1000.0 >
-            s->dspark_sched_saved_ms *
+        s->dspark_schedule.accepted != 0 &&
+        s->dspark_schedule.saved_ms > 0.0 &&
+        s->dspark_schedule.extra_ms * 1000.0 >
+            s->dspark_schedule.saved_ms *
             (double)max_extra_saved_ratio_milli;
 
     if (break_even_window != 0 &&
-        s->dspark_sched_cycles >= break_even_window &&
+        s->dspark_schedule.cycles >= break_even_window &&
         measured_unprofitable) {
-        s->dspark_sched_skip = ds4_dspark_scheduler_slow_skip_cycles();
+        s->dspark_schedule.skip = ds4_dspark_scheduler_slow_skip_cycles();
         if (getenv("DS4_DSPARK_SPEC_LOG") != NULL) {
             fprintf(stderr,
                     "ds4: DSpark scheduler break-even pause cycles=%u "
                     "accepted=%u saved=%.3fms extra=%.3fms skip=%u\n",
-                    s->dspark_sched_cycles,
-                    s->dspark_sched_accepted,
-                    s->dspark_sched_saved_ms,
-                    s->dspark_sched_extra_ms,
-                    s->dspark_sched_skip);
+                    s->dspark_schedule.cycles,
+                    s->dspark_schedule.accepted,
+                    s->dspark_schedule.saved_ms,
+                    s->dspark_schedule.extra_ms,
+                    s->dspark_schedule.skip);
         }
         ds4_session_dspark_scheduler_reset(s);
         return;
     }
 
-    if (s->dspark_sched_cycles < window) return;
+    if (s->dspark_schedule.cycles < window) return;
 
     const uint64_t avg_milli =
-        ((uint64_t)s->dspark_sched_accepted * 1000ull) /
-        (uint64_t)s->dspark_sched_cycles;
+        ((uint64_t)s->dspark_schedule.accepted * 1000ull) /
+        (uint64_t)s->dspark_schedule.cycles;
     const uint32_t min_avg_milli =
         ds4_dspark_scheduler_min_avg_milli();
     const bool low_accept = avg_milli < min_avg_milli;
     const bool many_no_draft =
-        s->dspark_sched_no_draft * 2u >= s->dspark_sched_cycles;
+        s->dspark_schedule.no_draft * 2u >= s->dspark_schedule.cycles;
     const uint32_t max_ms_per_accept_milli =
         ds4_dspark_scheduler_max_ms_per_accept_milli();
     const double extra_per_accept_ms =
-        s->dspark_sched_accepted != 0 ?
-        s->dspark_sched_extra_ms / (double)s->dspark_sched_accepted : 0.0;
+        s->dspark_schedule.accepted != 0 ?
+        s->dspark_schedule.extra_ms / (double)s->dspark_schedule.accepted : 0.0;
     const bool slow_accept =
         max_ms_per_accept_milli != 0 &&
-        s->dspark_sched_accepted != 0 &&
+        s->dspark_schedule.accepted != 0 &&
         extra_per_accept_ms * 1000.0 > (double)max_ms_per_accept_milli;
     if (low_accept || many_no_draft || slow_accept || measured_unprofitable) {
-        s->dspark_sched_skip = ds4_dspark_scheduler_skip_cycles();
+        s->dspark_schedule.skip = ds4_dspark_scheduler_skip_cycles();
         if (many_no_draft || slow_accept || measured_unprofitable) {
             const uint32_t slow_skip = ds4_dspark_scheduler_slow_skip_cycles();
-            if (s->dspark_sched_skip < slow_skip) {
-                s->dspark_sched_skip = slow_skip;
+            if (s->dspark_schedule.skip < slow_skip) {
+                s->dspark_schedule.skip = slow_skip;
             }
         }
         if (sched_backoff_enabled) {
-            s->dspark_sched_skip <<= (s->dspark_sched_backoff < 3u
-                                          ? s->dspark_sched_backoff : 3u);
-            if (s->dspark_sched_backoff < 8u) s->dspark_sched_backoff++;
+            s->dspark_schedule.skip <<= (s->dspark_schedule.backoff < 3u
+                                          ? s->dspark_schedule.backoff : 3u);
+            if (s->dspark_schedule.backoff < 8u) s->dspark_schedule.backoff++;
         }
         if (getenv("DS4_DSPARK_SPEC_LOG") != NULL) {
             fprintf(stderr,
                     "ds4: DSpark scheduler pause cycles=%u accepted=%u "
                     "avg=%.3f no_draft=%u extra_per_accept=%.3fms "
                     "saved=%.3fms extra=%.3fms skip=%u\n",
-                    s->dspark_sched_cycles,
-                    s->dspark_sched_accepted,
+                    s->dspark_schedule.cycles,
+                    s->dspark_schedule.accepted,
                     (double)avg_milli / 1000.0,
-                    s->dspark_sched_no_draft,
+                    s->dspark_schedule.no_draft,
                     extra_per_accept_ms,
-                    s->dspark_sched_saved_ms,
-                    s->dspark_sched_extra_ms,
-                    s->dspark_sched_skip);
+                    s->dspark_schedule.saved_ms,
+                    s->dspark_schedule.extra_ms,
+                    s->dspark_schedule.skip);
         }
     }
     ds4_session_dspark_scheduler_reset(s);
@@ -72972,8 +72976,8 @@ static bool ds4_session_prepare_dspark_draft_impl(ds4_session *s,
                  * the engagement bar so low-yield content only verifies
                  * near-certain proposals; one accepted draft resets it. */
                 if (getenv("DS4_DSPARK_SCHEDULER_BACKOFF") != NULL) {
-                    const uint32_t b = s->dspark_sched_backoff < 4u
-                                           ? s->dspark_sched_backoff : 4u;
+                    const uint32_t b = s->dspark_schedule.backoff < 4u
+                                           ? s->dspark_schedule.backoff : 4u;
                     conf0_threshold += 0.05f * (float)b;
                     if (conf0_threshold > 0.95f) conf0_threshold = 0.95f;
                 }
@@ -81344,8 +81348,10 @@ void ds4_session_invalidate(ds4_session *s) {
 #ifndef DS4_NO_GPU
 static bool session_ds4_hot_rewind_supported(const ds4_session *s) {
 #if defined(__APPLE__)
+    /* Legacy MTP owns a separate history not captured by this frontier. */
     return s && s->engine && s->engine->backend == DS4_BACKEND_METAL &&
         !ds4_session_is_glm(s) && !ds4_session_is_qwen4(s) &&
+        s->engine->support_kind != DS4_SUPPORT_MTP_LEGACY &&
         !s->distributed && !s->engine->tp.active && !s->graph.placement &&
         s->graph.raw_cap > 0;
 #else
@@ -81360,6 +81366,14 @@ static bool session_ds4_copy_hot_rewind(ds4_session *s, bool save) {
     const uint32_t rows = session_raw_live_rows(g, pos);
     const uint64_t row_bytes = (uint64_t)DS4_N_HEAD_DIM * sizeof(float);
     uint64_t bytes = (uint64_t)DS4_N_LAYER * rows * row_bytes;
+    /* Proposal features and its ring can be overwritten by verification too.
+     * Restoring target KV alone leaves a different draft history. */
+    ds4_gpu_tensor *draft_tensors[DS4_DSPARK_MAX_STAGES + 3] = {
+        g->dspark_target_hidden, g->dspark_target_hidden_batch, g->dspark_target_hc};
+    for (uint32_t i = 0; i < DS4_DSPARK_MAX_STAGES; i++)
+        draft_tensors[i + 3] = g->dspark_raw_cache[i];
+    for (uint32_t i = 0; i < DS4_DSPARK_MAX_STAGES + 3; i++)
+        bytes += ds4_gpu_tensor_bytes(draft_tensors[i]);
     for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
         bytes += ds4_gpu_tensor_bytes(g->layer_attn_state_kv[il]) +
                  ds4_gpu_tensor_bytes(g->layer_attn_state_score[il]) +
@@ -81388,8 +81402,33 @@ static bool session_ds4_copy_hot_rewind(ds4_session *s, bool save) {
             offset += n;
         }
     }
+    for (uint32_t i = 0; ok && i < DS4_DSPARK_MAX_STAGES + 3; i++) {
+        uint64_t n = ds4_gpu_tensor_bytes(draft_tensors[i]);
+        if (!n) continue;
+        ok = save ? ds4_gpu_tensor_copy(s->ds4_rewind_state, offset, draft_tensors[i], 0, n) != 0 :
+                    ds4_gpu_tensor_copy(draft_tensors[i], 0, s->ds4_rewind_state, offset, n) != 0;
+        offset += n;
+    }
     if (ok) ok = ds4_gpu_end_commands() != 0;
     else (void)ds4_gpu_synchronize();
+    if (ok && save) s->ds4_rewind_capture = (ds4_dspark_capture_checkpoint){
+        g->dspark_cache_start, g->dspark_cache_token_start, g->dspark_cache_len,
+        g->dspark_capture_mask, g->dspark_capture_checkpoint_len,
+        g->dspark_capture_batch_mask, g->dspark_capture_batch_start,
+        g->dspark_capture_batch_tokens, g->dspark_capture_valid, g->dspark_capture_batch_valid};
+    if (ok && !save) {
+        const ds4_dspark_capture_checkpoint *c = &s->ds4_rewind_capture;
+        g->dspark_cache_start = c->cache_start;
+        g->dspark_cache_token_start = c->cache_token_start;
+        g->dspark_cache_len = c->cache_len;
+        g->dspark_capture_mask = c->mask;
+        g->dspark_capture_checkpoint_len = c->checkpoint_len;
+        g->dspark_capture_batch_mask = c->batch_mask;
+        g->dspark_capture_batch_start = c->batch_start;
+        g->dspark_capture_batch_tokens = c->batch_tokens;
+        g->dspark_capture_valid = c->valid;
+        g->dspark_capture_batch_valid = c->batch_valid;
+    }
     if (ok) for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
         if (save) {
             s->ds4_rewind_comp[il] = g->layer_n_comp[il];
@@ -81415,6 +81454,9 @@ bool ds4_session_mark_rewind_point(ds4_session *s) {
         if (!s->ds4_rewind_logits || !session_ds4_copy_hot_rewind(s, true)) return false;
         memcpy(s->ds4_rewind_logits,s->logits,(size_t)DS4_N_VOCAB * sizeof(float));
         s->ds4_rewind_pos = s->checkpoint.len;
+        s->ds4_rewind_schedule = s->dspark_schedule;
+        s->ds4_rewind_pl_skip = s->pl_gate_skip_remaining;
+        s->ds4_rewind_pl_streak = s->pl_adaptive_full_streak;
         s->ds4_rewind_valid = true;
         return true;
     }
@@ -81461,6 +81503,7 @@ bool ds4_session_can_rewind_to(const ds4_session *s, int pos) {
 }
 
 void ds4_session_rewind(ds4_session *s, int pos) {
+    bool restored_hot = false;
     if (ds4_session_tp_leader(s) &&
         !ds4_tp_failed(s->engine->tp.ctx)) {
         (void)ds4_tp_send_rewind(s->engine->tp.ctx, s->tp_session_id, pos);
@@ -81471,6 +81514,10 @@ void ds4_session_rewind(ds4_session *s, int pos) {
     if (session_ds4_hot_rewind_supported(s) && pos < s->checkpoint.len) {
         if (ds4_session_can_rewind_to(s,pos) && session_ds4_copy_hot_rewind(s,false)) {
             memcpy(s->logits,s->ds4_rewind_logits,(size_t)DS4_N_VOCAB * sizeof(float));
+            s->dspark_schedule = s->ds4_rewind_schedule;
+            s->pl_gate_skip_remaining = s->ds4_rewind_pl_skip;
+            s->pl_adaptive_full_streak = s->ds4_rewind_pl_streak;
+            restored_hot = true;
         } else {
             /* Trimming tokens cannot restore compressors or evicted SWA rows.
              * Without a matching frontier, rebuild instead of reusing stale KV. */
@@ -81509,8 +81556,12 @@ void ds4_session_rewind(ds4_session *s, int pos) {
 #endif
     s->checkpoint.len = pos;
     s->mtp_draft_valid = false;
-    ds4_session_dspark_capture_invalidate(s);
+    if (!restored_hot) ds4_session_dspark_capture_invalidate(s);
 #ifndef DS4_NO_GPU
+    else {
+        s->dspark_draft_valid = false;
+        s->dspark_draft_len = 0;
+    }
     s->glm_mtp_have = 0;
     s->glm_mtp_rollback_valid = false;
     s->glm_mtp_min_pos = 0;

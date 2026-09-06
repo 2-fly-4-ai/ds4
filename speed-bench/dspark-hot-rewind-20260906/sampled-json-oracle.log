@@ -1,0 +1,18 @@
+ds4: warming mapped tensor pages: 80.26 GiB
+ds4: warmed tensor pages in 4.797s (checksum=645849147)
+ds4: DSpark support model detected: /Users/brianfarley/Desktop/ds4/gguf/DeepSeek-V4-Flash-Vision-Exp-DSpark-support.gguf (stages=3 block=5 markov_rank=256 tensors=81 missing=0 invalid=0 metadata_errors=0); use --dspark to enable experimental runtime decode
+ds4: DSpark direct verifier-state commits enabled; output may differ from one-token decode due to batched floating-point operation order
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 1.901 ms, residency requested in 373.036 ms, warmup 4.071 ms (mapped 82185.67 MiB from offset 5.09 MiB)
+ds4: Metal mapped mmaped model as 1 overlapping shared buffers
+ds4: Metal model views created in 0.186 ms, residency requested in 644.346 ms, warmup 1.048 ms (mapped 5711.67 MiB from offset 0.01 MiB)
+ds4: Metal mapped mmaped model as 2 overlapping shared buffers
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 0.42 GiB (raw 0.36 + compressed 0.06) + buffers 0.06 GiB + resident model 80.26 GiB = 80.74 GiB planned
+ds4: memory detail: ctx=8192 prefill_cap=4096 raw_kv_rows=4352 compressed_kv_rows=2050 backend=metal
+ds4: DSpark target-hidden capture enabled: layers=40,41,42
+HOT_ROUTE_COUNTS plain=0/0 lookup=0/0 neural=38/128
+HOT_PASS length=23 raw_cap=4352 mark_ms=5.300 restore_ms=2.541 extra_bytes=242411520
+HOT_COMPLETE pass=1

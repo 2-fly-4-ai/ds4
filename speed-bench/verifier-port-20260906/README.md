@@ -58,6 +58,10 @@ checks and final builds use the guarded port. No history mode was enabled.
 
 ### Known baseline issue, kept visible
 
+Follow-up: the later complete hot-frontier repair addresses this on the
+supported DeepSeek Metal path; see `../dspark-hot-rewind-20260906/README.md`.
+The account below describes the baseline when this verifier port was made.
+
 The first smoke run stopped because DeepSeek's cold code response differed
 from its cached repeat **on untouched main**. Raw evidence remains in
 `smoke.jsonl` and `smoke/`.

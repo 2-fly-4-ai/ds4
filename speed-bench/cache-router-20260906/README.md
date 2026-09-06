@@ -1,5 +1,10 @@
 # DeepSeek hot-prompt rewind investigation — 2026-09-06
 
+Historical target-only investigation. The subsequent complete-frontier repair
+and its stronger validation are documented in
+`../dspark-hot-rewind-20260906/README.md`; the unresolved-DSpark disposition
+below describes the earlier candidate, not that follow-up.
+
 Base: main `7322056`. Candidate branch: `experiment/cache-parity-cost-router-20260906`.
 This is a focused local experiment, not an upstream merge. No quant/model files,
 Metal kernels, or production router defaults have been changed.

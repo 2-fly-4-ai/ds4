@@ -1,0 +1,1079 @@
+ds4: DSpark support model detected: /Users/brianfarley/Desktop/ds4/gguf/DeepSeek-V4-Flash-Vision-Exp-DSpark-support.gguf (stages=3 block=5 markov_rank=256 tensors=81 missing=0 invalid=0 metadata_errors=0); use --dspark to enable experimental runtime decode
+ds4: DSpark direct verifier-state commits enabled; output may differ from one-token decode due to batched floating-point operation order
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 2.107 ms, residency requested in 497.994 ms, warmup 3.802 ms (mapped 82185.67 MiB from offset 5.09 MiB)
+ds4: Metal mapped mmaped model as 1 overlapping shared buffers
+ds4: Metal model views created in 0.209 ms, residency requested in 1102.612 ms, warmup 0.818 ms (mapped 5711.67 MiB from offset 0.01 MiB)
+ds4: Metal mapped mmaped model as 2 overlapping shared buffers
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 0.42 GiB (raw 0.36 + compressed 0.06) + buffers 0.06 GiB + resident model 80.26 GiB = 80.74 GiB planned
+ds4: memory detail: ctx=8192 prefill_cap=4096 raw_kv_rows=4352 compressed_kv_rows=2050 backend=metal
+0906 16:48:11 ds4-server: context buffers 495.92 MiB (ctx=8192, backend=metal, prefill_chunk=4096, raw_kv_rows=4352, compressed_kv_rows=2050)
+ds4: DSpark target-hidden capture enabled: layers=40,41,42
+0906 16:48:11 ds4-server: listening on http://127.0.0.1:65307
+0906 16:48:11 ds4-server: chat ctx=0..17:17 prompt start
+0906 16:48:12 ds4-server: chat ctx=0..17:17 prompt done 0.362s
+ds4: DSpark spec enter accepted=1 max=256 valid=1 len=5 pos=18
+ds4: DSpark spec direct-partial drafted=5 committed=4 accepted=5
+ds4: DSpark spec enter accepted=1 max=251 valid=1 len=5 pos=23
+ds4: DSpark spec direct-partial drafted=5 committed=3 accepted=4
+ds4: DSpark spec enter accepted=1 max=247 valid=1 len=5 pos=27
+ds4: DSpark spec direct-partial drafted=5 committed=4 accepted=5
+ds4: DSpark spec enter accepted=1 max=242 valid=1 len=5 pos=32
+ds4: DSpark spec miss first draft=387 base=6036
+ds4: DSpark spec enter accepted=1 max=241 valid=1 len=5 pos=33
+ds4: DSpark spec direct-partial drafted=5 committed=4 accepted=5
+ds4: DSpark spec enter accepted=1 max=236 valid=1 len=2 pos=38
+ds4: DSpark spec direct-full drafted=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=233 valid=1 len=4 pos=41
+ds4: DSpark spec direct-full drafted=4 accepted=5
+ds4: DSpark spec enter accepted=1 max=228 valid=1 len=5 pos=46
+ds4: DSpark spec direct-partial drafted=5 committed=3 accepted=4
+ds4: DSpark spec enter accepted=1 max=224 valid=1 len=4 pos=50
+ds4: DSpark spec direct-full drafted=4 accepted=5
+ds4: DSpark spec enter accepted=1 max=219 valid=1 len=5 pos=55
+ds4: DSpark spec direct-full drafted=5 accepted=6
+ds4: DSpark spec enter accepted=1 max=213 valid=1 len=5 pos=61
+ds4: DSpark spec direct-partial drafted=5 committed=3 accepted=4
+ds4: DSpark spec enter accepted=1 max=209 valid=1 len=5 pos=65
+ds4: DSpark spec miss first draft=29406 base=9132
+ds4: DSpark spec enter accepted=1 max=208 valid=1 len=5 pos=66
+ds4: DSpark spec direct-partial drafted=5 committed=2 accepted=3
+0906 16:48:13 ds4-server: chat ctx=17..67:50 gen=50 decoding chunk=49.63 t/s avg=49.63 t/s 1.007s
+ds4: DSpark spec enter accepted=1 max=205 valid=1 len=4 pos=69
+ds4: DSpark spec direct-partial drafted=4 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=203 valid=1 len=3 pos=71
+ds4: DSpark spec miss first draft=1313 base=688
+ds4: DSpark spec enter accepted=1 max=202 valid=1 len=4 pos=72
+ds4: DSpark spec direct-full drafted=4 accepted=5
+ds4: DSpark spec enter accepted=1 max=197 valid=1 len=5 pos=77
+ds4: DSpark spec direct-partial drafted=5 committed=3 accepted=4
+ds4: DSpark spec enter accepted=1 max=193 valid=1 len=3 pos=81
+ds4: DSpark spec direct-partial drafted=3 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=190 valid=1 len=5 pos=84
+ds4: DSpark spec direct-full drafted=5 accepted=6
+ds4: DSpark spec enter accepted=1 max=184 valid=1 len=5 pos=90
+ds4: DSpark spec miss first draft=28395 base=91371
+ds4: DSpark spec enter accepted=1 max=183 valid=1 len=4 pos=91
+ds4: DSpark spec direct-partial drafted=4 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=180 valid=1 len=5 pos=94
+ds4: DSpark spec direct-partial drafted=5 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=177 valid=1 len=5 pos=97
+ds4: DSpark spec direct-full drafted=5 accepted=6
+ds4: DSpark spec enter accepted=1 max=171 valid=1 len=5 pos=103
+ds4: DSpark spec direct-full drafted=5 accepted=6
+ds4: DSpark spec enter accepted=1 max=165 valid=1 len=5 pos=109
+ds4: DSpark spec direct-partial drafted=5 committed=4 accepted=5
+ds4: DSpark spec enter accepted=1 max=160 valid=1 len=3 pos=114
+ds4: DSpark spec direct-partial drafted=3 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=158 valid=1 len=4 pos=116
+ds4: DSpark spec miss first draft=3608 base=786
+ds4: DSpark spec enter accepted=1 max=157 valid=1 len=5 pos=117
+ds4: DSpark spec direct-partial drafted=5 committed=2 accepted=3
+0906 16:48:14 ds4-server: chat ctx=67..117:50 gen=100 decoding chunk=45.46 t/s avg=47.45 t/s 2.107s
+ds4: DSpark spec enter accepted=1 max=154 valid=1 len=5 pos=120
+ds4: DSpark spec direct-partial drafted=5 committed=4 accepted=5
+ds4: DSpark spec enter accepted=1 max=149 valid=1 len=4 pos=125
+ds4: DSpark spec direct-partial drafted=4 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=146 valid=1 len=3 pos=128
+ds4: DSpark spec direct-partial drafted=3 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=144 valid=1 len=3 pos=130
+ds4: DSpark scheduler pause cycles=8 accepted=14 avg=1.750 no_draft=0 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec miss first draft=270 base=1205
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=143 valid=0 len=0 pos=131
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=142 valid=0 len=0 pos=132
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=141 valid=1 len=5 pos=133
+ds4: DSpark spec direct-partial drafted=5 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=138 valid=1 len=5 pos=136
+ds4: DSpark spec direct-partial drafted=5 committed=3 accepted=4
+ds4: DSpark spec enter accepted=1 max=134 valid=1 len=3 pos=140
+ds4: DSpark spec miss first draft=603 base=1990
+ds4: DSpark spec enter accepted=1 max=133 valid=1 len=3 pos=141
+ds4: DSpark spec direct-partial drafted=3 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=130 valid=1 len=4 pos=144
+ds4: DSpark spec direct-partial drafted=4 committed=3 accepted=4
+ds4: DSpark spec enter accepted=1 max=126 valid=1 len=5 pos=148
+ds4: DSpark spec miss first draft=3608 base=28
+ds4: DSpark spec enter accepted=1 max=125 valid=1 len=5 pos=149
+ds4: DSpark spec direct-partial drafted=5 committed=3 accepted=4
+ds4: DSpark spec enter accepted=1 max=121 valid=1 len=5 pos=153
+ds4: DSpark spec direct-full drafted=5 accepted=6
+ds4: DSpark spec enter accepted=1 max=115 valid=1 len=5 pos=159
+ds4: DSpark spec direct-partial drafted=5 committed=4 accepted=5
+ds4: DSpark spec enter accepted=1 max=110 valid=1 len=3 pos=164
+ds4: DSpark spec direct-partial drafted=3 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=107 valid=1 len=5 pos=167
+ds4: DSpark spec miss first draft=28 base=14629
+0906 16:48:15 ds4-server: chat ctx=117..167:50 gen=150 decoding chunk=46.16 t/s avg=47.01 t/s 3.191s
+ds4: DSpark spec enter accepted=1 max=106 valid=1 len=5 pos=168
+ds4: DSpark spec direct-full drafted=5 accepted=6
+ds4: DSpark spec enter accepted=1 max=100 valid=1 len=5 pos=174
+ds4: DSpark spec direct-full drafted=5 accepted=6
+ds4: DSpark spec enter accepted=1 max=94 valid=1 len=5 pos=180
+ds4: DSpark spec direct-partial drafted=5 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=92 valid=1 len=5 pos=182
+ds4: DSpark spec direct-partial drafted=5 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=89 valid=1 len=5 pos=185
+ds4: DSpark spec direct-partial drafted=5 committed=3 accepted=4
+ds4: DSpark spec enter accepted=1 max=85 valid=1 len=5 pos=189
+ds4: DSpark spec miss first draft=7414 base=106254
+ds4: DSpark spec enter accepted=1 max=84 valid=1 len=2 pos=190
+ds4: DSpark spec miss first draft=565 base=7414
+ds4: DSpark spec enter accepted=1 max=83 valid=1 len=3 pos=191
+ds4: DSpark spec miss first draft=19 base=20
+ds4: DSpark spec enter accepted=1 max=82 valid=1 len=5 pos=192
+ds4: DSpark spec direct-partial drafted=5 committed=4 accepted=5
+ds4: DSpark spec enter accepted=1 max=77 valid=1 len=5 pos=197
+ds4: DSpark spec miss first draft=24800 base=1823
+ds4: DSpark spec enter accepted=1 max=76 valid=1 len=2 pos=198
+ds4: DSpark spec miss first draft=223 base=24800
+ds4: DSpark spec enter accepted=1 max=75 valid=1 len=5 pos=199
+ds4: DSpark spec miss first draft=223 base=28
+ds4: DSpark spec enter accepted=1 max=74 valid=1 len=4 pos=200
+ds4: DSpark scheduler pause cycles=8 accepted=4 avg=0.500 no_draft=0 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec miss first draft=23 base=223
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=73 valid=0 len=0 pos=201
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=72 valid=0 len=0 pos=202
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=71 valid=1 len=3 pos=203
+ds4: DSpark spec miss first draft=20759 base=3098
+ds4: DSpark spec enter accepted=1 max=70 valid=1 len=5 pos=204
+ds4: DSpark spec miss first draft=10 base=106254
+ds4: DSpark spec enter accepted=1 max=69 valid=1 len=4 pos=205
+ds4: DSpark spec miss first draft=14 base=10
+ds4: DSpark spec enter accepted=1 max=68 valid=1 len=5 pos=206
+ds4: DSpark spec miss first draft=553 base=18
+ds4: DSpark spec enter accepted=1 max=67 valid=1 len=5 pos=207
+ds4: DSpark spec direct-partial drafted=5 committed=4 accepted=5
+ds4: DSpark spec enter accepted=1 max=62 valid=1 len=5 pos=212
+ds4: DSpark spec direct-full drafted=5 accepted=6
+0906 16:48:16 ds4-server: chat ctx=167..217:50 gen=200 decoding chunk=46.61 t/s avg=46.91 t/s 4.263s
+ds4: DSpark spec enter accepted=1 max=56 valid=1 len=5 pos=218
+ds4: DSpark spec miss first draft=9854 base=20759
+ds4: DSpark spec enter accepted=1 max=55 valid=1 len=3 pos=219
+ds4: DSpark scheduler pause cycles=8 accepted=9 avg=1.125 no_draft=0 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec miss first draft=666 base=2337
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=54 valid=0 len=0 pos=220
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=53 valid=0 len=0 pos=221
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=52 valid=1 len=5 pos=222
+ds4: DSpark spec miss first draft=4654 base=6569
+ds4: DSpark spec enter accepted=1 max=51 valid=1 len=4 pos=223
+ds4: DSpark spec direct-partial drafted=4 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=48 valid=1 len=3 pos=226
+ds4: DSpark spec miss first draft=1192 base=270
+ds4: DSpark spec enter accepted=1 max=47 valid=1 len=5 pos=227
+ds4: DSpark spec direct-partial drafted=5 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=45 valid=1 len=4 pos=229
+ds4: DSpark spec miss first draft=3012 base=294
+ds4: DSpark spec enter accepted=1 max=44 valid=1 len=3 pos=230
+ds4: DSpark spec miss first draft=1234 base=260
+ds4: DSpark spec enter accepted=1 max=43 valid=1 len=3 pos=231
+ds4: DSpark spec direct-partial drafted=3 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=40 valid=1 len=5 pos=234
+ds4: DSpark scheduler pause cycles=8 accepted=5 avg=0.625 no_draft=0 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec miss first draft=305 base=14
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=39 valid=0 len=0 pos=235
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=38 valid=0 len=0 pos=236
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=37 valid=1 len=5 pos=237
+ds4: DSpark spec direct-partial drafted=5 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=34 valid=1 len=5 pos=240
+ds4: DSpark spec miss first draft=16 base=6809
+ds4: DSpark spec enter accepted=1 max=33 valid=1 len=5 pos=241
+ds4: DSpark spec direct-partial drafted=5 committed=2 accepted=3
+0906 16:48:17 ds4-server: chat ctx=217..242:25 gen=225 decoding chunk=33.95 t/s avg=45.00 t/s 5.000s
+0906 16:48:17 ds4-server: chat ctx=0..17:17 gen=225 finish=stop 5.362s
+0906 16:48:17 ds4-server: live kv cache rewind-hit live=243 prompt=17 common=17 reused=17
+0906 16:48:17 ds4-server: chat ctx=17..17:0 prompt start
+0906 16:48:17 ds4-server: chat ctx=17..17:0 prompt done 0.000s
+ds4: DSpark spec enter accepted=1 max=256 valid=1 len=5 pos=18
+ds4: DSpark spec direct-partial drafted=5 committed=4 accepted=5
+ds4: DSpark spec enter accepted=1 max=251 valid=1 len=5 pos=23
+ds4: DSpark spec direct-partial drafted=5 committed=3 accepted=4
+ds4: DSpark spec enter accepted=1 max=247 valid=1 len=5 pos=27
+ds4: DSpark spec direct-partial drafted=5 committed=4 accepted=5
+ds4: DSpark spec enter accepted=1 max=242 valid=1 len=5 pos=32
+ds4: DSpark spec miss first draft=387 base=6036
+ds4: DSpark spec enter accepted=1 max=241 valid=1 len=5 pos=33
+ds4: DSpark spec direct-partial drafted=5 committed=4 accepted=5
+ds4: DSpark spec enter accepted=1 max=236 valid=1 len=2 pos=38
+ds4: DSpark spec direct-full drafted=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=233 valid=1 len=4 pos=41
+ds4: DSpark spec direct-full drafted=4 accepted=5
+ds4: DSpark spec enter accepted=1 max=228 valid=1 len=5 pos=46
+ds4: DSpark spec direct-partial drafted=5 committed=3 accepted=4
+ds4: DSpark spec enter accepted=1 max=224 valid=1 len=4 pos=50
+ds4: DSpark spec direct-full drafted=4 accepted=5
+ds4: DSpark spec enter accepted=1 max=219 valid=1 len=5 pos=55
+ds4: DSpark spec direct-full drafted=5 accepted=6
+ds4: DSpark spec enter accepted=1 max=213 valid=1 len=5 pos=61
+ds4: DSpark spec direct-partial drafted=5 committed=3 accepted=4
+ds4: DSpark spec enter accepted=1 max=209 valid=1 len=5 pos=65
+ds4: DSpark spec miss first draft=29406 base=9132
+ds4: DSpark spec enter accepted=1 max=208 valid=1 len=5 pos=66
+ds4: DSpark spec direct-partial drafted=5 committed=2 accepted=3
+0906 16:48:18 ds4-server: chat ctx=17..67:50 gen=50 decoding chunk=50.09 t/s avg=50.09 t/s 0.998s
+ds4: DSpark spec enter accepted=1 max=205 valid=1 len=4 pos=69
+ds4: DSpark spec direct-partial drafted=4 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=203 valid=1 len=3 pos=71
+ds4: DSpark spec miss first draft=1313 base=688
+ds4: DSpark spec enter accepted=1 max=202 valid=1 len=4 pos=72
+ds4: DSpark spec direct-full drafted=4 accepted=5
+ds4: DSpark spec enter accepted=1 max=197 valid=1 len=5 pos=77
+ds4: DSpark spec direct-partial drafted=5 committed=3 accepted=4
+ds4: DSpark spec enter accepted=1 max=193 valid=1 len=3 pos=81
+ds4: DSpark spec direct-partial drafted=3 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=190 valid=1 len=5 pos=84
+ds4: DSpark spec direct-full drafted=5 accepted=6
+ds4: DSpark spec enter accepted=1 max=184 valid=1 len=5 pos=90
+ds4: DSpark spec miss first draft=28395 base=91371
+ds4: DSpark spec enter accepted=1 max=183 valid=1 len=4 pos=91
+ds4: DSpark spec direct-partial drafted=4 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=180 valid=1 len=5 pos=94
+ds4: DSpark spec direct-partial drafted=5 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=177 valid=1 len=5 pos=97
+ds4: DSpark spec direct-full drafted=5 accepted=6
+ds4: DSpark spec enter accepted=1 max=171 valid=1 len=5 pos=103
+ds4: DSpark spec direct-full drafted=5 accepted=6
+ds4: DSpark spec enter accepted=1 max=165 valid=1 len=5 pos=109
+ds4: DSpark spec direct-partial drafted=5 committed=4 accepted=5
+ds4: DSpark spec enter accepted=1 max=160 valid=1 len=3 pos=114
+ds4: DSpark spec direct-partial drafted=3 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=158 valid=1 len=4 pos=116
+ds4: DSpark spec miss first draft=3608 base=786
+ds4: DSpark spec enter accepted=1 max=157 valid=1 len=5 pos=117
+ds4: DSpark spec direct-partial drafted=5 committed=2 accepted=3
+0906 16:48:19 ds4-server: chat ctx=67..117:50 gen=100 decoding chunk=44.93 t/s avg=47.37 t/s 2.111s
+ds4: DSpark spec enter accepted=1 max=154 valid=1 len=5 pos=120
+ds4: DSpark spec direct-partial drafted=5 committed=4 accepted=5
+ds4: DSpark spec enter accepted=1 max=149 valid=1 len=4 pos=125
+ds4: DSpark spec direct-partial drafted=4 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=146 valid=1 len=3 pos=128
+ds4: DSpark spec direct-partial drafted=3 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=144 valid=1 len=3 pos=130
+ds4: DSpark spec miss first draft=270 base=1205
+ds4: DSpark spec enter accepted=1 max=143 valid=1 len=4 pos=131
+ds4: DSpark spec direct-full drafted=4 accepted=5
+ds4: DSpark spec enter accepted=1 max=138 valid=1 len=4 pos=136
+ds4: DSpark spec direct-partial drafted=4 committed=3 accepted=4
+ds4: DSpark spec enter accepted=1 max=134 valid=1 len=3 pos=140
+ds4: DSpark spec miss first draft=603 base=1990
+ds4: DSpark spec enter accepted=1 max=133 valid=1 len=3 pos=141
+ds4: DSpark spec direct-partial drafted=3 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=130 valid=1 len=4 pos=144
+ds4: DSpark scheduler pause cycles=8 accepted=15 avg=1.875 no_draft=0 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec direct-partial drafted=4 committed=3 accepted=4
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=126 valid=0 len=0 pos=148
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=125 valid=0 len=0 pos=149
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=124 valid=1 len=5 pos=150
+ds4: DSpark spec direct-partial drafted=5 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=122 valid=1 len=5 pos=152
+ds4: DSpark spec direct-full drafted=5 accepted=6
+ds4: DSpark spec enter accepted=1 max=116 valid=1 len=5 pos=158
+ds4: DSpark spec direct-full drafted=5 accepted=6
+ds4: DSpark spec enter accepted=1 max=110 valid=1 len=3 pos=164
+ds4: DSpark spec direct-partial drafted=3 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=108 valid=1 len=5 pos=166
+ds4: DSpark spec direct-partial drafted=5 committed=1 accepted=2
+0906 16:48:20 ds4-server: chat ctx=117..167:50 gen=150 decoding chunk=45.20 t/s avg=46.62 t/s 3.217s
+ds4: DSpark spec enter accepted=1 max=106 valid=1 len=5 pos=168
+ds4: DSpark spec direct-full drafted=5 accepted=6
+ds4: DSpark spec enter accepted=1 max=100 valid=1 len=5 pos=174
+ds4: DSpark spec direct-full drafted=5 accepted=6
+ds4: DSpark spec enter accepted=1 max=94 valid=1 len=5 pos=180
+ds4: DSpark spec direct-partial drafted=5 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=92 valid=1 len=5 pos=182
+ds4: DSpark spec direct-partial drafted=5 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=89 valid=1 len=5 pos=185
+ds4: DSpark spec direct-partial drafted=5 committed=3 accepted=4
+ds4: DSpark spec enter accepted=1 max=85 valid=1 len=5 pos=189
+ds4: DSpark spec miss first draft=7414 base=106254
+ds4: DSpark spec enter accepted=1 max=84 valid=1 len=2 pos=190
+ds4: DSpark spec miss first draft=565 base=7414
+ds4: DSpark spec enter accepted=1 max=83 valid=1 len=3 pos=191
+ds4: DSpark spec miss first draft=19 base=20
+ds4: DSpark spec enter accepted=1 max=82 valid=1 len=5 pos=192
+ds4: DSpark spec direct-partial drafted=5 committed=4 accepted=5
+ds4: DSpark spec enter accepted=1 max=77 valid=1 len=5 pos=197
+ds4: DSpark spec direct-full drafted=5 accepted=6
+ds4: DSpark spec enter accepted=1 max=71 valid=1 len=4 pos=203
+ds4: DSpark scheduler pause cycles=8 accepted=15 avg=1.875 no_draft=0 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec direct-partial drafted=4 committed=1 accepted=2
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=69 valid=0 len=0 pos=205
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=68 valid=0 len=0 pos=206
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=67 valid=1 len=5 pos=207
+ds4: DSpark spec direct-partial drafted=5 committed=4 accepted=5
+ds4: DSpark spec enter accepted=1 max=62 valid=1 len=5 pos=212
+ds4: DSpark spec direct-full drafted=5 accepted=6
+0906 16:48:21 ds4-server: chat ctx=167..217:50 gen=200 decoding chunk=48.81 t/s avg=47.15 t/s 4.242s
+ds4: DSpark spec enter accepted=1 max=56 valid=1 len=5 pos=218
+ds4: DSpark spec miss first draft=9854 base=20759
+ds4: DSpark spec enter accepted=1 max=55 valid=1 len=3 pos=219
+ds4: DSpark spec direct-full drafted=3 accepted=4
+ds4: DSpark spec enter accepted=1 max=51 valid=1 len=4 pos=223
+ds4: DSpark spec direct-partial drafted=4 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=48 valid=1 len=3 pos=226
+ds4: DSpark spec miss first draft=1192 base=270
+ds4: DSpark spec enter accepted=1 max=47 valid=1 len=5 pos=227
+ds4: DSpark spec direct-partial drafted=5 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=45 valid=1 len=4 pos=229
+ds4: DSpark scheduler pause cycles=8 accepted=15 avg=1.875 no_draft=0 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec miss first draft=3012 base=294
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=44 valid=0 len=0 pos=230
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=43 valid=0 len=0 pos=231
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=42 valid=1 len=4 pos=232
+ds4: DSpark spec direct-partial drafted=4 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=40 valid=1 len=5 pos=234
+ds4: DSpark spec miss first draft=305 base=14
+ds4: DSpark spec enter accepted=1 max=39 valid=1 len=1 pos=235
+ds4: DSpark spec miss first draft=418 base=10767
+ds4: DSpark spec enter accepted=1 max=38 valid=1 len=5 pos=236
+ds4: DSpark spec miss first draft=14 base=14327
+ds4: DSpark spec enter accepted=1 max=37 valid=1 len=5 pos=237
+ds4: DSpark spec direct-partial drafted=5 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=34 valid=1 len=5 pos=240
+ds4: DSpark spec miss first draft=16 base=6809
+ds4: DSpark spec enter accepted=1 max=33 valid=1 len=5 pos=241
+ds4: DSpark spec direct-partial drafted=5 committed=2 accepted=3
+0906 16:48:22 ds4-server: chat ctx=217..242:25 gen=225 decoding chunk=33.40 t/s avg=45.09 t/s 4.990s
+0906 16:48:22 ds4-server: chat ctx=17..17:0 gen=225 finish=stop 4.991s
+0906 16:48:22 ds4-server: live kv cache miss live=243 prompt=19 common=4 vision=match reason=token-mismatch
+0906 16:48:22 ds4-server: chat ctx=0..19:19 prompt start
+0906 16:48:22 ds4-server: chat ctx=0..19:19 prompt done 0.237s
+ds4: DSpark spec enter accepted=1 max=256 valid=1 len=1 pos=20
+ds4: DSpark scheduler pause cycles=8 accepted=5 avg=0.625 no_draft=0 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec miss first draft=115921 base=7010
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=255 valid=0 len=0 pos=21
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=254 valid=0 len=0 pos=22
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=253 valid=1 len=1 pos=23
+ds4: DSpark spec one-token decode accepted=2
+ds4: DSpark spec enter accepted=1 max=251 valid=1 len=2 pos=25
+ds4: DSpark spec direct-partial drafted=2 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=249 valid=1 len=3 pos=27
+ds4: DSpark spec miss first draft=513 base=295
+ds4: DSpark spec enter accepted=1 max=248 valid=1 len=1 pos=28
+ds4: DSpark spec miss first draft=270 base=513
+ds4: DSpark spec enter accepted=1 max=247 valid=1 len=1 pos=29
+ds4: DSpark spec one-token decode accepted=2
+ds4: DSpark spec enter accepted=1 max=245 valid=1 len=1 pos=31
+ds4: DSpark spec miss first draft=8343 base=14
+ds4: DSpark spec enter accepted=1 max=244 valid=1 len=1 pos=32
+ds4: DSpark spec miss first draft=793 base=537
+ds4: DSpark spec enter accepted=1 max=243 valid=1 len=1 pos=33
+ds4: DSpark scheduler pause cycles=8 accepted=4 avg=0.500 no_draft=0 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec one-token decode accepted=2
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=241 valid=0 len=0 pos=35
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=240 valid=0 len=0 pos=36
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=239 valid=1 len=4 pos=37
+ds4: DSpark spec miss first draft=515 base=7020
+ds4: DSpark spec enter accepted=1 max=238 valid=1 len=5 pos=38
+ds4: DSpark spec direct-partial drafted=5 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=236 valid=1 len=5 pos=40
+ds4: DSpark spec direct-partial drafted=5 committed=4 accepted=5
+ds4: DSpark spec enter accepted=1 max=231 valid=1 len=4 pos=45
+ds4: DSpark spec direct-partial drafted=4 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=229 valid=1 len=1 pos=47
+ds4: DSpark spec one-token decode accepted=2
+ds4: DSpark spec enter accepted=1 max=227 valid=1 len=2 pos=49
+ds4: DSpark spec direct-partial drafted=2 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=225 valid=0 len=0 pos=51
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=224 valid=1 len=1 pos=52
+ds4: DSpark scheduler pause cycles=8 accepted=9 avg=1.125 no_draft=1 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec one-token decode accepted=2
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=222 valid=0 len=0 pos=54
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=221 valid=0 len=0 pos=55
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=220 valid=1 len=3 pos=56
+ds4: DSpark spec miss first draft=2336 base=2790
+ds4: DSpark spec enter accepted=1 max=219 valid=1 len=2 pos=57
+ds4: DSpark spec direct-full drafted=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=216 valid=1 len=2 pos=60
+ds4: DSpark spec miss first draft=92356 base=337
+ds4: DSpark spec enter accepted=1 max=215 valid=1 len=1 pos=61
+ds4: DSpark spec miss first draft=564 base=2023
+ds4: DSpark spec enter accepted=1 max=214 valid=1 len=2 pos=62
+ds4: DSpark spec miss first draft=2761 base=1610
+ds4: DSpark spec enter accepted=1 max=213 valid=0 len=0 pos=63
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=212 valid=1 len=3 pos=64
+ds4: DSpark spec direct-partial drafted=3 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=209 valid=1 len=2 pos=67
+ds4: DSpark scheduler pause cycles=8 accepted=5 avg=0.625 no_draft=1 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec direct-partial drafted=2 committed=1 accepted=2
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=207 valid=0 len=0 pos=69
+ds4: DSpark spec skip no-draft
+0906 16:48:23 ds4-server: chat ctx=19..69:50 gen=50 decoding chunk=37.80 t/s avg=37.80 t/s 1.323s
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=206 valid=0 len=0 pos=70
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=205 valid=0 len=0 pos=71
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=204 valid=1 len=2 pos=72
+ds4: DSpark spec miss first draft=9676 base=436
+ds4: DSpark spec enter accepted=1 max=203 valid=1 len=3 pos=73
+ds4: DSpark spec miss first draft=509 base=377
+ds4: DSpark spec enter accepted=1 max=202 valid=1 len=1 pos=74
+ds4: DSpark spec one-token decode accepted=2
+ds4: DSpark spec enter accepted=1 max=200 valid=1 len=1 pos=76
+ds4: DSpark spec miss first draft=305 base=442
+ds4: DSpark spec enter accepted=1 max=199 valid=1 len=1 pos=77
+ds4: DSpark spec one-token decode accepted=2
+ds4: DSpark spec enter accepted=1 max=197 valid=1 len=2 pos=79
+ds4: DSpark spec miss first draft=6824 base=39397
+ds4: DSpark spec enter accepted=1 max=196 valid=1 len=1 pos=80
+ds4: DSpark scheduler pause cycles=8 accepted=3 avg=0.375 no_draft=1 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec one-token decode accepted=2
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=194 valid=0 len=0 pos=82
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=193 valid=0 len=0 pos=83
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=192 valid=0 len=0 pos=84
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=191 valid=1 len=1 pos=85
+ds4: DSpark spec one-token decode accepted=2
+ds4: DSpark spec enter accepted=1 max=189 valid=1 len=2 pos=87
+ds4: DSpark spec direct-partial drafted=2 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=187 valid=1 len=4 pos=89
+ds4: DSpark spec direct-partial drafted=4 committed=3 accepted=4
+ds4: DSpark spec enter accepted=1 max=183 valid=1 len=3 pos=93
+ds4: DSpark spec miss first draft=5171 base=83215
+ds4: DSpark spec enter accepted=1 max=182 valid=1 len=4 pos=94
+ds4: DSpark spec direct-partial drafted=4 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=179 valid=1 len=2 pos=97
+ds4: DSpark spec direct-partial drafted=2 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=177 valid=0 len=0 pos=99
+ds4: DSpark scheduler pause cycles=8 accepted=8 avg=1.000 no_draft=2 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=176 valid=0 len=0 pos=100
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=175 valid=0 len=0 pos=101
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=174 valid=1 len=1 pos=102
+ds4: DSpark spec one-token decode accepted=2
+ds4: DSpark spec enter accepted=1 max=172 valid=1 len=2 pos=104
+ds4: DSpark spec direct-partial drafted=2 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=170 valid=1 len=4 pos=106
+ds4: DSpark spec direct-partial drafted=4 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=167 valid=1 len=2 pos=109
+ds4: DSpark spec direct-partial drafted=2 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=165 valid=1 len=4 pos=111
+ds4: DSpark spec direct-partial drafted=4 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=162 valid=1 len=3 pos=114
+ds4: DSpark spec direct-partial drafted=3 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=159 valid=1 len=2 pos=117
+ds4: DSpark spec miss first draft=295 base=270
+ds4: DSpark spec enter accepted=1 max=158 valid=1 len=3 pos=118
+ds4: DSpark scheduler pause cycles=8 accepted=11 avg=1.375 no_draft=0 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec direct-partial drafted=3 committed=2 accepted=3
+0906 16:48:24 ds4-server: chat ctx=69..119:50 gen=100 decoding chunk=37.38 t/s avg=37.59 t/s 2.660s
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=155 valid=0 len=0 pos=121
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=154 valid=0 len=0 pos=122
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=153 valid=1 len=2 pos=123
+ds4: DSpark spec miss first draft=2924 base=294
+ds4: DSpark spec enter accepted=1 max=152 valid=1 len=3 pos=124
+ds4: DSpark spec miss first draft=61108 base=5657
+ds4: DSpark spec enter accepted=1 max=151 valid=1 len=3 pos=125
+ds4: DSpark spec direct-partial drafted=3 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=149 valid=0 len=0 pos=127
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=148 valid=1 len=3 pos=128
+ds4: DSpark spec direct-full drafted=3 accepted=4
+ds4: DSpark spec enter accepted=1 max=144 valid=1 len=3 pos=132
+ds4: DSpark spec direct-partial drafted=3 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=141 valid=1 len=3 pos=135
+ds4: DSpark spec miss first draft=6273 base=13915
+ds4: DSpark spec enter accepted=1 max=140 valid=1 len=4 pos=136
+ds4: DSpark scheduler pause cycles=8 accepted=8 avg=1.000 no_draft=1 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec direct-partial drafted=4 committed=2 accepted=3
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=137 valid=0 len=0 pos=139
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=136 valid=0 len=0 pos=140
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=135 valid=1 len=3 pos=141
+ds4: DSpark spec direct-full drafted=3 accepted=4
+ds4: DSpark spec enter accepted=1 max=131 valid=1 len=3 pos=145
+ds4: DSpark spec direct-partial drafted=3 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=129 valid=1 len=1 pos=147
+ds4: DSpark spec miss first draft=260 base=16
+ds4: DSpark spec enter accepted=1 max=128 valid=1 len=3 pos=148
+ds4: DSpark spec direct-partial drafted=3 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=126 valid=1 len=2 pos=150
+ds4: DSpark spec miss first draft=515 base=3756
+ds4: DSpark spec enter accepted=1 max=125 valid=1 len=2 pos=151
+ds4: DSpark spec direct-full drafted=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=122 valid=1 len=3 pos=154
+ds4: DSpark spec miss first draft=2562 base=2004
+ds4: DSpark spec enter accepted=1 max=121 valid=1 len=3 pos=155
+ds4: DSpark scheduler pause cycles=8 accepted=8 avg=1.000 no_draft=0 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec direct-partial drafted=3 committed=1 accepted=2
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=119 valid=0 len=0 pos=157
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=118 valid=0 len=0 pos=158
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=117 valid=1 len=2 pos=159
+ds4: DSpark spec miss first draft=37647 base=57782
+ds4: DSpark spec enter accepted=1 max=116 valid=0 len=0 pos=160
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=115 valid=1 len=4 pos=161
+ds4: DSpark spec direct-partial drafted=4 committed=3 accepted=4
+ds4: DSpark spec enter accepted=1 max=111 valid=1 len=3 pos=165
+ds4: DSpark spec direct-partial drafted=3 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=109 valid=1 len=5 pos=167
+ds4: DSpark spec direct-partial drafted=5 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=107 valid=1 len=3 pos=169
+ds4: DSpark spec direct-partial drafted=3 committed=2 accepted=3
+0906 16:48:26 ds4-server: chat ctx=119..169:50 gen=150 decoding chunk=36.61 t/s avg=37.26 t/s 4.026s
+ds4: DSpark spec enter accepted=1 max=104 valid=1 len=2 pos=172
+ds4: DSpark spec miss first draft=16 base=260
+ds4: DSpark spec enter accepted=1 max=103 valid=1 len=2 pos=173
+ds4: DSpark scheduler pause cycles=8 accepted=9 avg=1.125 no_draft=1 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec direct-full drafted=2 accepted=3
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=100 valid=0 len=0 pos=176
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=99 valid=0 len=0 pos=177
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=98 valid=1 len=3 pos=178
+ds4: DSpark spec direct-partial drafted=3 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=96 valid=1 len=1 pos=180
+ds4: DSpark spec one-token decode accepted=2
+ds4: DSpark spec enter accepted=1 max=94 valid=1 len=3 pos=182
+ds4: DSpark spec direct-partial drafted=3 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=91 valid=1 len=5 pos=185
+ds4: DSpark spec miss first draft=39 base=40371
+ds4: DSpark spec enter accepted=1 max=90 valid=1 len=2 pos=186
+ds4: DSpark spec direct-partial drafted=2 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=88 valid=1 len=1 pos=188
+ds4: DSpark spec one-token decode accepted=2
+ds4: DSpark spec enter accepted=1 max=86 valid=1 len=3 pos=190
+ds4: DSpark spec miss first draft=3575 base=43
+ds4: DSpark spec enter accepted=1 max=85 valid=1 len=1 pos=191
+ds4: DSpark scheduler pause cycles=8 accepted=6 avg=0.750 no_draft=0 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec miss first draft=1030 base=1153
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=84 valid=0 len=0 pos=192
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=83 valid=0 len=0 pos=193
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=82 valid=1 len=1 pos=194
+ds4: DSpark spec one-token decode accepted=2
+ds4: DSpark spec enter accepted=1 max=80 valid=1 len=4 pos=196
+ds4: DSpark spec direct-partial drafted=4 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=78 valid=1 len=5 pos=198
+ds4: DSpark spec direct-partial drafted=5 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=75 valid=1 len=5 pos=201
+ds4: DSpark spec direct-partial drafted=5 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=73 valid=1 len=2 pos=203
+ds4: DSpark spec miss first draft=16 base=463
+ds4: DSpark spec enter accepted=1 max=72 valid=1 len=4 pos=204
+ds4: DSpark spec direct-partial drafted=4 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=70 valid=1 len=2 pos=206
+ds4: DSpark spec direct-full drafted=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=67 valid=1 len=4 pos=209
+ds4: DSpark scheduler pause cycles=8 accepted=8 avg=1.000 no_draft=0 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec miss first draft=943 base=995
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=66 valid=0 len=0 pos=210
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=65 valid=0 len=0 pos=211
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=64 valid=1 len=1 pos=212
+ds4: DSpark spec miss first draft=4985 base=8678
+ds4: DSpark spec enter accepted=1 max=63 valid=1 len=3 pos=213
+ds4: DSpark spec miss first draft=418 base=260
+ds4: DSpark spec enter accepted=1 max=62 valid=1 len=4 pos=214
+ds4: DSpark spec direct-partial drafted=4 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=59 valid=1 len=2 pos=217
+ds4: DSpark spec miss first draft=1030 base=442
+ds4: DSpark spec enter accepted=1 max=58 valid=1 len=2 pos=218
+ds4: DSpark spec direct-full drafted=2 accepted=3
+0906 16:48:27 ds4-server: chat ctx=169..219:50 gen=200 decoding chunk=36.70 t/s avg=37.12 t/s 5.388s
+ds4: DSpark spec enter accepted=1 max=55 valid=1 len=4 pos=221
+ds4: DSpark spec direct-full drafted=4 accepted=5
+ds4: DSpark spec enter accepted=1 max=50 valid=1 len=3 pos=226
+ds4: DSpark spec direct-full drafted=3 accepted=4
+ds4: DSpark spec enter accepted=1 max=46 valid=1 len=3 pos=230
+ds4: DSpark scheduler pause cycles=8 accepted=13 avg=1.625 no_draft=0 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec direct-partial drafted=3 committed=2 accepted=3
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=43 valid=0 len=0 pos=233
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=42 valid=0 len=0 pos=234
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=41 valid=1 len=4 pos=235
+ds4: DSpark spec direct-partial drafted=4 committed=3 accepted=4
+ds4: DSpark spec enter accepted=1 max=37 valid=1 len=3 pos=239
+ds4: DSpark spec direct-partial drafted=3 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=34 valid=1 len=1 pos=242
+ds4: DSpark spec one-token decode accepted=2
+ds4: DSpark spec enter accepted=1 max=32 valid=1 len=2 pos=244
+ds4: DSpark spec direct-full drafted=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=29 valid=1 len=3 pos=247
+ds4: DSpark spec direct-partial drafted=3 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=27 valid=1 len=3 pos=249
+ds4: DSpark spec direct-partial drafted=3 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=25 valid=1 len=3 pos=251
+ds4: DSpark spec miss first draft=304 base=440
+ds4: DSpark spec enter accepted=1 max=24 valid=1 len=3 pos=252
+ds4: DSpark scheduler pause cycles=8 accepted=13 avg=1.625 no_draft=0 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec direct-full drafted=3 accepted=4
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=20 valid=0 len=0 pos=256
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=19 valid=0 len=0 pos=257
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=18 valid=1 len=3 pos=258
+ds4: DSpark spec direct-partial drafted=3 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=15 valid=1 len=3 pos=261
+ds4: DSpark spec direct-partial drafted=3 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=12 valid=1 len=3 pos=264
+ds4: DSpark spec miss first draft=98979 base=270
+ds4: DSpark spec enter accepted=1 max=11 valid=1 len=3 pos=265
+ds4: DSpark spec direct-partial drafted=3 committed=2 accepted=3
+ds4: DSpark scheduler tail skip max=8 min=10
+ds4: DSpark scheduler tail skip max=7 min=10
+0906 16:48:28 ds4-server: chat ctx=219..269:50 gen=250 decoding chunk=44.21 t/s avg=38.35 t/s 6.519s
+ds4: DSpark scheduler tail skip max=6 min=10
+ds4: DSpark scheduler tail skip max=5 min=10
+ds4: DSpark scheduler tail skip max=4 min=10
+ds4: DSpark scheduler tail skip max=3 min=10
+ds4: DSpark scheduler tail skip max=2 min=10
+0906 16:48:28 ds4-server: chat ctx=269..275:6 gen=256 decoding chunk=48.30 t/s avg=38.53 t/s 6.644s
+0906 16:48:28 ds4-server: chat ctx=0..19:19 gen=256 finish=length 6.881s
+0906 16:48:28 ds4-server: live kv cache rewind-hit live=275 prompt=19 common=19 reused=19
+0906 16:48:28 ds4-server: chat ctx=19..19:0 prompt start
+0906 16:48:28 ds4-server: chat ctx=19..19:0 prompt done 0.000s
+ds4: DSpark spec enter accepted=1 max=256 valid=0 len=0 pos=20
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=255 valid=1 len=3 pos=21
+ds4: DSpark spec miss first draft=284 base=13721
+ds4: DSpark spec enter accepted=1 max=254 valid=1 len=2 pos=22
+ds4: DSpark spec direct-partial drafted=2 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=252 valid=0 len=0 pos=24
+ds4: DSpark scheduler pause cycles=8 accepted=7 avg=0.875 no_draft=2 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=251 valid=0 len=0 pos=25
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=250 valid=0 len=0 pos=26
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=249 valid=1 len=3 pos=27
+ds4: DSpark spec miss first draft=513 base=295
+ds4: DSpark spec enter accepted=1 max=248 valid=1 len=1 pos=28
+ds4: DSpark spec miss first draft=270 base=513
+ds4: DSpark spec enter accepted=1 max=247 valid=1 len=1 pos=29
+ds4: DSpark spec one-token decode accepted=2
+ds4: DSpark spec enter accepted=1 max=245 valid=1 len=1 pos=31
+ds4: DSpark spec miss first draft=8343 base=14
+ds4: DSpark spec enter accepted=1 max=244 valid=1 len=1 pos=32
+ds4: DSpark spec miss first draft=793 base=537
+ds4: DSpark spec enter accepted=1 max=243 valid=1 len=1 pos=33
+ds4: DSpark spec one-token decode accepted=2
+ds4: DSpark spec enter accepted=1 max=241 valid=1 len=2 pos=35
+ds4: DSpark spec miss first draft=14 base=16
+ds4: DSpark spec enter accepted=1 max=240 valid=1 len=2 pos=36
+ds4: DSpark scheduler pause cycles=8 accepted=2 avg=0.250 no_draft=0 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec miss first draft=983 base=84689
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=239 valid=0 len=0 pos=37
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=238 valid=0 len=0 pos=38
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=237 valid=1 len=5 pos=39
+ds4: DSpark spec miss first draft=80893 base=115921
+ds4: DSpark spec enter accepted=1 max=236 valid=1 len=2 pos=40
+ds4: DSpark spec miss first draft=14 base=80893
+ds4: DSpark spec enter accepted=1 max=235 valid=1 len=2 pos=41
+ds4: DSpark spec direct-full drafted=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=232 valid=1 len=3 pos=44
+ds4: DSpark spec miss first draft=11779 base=32432
+ds4: DSpark spec enter accepted=1 max=231 valid=1 len=1 pos=45
+ds4: DSpark spec miss first draft=260 base=270
+ds4: DSpark spec enter accepted=1 max=230 valid=1 len=1 pos=46
+ds4: DSpark spec one-token decode accepted=2
+ds4: DSpark spec enter accepted=1 max=228 valid=1 len=4 pos=48
+ds4: DSpark spec direct-partial drafted=4 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=225 valid=1 len=3 pos=51
+ds4: DSpark scheduler pause cycles=8 accepted=6 avg=0.750 no_draft=0 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec direct-partial drafted=3 committed=1 accepted=2
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=223 valid=0 len=0 pos=53
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=222 valid=0 len=0 pos=54
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=221 valid=0 len=0 pos=55
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=220 valid=1 len=2 pos=56
+ds4: DSpark spec miss first draft=7536 base=39892
+ds4: DSpark spec enter accepted=1 max=219 valid=1 len=4 pos=57
+ds4: DSpark spec miss first draft=16 base=305
+ds4: DSpark spec enter accepted=1 max=218 valid=0 len=0 pos=58
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=217 valid=1 len=2 pos=59
+ds4: DSpark spec miss first draft=16 base=6103
+ds4: DSpark spec enter accepted=1 max=216 valid=1 len=5 pos=60
+ds4: DSpark spec direct-partial drafted=5 committed=4 accepted=5
+ds4: DSpark spec enter accepted=1 max=211 valid=1 len=3 pos=65
+ds4: DSpark spec direct-partial drafted=3 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=209 valid=1 len=3 pos=67
+ds4: DSpark scheduler pause cycles=8 accepted=5 avg=0.625 no_draft=2 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec miss first draft=284 base=4576
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=208 valid=0 len=0 pos=68
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=207 valid=0 len=0 pos=69
+ds4: DSpark spec skip no-draft
+0906 16:48:30 ds4-server: chat ctx=19..69:50 gen=50 decoding chunk=39.14 t/s avg=39.14 t/s 1.277s
+ds4: DSpark spec enter accepted=1 max=206 valid=1 len=1 pos=70
+ds4: DSpark spec one-token decode accepted=2
+ds4: DSpark spec enter accepted=1 max=204 valid=1 len=4 pos=72
+ds4: DSpark spec direct-partial drafted=4 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=201 valid=1 len=3 pos=75
+ds4: DSpark spec direct-partial drafted=3 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=198 valid=1 len=3 pos=78
+ds4: DSpark spec miss first draft=288 base=396
+ds4: DSpark spec enter accepted=1 max=197 valid=1 len=1 pos=79
+ds4: DSpark spec miss first draft=515 base=6273
+ds4: DSpark spec enter accepted=1 max=196 valid=1 len=2 pos=80
+ds4: DSpark spec miss first draft=1277 base=16183
+ds4: DSpark spec enter accepted=1 max=195 valid=1 len=5 pos=81
+ds4: DSpark spec miss first draft=1277 base=12250
+ds4: DSpark spec enter accepted=1 max=194 valid=1 len=2 pos=82
+ds4: DSpark scheduler pause cycles=8 accepted=6 avg=0.750 no_draft=0 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec direct-partial drafted=2 committed=1 accepted=2
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=192 valid=0 len=0 pos=84
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=191 valid=0 len=0 pos=85
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=190 valid=1 len=2 pos=86
+ds4: DSpark spec direct-partial drafted=2 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=188 valid=1 len=4 pos=88
+ds4: DSpark spec direct-partial drafted=4 committed=3 accepted=4
+ds4: DSpark spec enter accepted=1 max=184 valid=0 len=0 pos=92
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=183 valid=1 len=1 pos=93
+ds4: DSpark spec miss first draft=284 base=4576
+ds4: DSpark spec enter accepted=1 max=182 valid=1 len=4 pos=94
+ds4: DSpark spec direct-partial drafted=4 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=179 valid=1 len=1 pos=97
+ds4: DSpark spec miss first draft=270 base=19152
+ds4: DSpark spec enter accepted=1 max=178 valid=1 len=3 pos=98
+ds4: DSpark spec direct-full drafted=3 accepted=4
+ds4: DSpark spec enter accepted=1 max=174 valid=1 len=2 pos=102
+ds4: DSpark scheduler pause cycles=8 accepted=10 avg=1.250 no_draft=1 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec direct-partial drafted=2 committed=1 accepted=2
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=172 valid=0 len=0 pos=104
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=171 valid=0 len=0 pos=105
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=170 valid=1 len=2 pos=106
+ds4: DSpark spec direct-full drafted=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=167 valid=1 len=4 pos=109
+ds4: DSpark spec direct-partial drafted=4 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=165 valid=1 len=2 pos=111
+ds4: DSpark spec miss first draft=1337 base=14
+ds4: DSpark spec enter accepted=1 max=164 valid=1 len=2 pos=112
+ds4: DSpark spec miss first draft=15965 base=126010
+ds4: DSpark spec enter accepted=1 max=163 valid=1 len=2 pos=113
+ds4: DSpark spec miss first draft=16 base=1337
+ds4: DSpark spec enter accepted=1 max=162 valid=1 len=3 pos=114
+ds4: DSpark spec direct-partial drafted=3 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=160 valid=1 len=2 pos=116
+ds4: DSpark spec miss first draft=12836 base=4002
+ds4: DSpark spec enter accepted=1 max=159 valid=1 len=4 pos=117
+ds4: DSpark scheduler pause cycles=8 accepted=6 avg=0.750 no_draft=0 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec direct-partial drafted=4 committed=2 accepted=3
+0906 16:48:31 ds4-server: chat ctx=69..119:50 gen=100 decoding chunk=38.16 t/s avg=38.65 t/s 2.588s
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=156 valid=0 len=0 pos=120
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=155 valid=0 len=0 pos=121
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=154 valid=1 len=5 pos=122
+ds4: DSpark spec direct-partial drafted=5 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=151 valid=1 len=3 pos=125
+ds4: DSpark spec direct-partial drafted=3 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=149 valid=1 len=2 pos=127
+ds4: DSpark spec miss first draft=1030 base=1153
+ds4: DSpark spec enter accepted=1 max=148 valid=1 len=2 pos=128
+ds4: DSpark spec direct-partial drafted=2 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=146 valid=1 len=2 pos=130
+ds4: DSpark spec direct-full drafted=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=143 valid=1 len=5 pos=133
+ds4: DSpark spec miss first draft=16 base=377
+ds4: DSpark spec enter accepted=1 max=142 valid=1 len=3 pos=134
+ds4: DSpark spec direct-partial drafted=3 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=139 valid=1 len=2 pos=137
+ds4: DSpark scheduler pause cycles=8 accepted=8 avg=1.000 no_draft=0 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec miss first draft=4571 base=442
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=138 valid=0 len=0 pos=138
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=137 valid=0 len=0 pos=139
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=136 valid=1 len=4 pos=140
+ds4: DSpark spec miss first draft=377 base=436
+ds4: DSpark spec enter accepted=1 max=135 valid=1 len=3 pos=141
+ds4: DSpark spec direct-partial drafted=3 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=132 valid=1 len=2 pos=144
+ds4: DSpark spec miss first draft=11992 base=342
+ds4: DSpark spec enter accepted=1 max=131 valid=1 len=3 pos=145
+ds4: DSpark spec miss first draft=4571 base=442
+ds4: DSpark spec enter accepted=1 max=130 valid=1 len=3 pos=146
+ds4: DSpark spec direct-partial drafted=3 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=127 valid=1 len=5 pos=149
+ds4: DSpark spec direct-partial drafted=5 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=125 valid=1 len=2 pos=151
+ds4: DSpark spec miss first draft=1762 base=442
+ds4: DSpark spec enter accepted=1 max=124 valid=1 len=3 pos=152
+ds4: DSpark scheduler pause cycles=8 accepted=6 avg=0.750 no_draft=0 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec direct-partial drafted=3 committed=1 accepted=2
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=122 valid=0 len=0 pos=154
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=121 valid=0 len=0 pos=155
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=120 valid=1 len=3 pos=156
+ds4: DSpark spec direct-partial drafted=3 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=118 valid=1 len=5 pos=158
+ds4: DSpark spec direct-partial drafted=5 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=116 valid=1 len=3 pos=160
+ds4: DSpark spec miss first draft=798 base=304
+ds4: DSpark spec enter accepted=1 max=115 valid=1 len=3 pos=161
+ds4: DSpark spec direct-partial drafted=3 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=113 valid=1 len=5 pos=163
+ds4: DSpark spec direct-partial drafted=5 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=111 valid=1 len=4 pos=165
+ds4: DSpark spec miss first draft=67 base=28
+ds4: DSpark spec enter accepted=1 max=110 valid=1 len=2 pos=166
+ds4: DSpark spec miss first draft=2491 base=929
+ds4: DSpark spec enter accepted=1 max=109 valid=1 len=2 pos=167
+ds4: DSpark scheduler pause cycles=8 accepted=4 avg=0.500 no_draft=0 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec miss first draft=16 base=7167
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=108 valid=0 len=0 pos=168
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=107 valid=0 len=0 pos=169
+ds4: DSpark spec skip no-draft
+0906 16:48:32 ds4-server: chat ctx=119..169:50 gen=150 decoding chunk=33.86 t/s avg=36.91 t/s 4.064s
+ds4: DSpark spec enter accepted=1 max=106 valid=0 len=0 pos=170
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=105 valid=1 len=2 pos=171
+ds4: DSpark spec miss first draft=14 base=295
+ds4: DSpark spec enter accepted=1 max=104 valid=1 len=2 pos=172
+ds4: DSpark spec direct-full drafted=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=101 valid=1 len=2 pos=175
+ds4: DSpark spec miss first draft=344 base=759
+ds4: DSpark spec enter accepted=1 max=100 valid=1 len=3 pos=176
+ds4: DSpark spec miss first draft=29102 base=61013
+ds4: DSpark spec enter accepted=1 max=99 valid=1 len=2 pos=177
+ds4: DSpark spec direct-partial drafted=2 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=97 valid=1 len=4 pos=179
+ds4: DSpark spec miss first draft=1153 base=442
+ds4: DSpark spec enter accepted=1 max=96 valid=1 len=4 pos=180
+ds4: DSpark scheduler pause cycles=8 accepted=3 avg=0.375 no_draft=1 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec miss first draft=86 base=862
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=95 valid=0 len=0 pos=181
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=94 valid=0 len=0 pos=182
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=93 valid=1 len=5 pos=183
+ds4: DSpark spec miss first draft=270 base=295
+ds4: DSpark spec enter accepted=1 max=92 valid=1 len=5 pos=184
+ds4: DSpark spec direct-full drafted=5 accepted=6
+ds4: DSpark spec enter accepted=1 max=86 valid=1 len=4 pos=190
+ds4: DSpark spec direct-partial drafted=4 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=83 valid=1 len=3 pos=193
+ds4: DSpark spec direct-partial drafted=3 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=81 valid=1 len=2 pos=195
+ds4: DSpark spec direct-partial drafted=2 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=79 valid=1 len=2 pos=197
+ds4: DSpark spec direct-full drafted=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=76 valid=1 len=3 pos=200
+ds4: DSpark spec miss first draft=16 base=440
+ds4: DSpark spec enter accepted=1 max=75 valid=0 len=0 pos=201
+ds4: DSpark scheduler pause cycles=8 accepted=11 avg=1.375 no_draft=1 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=74 valid=0 len=0 pos=202
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=73 valid=0 len=0 pos=203
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=72 valid=1 len=3 pos=204
+ds4: DSpark spec miss first draft=5922 base=442
+ds4: DSpark spec enter accepted=1 max=71 valid=1 len=2 pos=205
+ds4: DSpark spec direct-full drafted=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=68 valid=1 len=3 pos=208
+ds4: DSpark spec direct-full drafted=3 accepted=4
+ds4: DSpark spec enter accepted=1 max=64 valid=1 len=1 pos=212
+ds4: DSpark spec miss first draft=671 base=2677
+ds4: DSpark spec enter accepted=1 max=63 valid=0 len=0 pos=213
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=62 valid=1 len=2 pos=214
+ds4: DSpark spec miss first draft=12 base=3122
+ds4: DSpark spec enter accepted=1 max=61 valid=0 len=0 pos=215
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=60 valid=1 len=4 pos=216
+ds4: DSpark scheduler pause cycles=8 accepted=8 avg=1.000 no_draft=2 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec direct-partial drafted=4 committed=3 accepted=4
+0906 16:48:34 ds4-server: chat ctx=169..219:50 gen=200 decoding chunk=42.61 t/s avg=38.18 t/s 5.238s
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=56 valid=0 len=0 pos=220
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=55 valid=0 len=0 pos=221
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=54 valid=1 len=3 pos=222
+ds4: DSpark spec direct-partial drafted=3 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=51 valid=1 len=5 pos=225
+ds4: DSpark spec miss first draft=1664 base=442
+ds4: DSpark spec enter accepted=1 max=50 valid=1 len=5 pos=226
+ds4: DSpark spec miss first draft=266 base=86
+ds4: DSpark spec enter accepted=1 max=49 valid=1 len=5 pos=227
+ds4: DSpark spec direct-partial drafted=5 committed=2 accepted=3
+ds4: DSpark spec enter accepted=1 max=46 valid=1 len=2 pos=230
+ds4: DSpark spec direct-partial drafted=2 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=44 valid=1 len=2 pos=232
+ds4: DSpark spec miss first draft=1153 base=442
+ds4: DSpark spec enter accepted=1 max=43 valid=1 len=4 pos=233
+ds4: DSpark spec miss first draft=85 base=79
+ds4: DSpark spec enter accepted=1 max=42 valid=1 len=4 pos=234
+ds4: DSpark scheduler pause cycles=8 accepted=5 avg=0.625 no_draft=0 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec miss first draft=19054 base=832
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=41 valid=0 len=0 pos=235
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=40 valid=0 len=0 pos=236
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=39 valid=1 len=2 pos=237
+ds4: DSpark spec direct-partial drafted=2 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=37 valid=0 len=0 pos=239
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=36 valid=1 len=2 pos=240
+ds4: DSpark spec direct-partial drafted=2 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=34 valid=1 len=3 pos=242
+ds4: DSpark spec direct-full drafted=3 accepted=4
+ds4: DSpark spec enter accepted=1 max=30 valid=1 len=4 pos=246
+ds4: DSpark spec miss first draft=39 base=3158
+ds4: DSpark spec enter accepted=1 max=29 valid=1 len=2 pos=247
+ds4: DSpark spec direct-partial drafted=2 committed=1 accepted=2
+ds4: DSpark spec enter accepted=1 max=27 valid=1 len=3 pos=249
+ds4: DSpark spec miss first draft=13796 base=2038
+ds4: DSpark spec enter accepted=1 max=26 valid=1 len=3 pos=250
+ds4: DSpark scheduler pause cycles=8 accepted=9 avg=1.125 no_draft=1 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec direct-full drafted=3 accepted=4
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=22 valid=0 len=0 pos=254
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=21 valid=0 len=0 pos=255
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=20 valid=1 len=3 pos=256
+ds4: DSpark spec miss first draft=16 base=14
+ds4: DSpark spec enter accepted=1 max=19 valid=1 len=1 pos=257
+ds4: DSpark spec one-token decode accepted=2
+ds4: DSpark spec enter accepted=1 max=17 valid=1 len=3 pos=259
+ds4: DSpark spec miss first draft=38112 base=784
+ds4: DSpark spec enter accepted=1 max=16 valid=1 len=3 pos=260
+ds4: DSpark spec miss first draft=16 base=1981
+ds4: DSpark spec enter accepted=1 max=15 valid=1 len=2 pos=261
+ds4: DSpark spec miss first draft=16 base=538
+ds4: DSpark spec enter accepted=1 max=14 valid=1 len=3 pos=262
+ds4: DSpark spec miss first draft=260 base=1093
+ds4: DSpark spec enter accepted=1 max=13 valid=0 len=0 pos=263
+ds4: DSpark spec skip no-draft
+ds4: DSpark spec enter accepted=1 max=12 valid=1 len=3 pos=264
+ds4: DSpark scheduler pause cycles=8 accepted=1 avg=0.125 no_draft=1 extra_per_accept=0.000ms saved=0.000ms extra=0.000ms skip=2
+ds4: DSpark spec miss first draft=104614 base=119689
+ds4: DSpark scheduler skip remaining=1
+ds4: DSpark spec enter accepted=1 max=11 valid=0 len=0 pos=265
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler skip remaining=0
+ds4: DSpark spec enter accepted=1 max=10 valid=0 len=0 pos=266
+ds4: DSpark spec skip no-draft
+ds4: DSpark scheduler tail skip max=9 min=10
+ds4: DSpark scheduler tail skip max=8 min=10
+ds4: DSpark scheduler tail skip max=7 min=10
+0906 16:48:35 ds4-server: chat ctx=219..269:50 gen=250 decoding chunk=39.79 t/s avg=38.49 t/s 6.494s
+ds4: DSpark scheduler tail skip max=6 min=10
+ds4: DSpark scheduler tail skip max=5 min=10
+ds4: DSpark scheduler tail skip max=4 min=10
+ds4: DSpark scheduler tail skip max=3 min=10
+ds4: DSpark scheduler tail skip max=2 min=10
+0906 16:48:35 ds4-server: chat ctx=269..275:6 gen=256 decoding chunk=48.41 t/s avg=38.68 t/s 6.618s
+0906 16:48:35 ds4-server: chat ctx=19..19:0 gen=256 finish=length 6.619s
+0906 16:48:35 ds4-server: shutdown requested, draining requests

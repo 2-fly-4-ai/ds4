@@ -1,0 +1,205 @@
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 2.542 ms, residency requested in 379.624 ms, warmup 3.524 ms (mapped 82185.67 MiB from offset 5.09 MiB)
+ds4: Metal mapped mmaped model as 1 overlapping shared buffers
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 0.42 GiB (raw 0.36 + compressed 0.06) + buffers 0.06 GiB + resident model 80.26 GiB = 80.74 GiB planned
+ds4: memory detail: ctx=8192 prefill_cap=4096 raw_kv_rows=4352 compressed_kv_rows=2050 backend=metal
+0906 17:01:04 ds4-server: context buffers 495.92 MiB (ctx=8192, backend=metal, prefill_chunk=4096, raw_kv_rows=4352, compressed_kv_rows=2050)
+0906 17:01:04 ds4-server: listening on http://127.0.0.1:49580
+0906 17:01:04 ds4-server: chat ctx=0..17:17 prompt start
+0906 17:01:04 ds4-server: chat ctx=0..17:17 prompt done 0.330s
+0906 17:01:04 ds4-server: chat ctx=0..17:17 greedy Metal chain start max=256
+0906 17:01:06 ds4-server: chat ctx=17..67:50 gen=50 decoding chunk=47.26 t/s avg=47.26 t/s 1.058s
+0906 17:01:07 ds4-server: chat ctx=67..117:50 gen=100 decoding chunk=46.06 t/s avg=46.65 t/s 2.143s
+0906 17:01:08 ds4-server: chat ctx=117..167:50 gen=150 decoding chunk=46.40 t/s avg=46.57 t/s 3.221s
+0906 17:01:09 ds4-server: chat ctx=167..217:50 gen=200 decoding chunk=46.45 t/s avg=46.54 t/s 4.298s
+0906 17:01:09 ds4-server: chat ctx=217..242:25 gen=225 decoding chunk=42.93 t/s avg=46.11 t/s 4.880s
+0906 17:01:09 ds4-server: chat ctx=0..17:17 gen=225 finish=stop 5.210s
+0906 17:01:09 ds4-server: live kv cache rewind-hit live=242 prompt=17 common=17 reused=17
+0906 17:01:09 ds4-server: chat ctx=17..17:0 prompt start
+0906 17:01:09 ds4-server: chat ctx=17..17:0 prompt done 0.000s
+0906 17:01:09 ds4-server: chat ctx=17..17:0 greedy Metal chain start max=256
+0906 17:01:10 ds4-server: chat ctx=17..67:50 gen=50 decoding chunk=47.34 t/s avg=47.34 t/s 1.056s
+0906 17:01:11 ds4-server: chat ctx=67..117:50 gen=100 decoding chunk=46.26 t/s avg=46.80 t/s 2.137s
+0906 17:01:13 ds4-server: chat ctx=117..167:50 gen=150 decoding chunk=45.89 t/s avg=46.49 t/s 3.227s
+0906 17:01:14 ds4-server: chat ctx=167..217:50 gen=200 decoding chunk=45.49 t/s avg=46.23 t/s 4.326s
+0906 17:01:14 ds4-server: chat ctx=217..242:25 gen=225 decoding chunk=42.00 t/s avg=45.72 t/s 4.921s
+0906 17:01:14 ds4-server: chat ctx=17..17:0 gen=225 finish=stop 4.922s
+0906 17:01:14 ds4-server: live kv cache miss live=242 prompt=21 common=14 vision=match reason=token-mismatch
+0906 17:01:14 ds4-server: chat ctx=0..21:21 prompt start
+0906 17:01:15 ds4-server: chat ctx=0..21:21 prompt done 0.291s
+0906 17:01:16 ds4-server: chat ctx=21..71:50 gen=50 decoding chunk=43.40 t/s avg=43.40 t/s 1.152s
+0906 17:01:17 ds4-server: chat ctx=71..120:49 gen=99 decoding chunk=43.89 t/s avg=43.64 t/s 2.268s
+0906 17:01:17 ds4-server: chat ctx=0..21:21 gen=99 finish=stop 2.560s
+0906 17:01:17 ds4-server: live kv cache rewind-hit live=120 prompt=21 common=21 reused=21
+0906 17:01:17 ds4-server: chat ctx=21..21:0 prompt start
+0906 17:01:17 ds4-server: chat ctx=21..21:0 prompt done 0.000s
+0906 17:01:18 ds4-server: chat ctx=21..71:50 gen=50 decoding chunk=44.04 t/s avg=44.04 t/s 1.135s
+0906 17:01:19 ds4-server: chat ctx=71..120:49 gen=99 decoding chunk=43.76 t/s avg=43.90 t/s 2.255s
+0906 17:01:19 ds4-server: chat ctx=21..21:0 gen=99 finish=stop 2.256s
+0906 17:01:19 ds4-server: live kv cache miss live=120 prompt=19 common=4 vision=match reason=token-mismatch
+0906 17:01:19 ds4-server: chat ctx=0..19:19 prompt start
+0906 17:01:19 ds4-server: chat ctx=0..19:19 prompt done 0.286s
+0906 17:01:19 ds4-server: chat ctx=0..19:19 greedy Metal chain start max=256
+0906 17:01:20 ds4-server: chat ctx=19..69:50 gen=50 decoding chunk=46.49 t/s avg=46.49 t/s 1.075s
+0906 17:01:22 ds4-server: chat ctx=69..119:50 gen=100 decoding chunk=46.00 t/s avg=46.25 t/s 2.162s
+0906 17:01:23 ds4-server: chat ctx=119..169:50 gen=150 decoding chunk=45.76 t/s avg=46.08 t/s 3.255s
+0906 17:01:24 ds4-server: chat ctx=169..219:50 gen=200 decoding chunk=45.70 t/s avg=45.99 t/s 4.349s
+0906 17:01:25 ds4-server: chat ctx=219..269:50 gen=250 decoding chunk=45.52 t/s avg=45.89 t/s 5.447s
+0906 17:01:25 ds4-server: chat ctx=269..275:6 gen=256 decoding chunk=38.93 t/s avg=45.70 t/s 5.602s
+0906 17:01:25 ds4-server: chat ctx=0..19:19 gen=256 finish=length 5.887s
+0906 17:01:25 ds4-server: live kv cache rewind-hit live=275 prompt=19 common=19 reused=19
+0906 17:01:25 ds4-server: chat ctx=19..19:0 prompt start
+0906 17:01:25 ds4-server: chat ctx=19..19:0 prompt done 0.000s
+0906 17:01:25 ds4-server: chat ctx=19..19:0 greedy Metal chain start max=256
+0906 17:01:26 ds4-server: chat ctx=19..69:50 gen=50 decoding chunk=46.55 t/s avg=46.55 t/s 1.074s
+0906 17:01:27 ds4-server: chat ctx=69..119:50 gen=100 decoding chunk=45.69 t/s avg=46.12 t/s 2.168s
+0906 17:01:28 ds4-server: chat ctx=119..169:50 gen=150 decoding chunk=45.56 t/s avg=45.93 t/s 3.266s
+0906 17:01:29 ds4-server: chat ctx=169..219:50 gen=200 decoding chunk=45.61 t/s avg=45.85 t/s 4.362s
+0906 17:01:30 ds4-server: chat ctx=219..269:50 gen=250 decoding chunk=45.53 t/s avg=45.79 t/s 5.460s
+0906 17:01:31 ds4-server: chat ctx=269..275:6 gen=256 decoding chunk=39.05 t/s avg=45.60 t/s 5.614s
+0906 17:01:31 ds4-server: chat ctx=19..19:0 gen=256 finish=length 5.614s
+0906 17:01:31 ds4-server: live kv cache miss live=275 prompt=23 common=16 vision=match reason=token-mismatch
+0906 17:01:31 ds4-server: chat ctx=0..23:23 prompt start
+0906 17:01:31 ds4-server: chat ctx=0..23:23 prompt done 0.304s
+0906 17:01:32 ds4-server: chat ctx=23..73:50 gen=50 decoding chunk=43.06 t/s avg=43.06 t/s 1.161s
+0906 17:01:33 ds4-server: chat ctx=73..123:50 gen=100 decoding chunk=44.07 t/s avg=43.56 t/s 2.296s
+0906 17:01:34 ds4-server: chat ctx=123..173:50 gen=150 decoding chunk=43.73 t/s avg=43.62 t/s 3.439s
+0906 17:01:35 ds4-server: chat ctx=173..223:50 gen=200 decoding chunk=43.91 t/s avg=43.69 t/s 4.578s
+0906 17:01:37 ds4-server: chat ctx=223..273:50 gen=250 decoding chunk=43.70 t/s avg=43.69 t/s 5.722s
+0906 17:01:37 ds4-server: chat ctx=273..279:6 gen=256 decoding chunk=43.57 t/s avg=43.69 t/s 5.859s
+0906 17:01:37 ds4-server: chat ctx=0..23:23 gen=256 finish=length 6.164s
+0906 17:01:37 ds4-server: live kv cache rewind-hit live=279 prompt=23 common=23 reused=23
+0906 17:01:37 ds4-server: chat ctx=23..23:0 prompt start
+0906 17:01:37 ds4-server: chat ctx=23..23:0 prompt done 0.000s
+0906 17:01:38 ds4-server: chat ctx=23..73:50 gen=50 decoding chunk=43.90 t/s avg=43.90 t/s 1.139s
+0906 17:01:39 ds4-server: chat ctx=73..123:50 gen=100 decoding chunk=43.94 t/s avg=43.92 t/s 2.277s
+0906 17:01:40 ds4-server: chat ctx=123..173:50 gen=150 decoding chunk=43.70 t/s avg=43.84 t/s 3.421s
+0906 17:01:41 ds4-server: chat ctx=173..223:50 gen=200 decoding chunk=43.69 t/s avg=43.81 t/s 4.566s
+0906 17:01:42 ds4-server: chat ctx=223..273:50 gen=250 decoding chunk=43.66 t/s avg=43.78 t/s 5.711s
+0906 17:01:43 ds4-server: chat ctx=273..279:6 gen=256 decoding chunk=43.94 t/s avg=43.78 t/s 5.847s
+0906 17:01:43 ds4-server: chat ctx=23..23:0 gen=256 finish=length 5.848s
+0906 17:01:43 ds4-server: live kv cache miss live=279 prompt=23 common=2 vision=match reason=token-mismatch
+0906 17:01:43 ds4-server: chat ctx=0..23:23 prompt start
+0906 17:01:43 ds4-server: chat ctx=0..23:23 prompt done 0.297s
+0906 17:01:43 ds4-server: chat ctx=0..23:23 greedy Metal chain start max=256
+0906 17:01:44 ds4-server: chat ctx=23..73:50 gen=50 decoding chunk=46.68 t/s avg=46.68 t/s 1.071s
+0906 17:01:45 ds4-server: chat ctx=73..123:50 gen=100 decoding chunk=46.03 t/s avg=46.36 t/s 2.157s
+0906 17:01:46 ds4-server: chat ctx=123..173:50 gen=150 decoding chunk=45.82 t/s avg=46.17 t/s 3.249s
+0906 17:01:47 ds4-server: chat ctx=173..223:50 gen=200 decoding chunk=45.68 t/s avg=46.05 t/s 4.343s
+0906 17:01:48 ds4-server: chat ctx=223..253:30 gen=230 decoding chunk=42.70 t/s avg=45.58 t/s 5.046s
+0906 17:01:48 ds4-server: chat ctx=0..23:23 gen=230 finish=stop 5.343s
+0906 17:01:48 ds4-server: live kv cache rewind-hit live=253 prompt=23 common=23 reused=23
+0906 17:01:48 ds4-server: chat ctx=23..23:0 prompt start
+0906 17:01:48 ds4-server: chat ctx=23..23:0 prompt done 0.000s
+0906 17:01:48 ds4-server: chat ctx=23..23:0 greedy Metal chain start max=256
+0906 17:01:49 ds4-server: chat ctx=23..73:50 gen=50 decoding chunk=46.70 t/s avg=46.70 t/s 1.071s
+0906 17:01:50 ds4-server: chat ctx=73..123:50 gen=100 decoding chunk=45.72 t/s avg=46.21 t/s 2.164s
+0906 17:01:51 ds4-server: chat ctx=123..173:50 gen=150 decoding chunk=45.57 t/s avg=45.99 t/s 3.261s
+0906 17:01:52 ds4-server: chat ctx=173..223:50 gen=200 decoding chunk=45.64 t/s avg=45.90 t/s 4.357s
+0906 17:01:53 ds4-server: chat ctx=223..253:30 gen=230 decoding chunk=42.80 t/s avg=45.47 t/s 5.058s
+0906 17:01:53 ds4-server: chat ctx=23..23:0 gen=230 finish=stop 5.058s
+0906 17:01:53 ds4-server: live kv cache miss live=253 prompt=27 common=20 vision=match reason=token-mismatch
+0906 17:01:53 ds4-server: chat ctx=0..27:27 prompt start
+0906 17:01:53 ds4-server: chat ctx=0..27:27 prompt done 0.326s
+0906 17:01:54 ds4-server: chat ctx=27..77:50 gen=50 decoding chunk=43.54 t/s avg=43.54 t/s 1.148s
+0906 17:01:56 ds4-server: chat ctx=77..127:50 gen=100 decoding chunk=44.65 t/s avg=44.08 t/s 2.268s
+0906 17:01:57 ds4-server: chat ctx=127..177:50 gen=150 decoding chunk=43.98 t/s avg=44.05 t/s 3.405s
+0906 17:01:58 ds4-server: chat ctx=177..227:50 gen=200 decoding chunk=43.87 t/s avg=44.00 t/s 4.545s
+0906 17:01:58 ds4-server: chat ctx=227..254:27 gen=227 decoding chunk=43.79 t/s avg=43.98 t/s 5.162s
+0906 17:01:58 ds4-server: chat ctx=0..27:27 gen=227 finish=stop 5.488s
+0906 17:01:58 ds4-server: live kv cache rewind-hit live=254 prompt=27 common=27 reused=27
+0906 17:01:58 ds4-server: chat ctx=27..27:0 prompt start
+0906 17:01:58 ds4-server: chat ctx=27..27:0 prompt done 0.000s
+0906 17:02:00 ds4-server: chat ctx=27..77:50 gen=50 decoding chunk=44.05 t/s avg=44.05 t/s 1.135s
+0906 17:02:01 ds4-server: chat ctx=77..127:50 gen=100 decoding chunk=43.89 t/s avg=43.97 t/s 2.274s
+0906 17:02:02 ds4-server: chat ctx=127..177:50 gen=150 decoding chunk=43.83 t/s avg=43.92 t/s 3.415s
+0906 17:02:03 ds4-server: chat ctx=177..227:50 gen=200 decoding chunk=43.86 t/s avg=43.91 t/s 4.555s
+0906 17:02:04 ds4-server: chat ctx=227..254:27 gen=227 decoding chunk=43.83 t/s avg=43.90 t/s 5.171s
+0906 17:02:04 ds4-server: chat ctx=27..27:0 gen=227 finish=stop 5.171s
+0906 17:02:04 ds4-server: live kv cache miss live=254 prompt=266 common=2 vision=match reason=token-mismatch
+0906 17:02:04 ds4-server: chat ctx=0..266:266 prompt start
+0906 17:02:04 ds4-server: chat ctx=0..266:266 prompt done 0.700s
+0906 17:02:04 ds4-server: chat ctx=0..266:266 greedy Metal chain start max=256
+0906 17:02:05 ds4-server: chat ctx=0..266:266 greedy Metal chain switching to prompt lookup after 23 tokens
+0906 17:02:05 ds4-server: chat ctx=266..316:50 gen=50 decoding chunk=52.70 t/s avg=52.70 t/s 0.949s
+0906 17:02:06 ds4-server: chat ctx=316..366:50 gen=100 decoding chunk=79.91 t/s avg=63.52 t/s 1.574s
+0906 17:02:06 ds4-server: chat ctx=366..416:50 gen=150 decoding chunk=92.21 t/s avg=70.87 t/s 2.117s
+0906 17:02:07 ds4-server: chat ctx=416..466:50 gen=200 decoding chunk=93.91 t/s avg=75.50 t/s 2.649s
+0906 17:02:08 ds4-server: chat ctx=466..516:50 gen=250 decoding chunk=88.44 t/s avg=77.77 t/s 3.214s
+0906 17:02:08 ds4-server: chat ctx=516..522:6 gen=256 decoding chunk=73.83 t/s avg=77.68 t/s 3.296s
+0906 17:02:08 ds4-server: chat ctx=0..266:266 gen=256 finish=length 3.996s
+0906 17:02:08 ds4-server: live kv cache rewind-hit live=522 prompt=266 common=266 reused=266
+0906 17:02:08 ds4-server: chat ctx=266..266:0 prompt start
+0906 17:02:08 ds4-server: chat ctx=266..266:0 prompt done 0.000s
+0906 17:02:08 ds4-server: chat ctx=266..266:0 greedy Metal chain start max=256
+0906 17:02:08 ds4-server: chat ctx=266..266:0 greedy Metal chain switching to prompt lookup after 23 tokens
+0906 17:02:09 ds4-server: chat ctx=266..316:50 gen=50 decoding chunk=54.85 t/s avg=54.85 t/s 0.912s
+0906 17:02:09 ds4-server: chat ctx=316..366:50 gen=100 decoding chunk=86.13 t/s avg=67.02 t/s 1.492s
+0906 17:02:10 ds4-server: chat ctx=366..416:50 gen=150 decoding chunk=98.73 t/s avg=75.06 t/s 1.999s
+0906 17:02:10 ds4-server: chat ctx=416..466:50 gen=200 decoding chunk=98.27 t/s avg=79.77 t/s 2.507s
+0906 17:02:11 ds4-server: chat ctx=466..516:50 gen=250 decoding chunk=90.41 t/s avg=81.69 t/s 3.060s
+0906 17:02:11 ds4-server: chat ctx=516..522:6 gen=256 decoding chunk=75.74 t/s avg=81.54 t/s 3.140s
+0906 17:02:11 ds4-server: chat ctx=266..266:0 gen=256 finish=length 3.140s
+0906 17:02:11 ds4-server: live prefix rewind from 522 to 263 requires rebuild
+0906 17:02:11 ds4-server: live kv cache miss live=522 prompt=270 common=263 vision=match reason=token-mismatch
+0906 17:02:11 ds4-server: chat ctx=0..270:270 prompt start
+0906 17:02:11 ds4-server: chat ctx=0..270:270 prompt done 0.643s
+0906 17:02:13 ds4-server: chat ctx=270..320:50 gen=50 decoding chunk=44.29 t/s avg=44.29 t/s 1.129s
+0906 17:02:14 ds4-server: chat ctx=320..370:50 gen=100 decoding chunk=44.22 t/s avg=44.26 t/s 2.260s
+0906 17:02:15 ds4-server: chat ctx=370..420:50 gen=150 decoding chunk=43.97 t/s avg=44.16 t/s 3.397s
+0906 17:02:16 ds4-server: chat ctx=420..470:50 gen=200 decoding chunk=44.14 t/s avg=44.15 t/s 4.530s
+0906 17:02:17 ds4-server: chat ctx=470..520:50 gen=250 decoding chunk=44.02 t/s avg=44.13 t/s 5.666s
+0906 17:02:17 ds4-server: chat ctx=520..526:6 gen=256 decoding chunk=43.75 t/s avg=44.12 t/s 5.803s
+0906 17:02:17 ds4-server: chat ctx=0..270:270 gen=256 finish=length 6.445s
+0906 17:02:17 ds4-server: live kv cache rewind-hit live=526 prompt=270 common=270 reused=270
+0906 17:02:17 ds4-server: chat ctx=270..270:0 prompt start
+0906 17:02:17 ds4-server: chat ctx=270..270:0 prompt done 0.000s
+0906 17:02:18 ds4-server: chat ctx=270..320:50 gen=50 decoding chunk=43.30 t/s avg=43.30 t/s 1.155s
+0906 17:02:20 ds4-server: chat ctx=320..370:50 gen=100 decoding chunk=43.48 t/s avg=43.39 t/s 2.305s
+0906 17:02:21 ds4-server: chat ctx=370..420:50 gen=150 decoding chunk=44.31 t/s avg=43.69 t/s 3.433s
+0906 17:02:22 ds4-server: chat ctx=420..470:50 gen=200 decoding chunk=41.15 t/s avg=43.03 t/s 4.648s
+0906 17:02:23 ds4-server: chat ctx=470..520:50 gen=250 decoding chunk=40.10 t/s avg=42.41 t/s 5.895s
+0906 17:02:23 ds4-server: chat ctx=520..526:6 gen=256 decoding chunk=39.43 t/s avg=42.33 t/s 6.047s
+0906 17:02:23 ds4-server: chat ctx=270..270:0 gen=256 finish=length 6.048s
+0906 17:02:23 ds4-server: live kv cache miss live=526 prompt=421 common=2 vision=match reason=token-mismatch
+0906 17:02:23 ds4-server: chat ctx=0..421:421 prompt start
+0906 17:02:24 ds4-server: chat ctx=0..421:421 prompt done 1.046s
+0906 17:02:24 ds4-server: chat ctx=0..421:421 greedy Metal chain start max=256
+0906 17:02:25 ds4-server: chat ctx=0..421:421 greedy Metal chain switching to prompt lookup after 32 tokens
+0906 17:02:26 ds4-server: chat ctx=421..471:50 gen=50 decoding chunk=36.34 t/s avg=36.34 t/s 1.376s
+0906 17:02:27 ds4-server: chat ctx=471..521:50 gen=100 decoding chunk=59.05 t/s avg=44.99 t/s 2.223s
+0906 17:02:27 ds4-server: chat ctx=521..571:50 gen=150 decoding chunk=68.94 t/s avg=50.88 t/s 2.948s
+0906 17:02:28 ds4-server: chat ctx=571..599:28 gen=178 decoding chunk=93.57 t/s avg=54.82 t/s 3.247s
+0906 17:02:28 ds4-server: chat ctx=0..421:421 gen=178 finish=stop 4.293s
+0906 17:02:28 ds4-server: live kv cache rewind-hit live=599 prompt=421 common=421 reused=421
+0906 17:02:28 ds4-server: chat ctx=421..421:0 prompt start
+0906 17:02:28 ds4-server: chat ctx=421..421:0 prompt done 0.001s
+0906 17:02:28 ds4-server: chat ctx=421..421:0 greedy Metal chain start max=256
+0906 17:02:28 ds4-server: chat ctx=421..421:0 greedy Metal chain switching to prompt lookup after 32 tokens
+0906 17:02:29 ds4-server: chat ctx=421..471:50 gen=50 decoding chunk=37.41 t/s avg=37.41 t/s 1.337s
+0906 17:02:30 ds4-server: chat ctx=471..521:50 gen=100 decoding chunk=59.50 t/s avg=45.94 t/s 2.177s
+0906 17:02:30 ds4-server: chat ctx=521..571:50 gen=150 decoding chunk=69.77 t/s avg=51.84 t/s 2.894s
+0906 17:02:31 ds4-server: chat ctx=571..599:28 gen=178 decoding chunk=93.34 t/s avg=55.74 t/s 3.194s
+0906 17:02:31 ds4-server: chat ctx=421..421:0 gen=178 finish=stop 3.194s
+0906 17:02:31 ds4-server: live prefix rewind from 599 to 418 requires rebuild
+0906 17:02:31 ds4-server: live kv cache miss live=599 prompt=425 common=418 vision=match reason=token-mismatch
+0906 17:02:31 ds4-server: chat ctx=0..425:425 prompt start
+0906 17:02:32 ds4-server: chat ctx=0..425:425 prompt done 1.014s
+0906 17:02:33 ds4-server: chat ctx=425..475:50 gen=50 decoding chunk=40.71 t/s avg=40.71 t/s 1.228s
+0906 17:02:34 ds4-server: chat ctx=475..525:50 gen=100 decoding chunk=41.04 t/s avg=40.88 t/s 2.446s
+0906 17:02:35 ds4-server: chat ctx=525..575:50 gen=150 decoding chunk=40.35 t/s avg=40.70 t/s 3.685s
+0906 17:02:36 ds4-server: chat ctx=575..603:28 gen=178 decoding chunk=40.39 t/s avg=40.65 t/s 4.379s
+0906 17:02:36 ds4-server: chat ctx=0..425:425 gen=178 finish=stop 5.393s
+0906 17:02:36 ds4-server: live kv cache rewind-hit live=603 prompt=425 common=425 reused=425
+0906 17:02:36 ds4-server: chat ctx=425..425:0 prompt start
+0906 17:02:36 ds4-server: chat ctx=425..425:0 prompt done 0.000s
+0906 17:02:37 ds4-server: chat ctx=425..475:50 gen=50 decoding chunk=40.32 t/s avg=40.32 t/s 1.240s
+0906 17:02:39 ds4-server: chat ctx=475..525:50 gen=100 decoding chunk=39.81 t/s avg=40.06 t/s 2.496s
+0906 17:02:40 ds4-server: chat ctx=525..575:50 gen=150 decoding chunk=40.85 t/s avg=40.32 t/s 3.720s
+0906 17:02:41 ds4-server: chat ctx=575..603:28 gen=178 decoding chunk=39.72 t/s avg=40.22 t/s 4.425s
+0906 17:02:41 ds4-server: chat ctx=425..425:0 gen=178 finish=stop 4.426s
+0906 17:02:41 ds4-server: shutdown requested, draining requests
+ds4: prompt-lookup summary: attempts=62 no_match=0 first_miss=0 verify_passes=62 drafted=654 committed=632 accept=96.6% tokens/pass=10.19 scan=0.05 ms total gate_skips=16 gate_partials=2 gate_ambiguous=0 parity_replays=0
