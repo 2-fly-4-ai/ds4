@@ -130,6 +130,7 @@ typedef struct {
     const char *model_path;
     const char *mtp_path;
     const char *vision_path;
+    const char *ple_path; /* Optional CPU-mapped Qwen PLE GGUF sidecar. */
     ds4_backend backend;
     int n_threads;
     int context_size;

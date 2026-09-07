@@ -2285,7 +2285,7 @@ typedef struct {
     uint64_t bytes;
 } ds4_tensor;
 
-typedef struct {
+typedef struct ds4_model {
     int fd;
     const uint8_t *map;
     uint64_t size;
@@ -2299,6 +2299,7 @@ typedef struct {
 
     ds4_kv *kv;
     ds4_tensor *tensors;
+    struct ds4_model *ple_model; /* CPU-only mapping; never a main-model offset. */
 } ds4_model;
 
 static uint64_t scalar_value_size(uint32_t type) {
@@ -4441,6 +4442,7 @@ typedef struct {
     ds4_tensor *output_hc_down;
     ds4_tensor *output_hc_up;
     ds4_tensor *ple_embd;
+    bool ple_external;
     ds4_layer_weights layer[DS4_MAX_LAYER];
 } ds4_weights;
 
@@ -7466,9 +7468,11 @@ static void weights_bind(
         w->token_embd = model_find_tensor(m, "token_embd.weight");
     }
     if (ds4_model_is_qwen4()) {
-        w->ple_embd = require_token_embd ?
+        w->ple_embd = (require_token_embd && !m->ple_model) ?
             required_tensor(m, "per_layer_token_embd.weight") :
             model_find_tensor(m, "per_layer_token_embd.weight");
+        if (m->ple_model) w->ple_embd = required_tensor(m->ple_model, "ple.weight");
+        w->ple_external = m->ple_model != NULL;
     }
     weights_bind_output(w, m, require_output, optional_output);
 
@@ -7987,7 +7991,7 @@ static void model_map_span_vec_include_output(ds4_model_map_span_vec *spans, con
     model_map_span_vec_include_one(spans, w->output_hc_norm);
     model_map_span_vec_include_one(spans, w->output_hc_down);
     model_map_span_vec_include_one(spans, w->output_hc_up);
-    model_map_span_vec_include_one(spans, w->ple_embd);
+    if (!w->ple_external) model_map_span_vec_include_one(spans, w->ple_embd);
 }
 
 /* Qwen's per-layer embedding table is consumed exclusively by the host-side
@@ -39964,6 +39968,7 @@ struct ds4_engine {
     ds4_model model;
     ds4_model mtp_model;
     ds4_model vision_model;
+    ds4_model ple_model;
     ds4_vocab vocab;
     ds4_weights weights;
     ds4_mtp_weights mtp_weights;
@@ -56045,7 +56050,7 @@ static void qwen4_graph_stage_inputs(ds4_qwen4_gpu_graph *g, const ds4_model *m,
         uint32_t rows[DS4_MAX_PLE_HEADS];
         qwen4_ple_step(tokens[t], g->ple_prev, rows);
         for (uint32_t h = 0; h < DS4_N_PLE_HEADS; h++) {
-            qwen4_ref_row(m, w->ple_embd, rows[h], row + (uint64_t)t * E + (uint64_t)h * DS4_N_PLE_HEAD_DIM);
+            qwen4_ref_row(m->ple_model ? m->ple_model : m, w->ple_embd, rows[h], row + (uint64_t)t * E + (uint64_t)h * DS4_N_PLE_HEAD_DIM);
         }
         if (t == 0 && g->snap_after_first) {
             memcpy(g->snap_ple_prev, g->ple_prev, sizeof(g->ple_prev));
@@ -64124,7 +64129,7 @@ static void qwen4_ref_ple(const ds4_model *m, const ds4_weights *w, const ds4_la
     qwen4_ple_step(token, st->ple_prev, rows);
 
     float *emb = xmalloc(E * sizeof(float));
-    for (uint32_t h = 0; h < n_heads; h++) qwen4_ref_row(m, w->ple_embd, rows[h], emb + (uint64_t)h * hd);
+    for (uint32_t h = 0; h < n_heads; h++) qwen4_ref_row(m->ple_model ? m->ple_model : m, w->ple_embd, rows[h], emb + (uint64_t)h * hd);
 
     float *key = xmalloc(hc_dim * sizeof(float));
     float *keyn = xmalloc(hc_dim * sizeof(float));
@@ -67074,6 +67079,7 @@ static int ds4_engine_open_internal(ds4_engine **out,
     e->model.fd = -1;
     e->mtp_model.fd = -1;
     e->vision_model.fd = -1;
+    e->ple_model.fd = -1;
     e->backend = opt->backend;
     e->quality = opt->quality;
     e->glm_mtp = opt->glm_mtp;
@@ -67287,6 +67293,40 @@ static int ds4_engine_open_internal(ds4_engine **out,
                     "ds4: expert profile/hotlist is Metal-only for now; ignoring for %s backend\n",
                     ds4_backend_name(e->backend));
         }
+    }
+    if (opt->ple_path && opt->ple_path[0]) {
+        if (!ds4_model_is_qwen4()) {
+            fprintf(stderr, "ds4: --ple is only supported for Qwen3.8-Flash-Next models\n");
+            ds4_engine_close(e);
+            *out = NULL;
+            return 1;
+        }
+        /* CPU-only private mapping: the PLE gather runs on the host, so the
+         * sidecar never joins a Metal view or the main residency map. */
+        model_open(&e->ple_model, opt->ple_path, false, true);
+        const ds4_tensor *ple_t = model_find_tensor(&e->ple_model, "ple.weight");
+        if (!ple_t) {
+            fprintf(stderr, "ds4: --ple sidecar %s has no ple.weight tensor\n",
+                    opt->ple_path);
+            ds4_engine_close(e);
+            *out = NULL;
+            return 1;
+        }
+        if (ple_t->ndim != 2 || ple_t->dim[0] != DS4_N_PLE_HEAD_DIM ||
+            ple_t->dim[1] < g_ds4_qwen4_ple.n_rows) {
+            fprintf(stderr,
+                    "ds4: --ple sidecar ple.weight layout [%" PRIu64 ", %" PRIu64 "] does not "
+                    "cover %u x %" PRIu64 " hash rows\n",
+                    ple_t->dim[0], ple_t->dim[1], DS4_N_PLE_HEAD_DIM,
+                    g_ds4_qwen4_ple.n_rows);
+            ds4_engine_close(e);
+            *out = NULL;
+            return 1;
+        }
+        e->model.ple_model = &e->ple_model;
+        fprintf(stderr,
+                "ds4: PLE sidecar table: %s (ple.weight [%u, %" PRIu64 "], CPU-only)\n",
+                opt->ple_path, DS4_N_PLE_HEAD_DIM, ple_t->dim[1]);
     }
     weights_bind(&e->weights,
                  &e->model,
@@ -69034,6 +69074,8 @@ void ds4_engine_close(ds4_engine *e) {
     ds4_threads_shutdown();
     if (e->mtp_model.map) model_close(&e->mtp_model);
     if (e->vision_model.map) model_close(&e->vision_model);
+    e->model.ple_model = NULL;
+    if (e->ple_model.map) model_close(&e->ple_model);
     model_close(&e->model);
 #ifndef DS4_NO_GPU
     if (e->shared_prefill_workspace_ready) {
