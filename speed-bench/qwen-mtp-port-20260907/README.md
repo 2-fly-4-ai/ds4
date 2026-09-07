@@ -108,13 +108,22 @@ Diagnostic reference controls, used only for A/B testing:
 `DS4_QWEN_MTP_SERIAL_DISABLE`, `DS4_QWEN_NORM_REUSE_DISABLE`.
 Presence disables that new optimization; normal users do not need these flags.
 
-## Final validation and hold on promotion
+## Final validation and promotion
 
-**The candidate is saved on the experiment branch, not merged into main.**
-The new paths demonstrate gains and pass matched-reference checks, but the
-user requested every test green before promotion. An additional existing Qwen
-cold-prefill-versus-replay test is still red on both baseline and candidate.
-Its threshold has not been relaxed and the test has not been disabled.
+**Promoted to main as `ff5568e` following the user's approval to take the gains.**
+This cherry-picks the focused candidate `d1f0354`, not the upstream branch.
+The candidate was initially held because an additional existing Qwen
+cold-prefill-versus-replay test is red on both baseline and candidate. That
+issue remains documented below; its threshold has not been relaxed and the
+test has not been disabled. Matched-reference checks show no new divergence.
+
+Post-promotion verification on main: all five frontends rebuilt successfully;
+the expanded Qwen kernel suite passed again. The 128-token short-coding oracle
+passed exact target/draft logits and serialized-state comparison. Its balanced
+sustained timing was **58.39 → 60.54 t/s (+3.69%)**, with eight excluded warmup
+sequences and four measured sequences per arm (40 actual input tokens, MTP on).
+See `promotion-kernels.log` and `promotion-live/`. Runtime source is identical
+to the validated candidate. These are local commits; no remote push was made.
 
 | Check | Result |
 | --- | --- |
@@ -148,8 +157,9 @@ continued-prefill entries skip; those were explicitly run above. The optional
 DeepSeek MTP/DSpark depth tests and extended streaming decode/prefill oracle
 were not enabled in that invocation. SSD streaming was tested independently.
 CUDA/distributed hardware execution and other Apple chips are not certified;
-their source paths are unchanged. No model files, power setting, production
-defaults, or serving configuration were changed, and test servers are stopped.
+their source paths are unchanged. No model files, power setting, MTP enablement,
+router policy, or serving configuration were changed. The validated M5 dispatch
+optimizations are now defaults in their existing eligible paths on main.
 
 API/cross-model reproduction needs a separate baseline build. Set
 `QWEN_PORT_BASELINE=/absolute/path/to/baseline` and optionally
