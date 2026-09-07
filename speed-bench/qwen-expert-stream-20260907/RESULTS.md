@@ -3,6 +3,12 @@
 Base: `057a234`. Isolated worktree: `ds4-qwen-expert-stream`.
 Hardware: M5 Max, 128 GiB; macOS Automatic power setting left unchanged.
 
+Promoted by focused cherry-pick to main as `8557740` (experiment `58957b8`).
+All five frontends were rebuilt on main. The actual-main 80-slot interleaved
+snapshot test and MTP snapshot/rewind tests passed again. No push was performed,
+no inference server was left running, and the default DeepSeek model symlink
+was preserved. The experiment worktree retains the large raw binary traces.
+
 ## Scope
 
 An optional lower-memory mode for the installed
