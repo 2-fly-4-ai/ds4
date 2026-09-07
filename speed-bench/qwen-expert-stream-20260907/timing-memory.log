@@ -1,0 +1,30 @@
+ds4: PLE sidecar table: /Users/brianfarley/Desktop/ds4/gguf/qwen38-iq2-test/Qwen3.8-Flash-Next-PLE-Q4_1.gguf (ple.weight [160, 320001536], CPU-only)
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal SSD streaming mode enabled; full model residency and warmup are skipped
+ds4: metal SSD streaming cache target 8.00 GiB; effective 8.00 GiB = 1.64 GiB prefill headroom + 6.36 GiB dynamic cache (3984 experts, 1.64 MiB each)
+ds4: SSD streaming mixed-precision model: 1/49 routed layers off the slab size class will bypass the expert cache and read experts via mapped model views
+ds4: Qwen SSD static weights: 50 spans, 6.32 GiB; PLE stays CPU-mapped
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 0.29 GiB (raw 0.23 + compressed 0.06) + buffers 7.05 GiB + resident model 6.32 GiB + expert cache 6.36 GiB + prefill expert reserve 1.64 GiB = 21.67 GiB planned
+ds4: memory detail: ctx=9216 prefill_cap=8192 raw_kv_rows=9216 compressed_kv_rows=2305 backend=metal
+ds4-bench: context buffers 7524.02 MiB (ctx=9216, backend=metal, prefill_chunk=8192, raw_kv_rows=9216, compressed_kv_rows=2305)
+       40.81 real         2.62 user        13.04 sys
+         45281656832  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+              763438  page reclaims
+             2000622  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                  73  voluntary context switches
+              335236  involuntary context switches
+         96381107941  instructions retired
+         60447728633  cycles elapsed
+         13674185656  peak memory footprint

@@ -346,8 +346,8 @@ are too narrow for 256-value blocks and go to MXFP4. The first matching
 because an importance matrix collected with llama.cpp never sees them. Keep
 the `hc_=f16` override: the Q8_0 base type would otherwise requantize the
 hyper-connection mixers, which slows prefill. Q2K is the better two-bit
-choice unless the last few GB matter. All need a Mac with more unified memory
-than the file size.
+choice unless the last few GB matter. Resident inference needs a Mac with more
+unified memory than the file size.
 
 ```sh
 ./ds4 -m gguf/Qwen3.8-Flash-Next-Q8.gguf --ctx 32768
@@ -364,7 +364,23 @@ drafts, like the GLM path, which skews sampled output toward the greedy
 choice; `--mtp-exact-sampling` preserves the ordinary sampling distribution
 at a smaller speedup.
 
-On an M5 Mac, greedy Qwen sessions also use guarded prompt-lookup drafting.
+An optional Metal SSD mode supports the IQ2_XXS gate/up + MXFP4 down Qwen
+recipe without changing its quant. Selected trunk experts use a bounded RAM
+cache; prefill maps one layer at a time. External PLE remains CPU-mapped:
+
+```sh
+./ds4 -m gguf/qwen38-iq2-test/Qwen3.8-Flash-Next-IQ2XXSImatrix-MXFP4Down-MTP.gguf \
+  --ple gguf/qwen38-iq2-test/Qwen3.8-Flash-Next-PLE-Q4_1.gguf \
+  --ssd-streaming --ssd-streaming-cache-experts 8GB --ctx 4096
+```
+
+The expert budget is additional to static weights, KV, graph buffers, CPU PLE
+pages, and macOS; it includes prefill headroom. `--mtp` also works in this mode
+and retains the differently quantized predictor layer (about 1.3 GiB extra).
+Prompt lookup is not enabled for SSD mode. Resident defaults are unchanged.
+See [streaming measurements and limitations](speed-bench/qwen-expert-stream-20260907/RESULTS.md).
+
+On an M5 Mac, greedy resident Qwen sessions also use guarded prompt-lookup drafting.
 When two earlier occurrences agree on the continuation of the current
 eight-token suffix, DS4 verifies the anchor plus up to seven context-derived
 tokens in one native Qwen pass. Full matches commit directly; partial matches

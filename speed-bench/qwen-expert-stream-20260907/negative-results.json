@@ -1,0 +1,66 @@
+[
+  {
+    "tag": "q4",
+    "exit": 1,
+    "passed": true,
+    "command": [
+      "/Users/brianfarley/Desktop/ds4-qwen-expert-stream/ds4",
+      "-m",
+      "/Users/brianfarley/Desktop/ds4/gguf/Qwen3.8-Flash-Next-DS4-Ivan-Q4-Compat.gguf",
+      "--ssd-streaming",
+      "--ssd-streaming-cache-experts",
+      "8GB",
+      "--ctx",
+      "1024",
+      "-n",
+      "1",
+      "-p",
+      "test"
+    ]
+  },
+  {
+    "tag": "small-cache",
+    "exit": 1,
+    "passed": true,
+    "command": [
+      "/Users/brianfarley/Desktop/ds4-qwen-expert-stream/ds4",
+      "-m",
+      "/Users/brianfarley/Desktop/ds4/gguf/qwen38-iq2-test/Qwen3.8-Flash-Next-IQ2XXSImatrix-MXFP4Down-MTP.gguf",
+      "--ssd-streaming",
+      "--ssd-streaming-cache-experts",
+      "8GB",
+      "--ctx",
+      "1024",
+      "-n",
+      "1",
+      "-p",
+      "test",
+      "--ple",
+      "/Users/brianfarley/Desktop/ds4/gguf/qwen38-iq2-test/Qwen3.8-Flash-Next-PLE-Q4_1.gguf",
+      "--ssd-streaming-cache-experts",
+      "79"
+    ]
+  },
+  {
+    "tag": "cold",
+    "exit": 1,
+    "passed": true,
+    "command": [
+      "/Users/brianfarley/Desktop/ds4-qwen-expert-stream/ds4",
+      "-m",
+      "/Users/brianfarley/Desktop/ds4/gguf/qwen38-iq2-test/Qwen3.8-Flash-Next-IQ2XXSImatrix-MXFP4Down-MTP.gguf",
+      "--ssd-streaming",
+      "--ssd-streaming-cache-experts",
+      "8GB",
+      "--ctx",
+      "1024",
+      "-n",
+      "1",
+      "-p",
+      "test",
+      "--ple",
+      "/Users/brianfarley/Desktop/ds4/gguf/qwen38-iq2-test/Qwen3.8-Flash-Next-PLE-Q4_1.gguf",
+      "--ssd-streaming-cold"
+    ]
+  }
+]

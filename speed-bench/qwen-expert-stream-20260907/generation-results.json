@@ -1,0 +1,92 @@
+[
+  {
+    "tag": "mtp-code-base",
+    "exit": 0,
+    "command": [
+      "/tmp/ds4-qwen-base-gen",
+      "/Users/brianfarley/Desktop/ds4/gguf/qwen38-iq2-test/Qwen3.8-Flash-Next-IQ2XXSImatrix-MXFP4Down-MTP.gguf",
+      "/Users/brianfarley/Desktop/ds4/gguf/qwen38-iq2-test/Qwen3.8-Flash-Next-PLE-Q4_1.gguf",
+      "0",
+      "1",
+      "48",
+      "Write a Python LRU cache class with get and put methods, type hints, and unit tests.\n",
+      "/Users/brianfarley/Desktop/ds4-qwen-expert-stream/speed-bench/qwen-expert-stream-20260907/mtp-code-base.bin"
+    ],
+    "sha256": "d8360b511a0f6b4a04315a64fe89126871feea6103e4093b3888e867b37820b3"
+  },
+  {
+    "tag": "mtp-code-stream",
+    "exit": 0,
+    "command": [
+      "/tmp/ds4-qwen-stream-gen",
+      "/Users/brianfarley/Desktop/ds4/gguf/qwen38-iq2-test/Qwen3.8-Flash-Next-IQ2XXSImatrix-MXFP4Down-MTP.gguf",
+      "/Users/brianfarley/Desktop/ds4/gguf/qwen38-iq2-test/Qwen3.8-Flash-Next-PLE-Q4_1.gguf",
+      "8",
+      "1",
+      "48",
+      "Write a Python LRU cache class with get and put methods, type hints, and unit tests.\n",
+      "/Users/brianfarley/Desktop/ds4-qwen-expert-stream/speed-bench/qwen-expert-stream-20260907/mtp-code-stream.bin"
+    ],
+    "sha256": "d8360b511a0f6b4a04315a64fe89126871feea6103e4093b3888e867b37820b3"
+  },
+  {
+    "tag": "mtp-story-base",
+    "exit": 0,
+    "command": [
+      "/tmp/ds4-qwen-base-gen",
+      "/Users/brianfarley/Desktop/ds4/gguf/qwen38-iq2-test/Qwen3.8-Flash-Next-IQ2XXSImatrix-MXFP4Down-MTP.gguf",
+      "/Users/brianfarley/Desktop/ds4/gguf/qwen38-iq2-test/Qwen3.8-Flash-Next-PLE-Q4_1.gguf",
+      "0",
+      "1",
+      "48",
+      "Write a story about a lighthouse keeper who receives a letter from tomorrow.\n",
+      "/Users/brianfarley/Desktop/ds4-qwen-expert-stream/speed-bench/qwen-expert-stream-20260907/mtp-story-base.bin"
+    ],
+    "sha256": "b10397c1a7c6ea3133ec2b55fb160c114aa6cea6ec77ae7c11d1de177bbec2b2"
+  },
+  {
+    "tag": "mtp-story-stream",
+    "exit": 0,
+    "command": [
+      "/tmp/ds4-qwen-stream-gen",
+      "/Users/brianfarley/Desktop/ds4/gguf/qwen38-iq2-test/Qwen3.8-Flash-Next-IQ2XXSImatrix-MXFP4Down-MTP.gguf",
+      "/Users/brianfarley/Desktop/ds4/gguf/qwen38-iq2-test/Qwen3.8-Flash-Next-PLE-Q4_1.gguf",
+      "8",
+      "1",
+      "48",
+      "Write a story about a lighthouse keeper who receives a letter from tomorrow.\n",
+      "/Users/brianfarley/Desktop/ds4-qwen-expert-stream/speed-bench/qwen-expert-stream-20260907/mtp-story-stream.bin"
+    ],
+    "sha256": "b10397c1a7c6ea3133ec2b55fb160c114aa6cea6ec77ae7c11d1de177bbec2b2"
+  },
+  {
+    "tag": "mtp-json-base",
+    "exit": 0,
+    "command": [
+      "/tmp/ds4-qwen-base-gen",
+      "/Users/brianfarley/Desktop/ds4/gguf/qwen38-iq2-test/Qwen3.8-Flash-Next-IQ2XXSImatrix-MXFP4Down-MTP.gguf",
+      "/Users/brianfarley/Desktop/ds4/gguf/qwen38-iq2-test/Qwen3.8-Flash-Next-PLE-Q4_1.gguf",
+      "0",
+      "1",
+      "48",
+      "Produce a JSON array of twelve fictional books, each with title, author, year, and genre.\n",
+      "/Users/brianfarley/Desktop/ds4-qwen-expert-stream/speed-bench/qwen-expert-stream-20260907/mtp-json-base.bin"
+    ],
+    "sha256": "8336b5ec83b196f548c60f83c0d25179deb6d7c01da4bf7ba3d74325ec8189b8"
+  },
+  {
+    "tag": "mtp-json-stream",
+    "exit": 0,
+    "command": [
+      "/tmp/ds4-qwen-stream-gen",
+      "/Users/brianfarley/Desktop/ds4/gguf/qwen38-iq2-test/Qwen3.8-Flash-Next-IQ2XXSImatrix-MXFP4Down-MTP.gguf",
+      "/Users/brianfarley/Desktop/ds4/gguf/qwen38-iq2-test/Qwen3.8-Flash-Next-PLE-Q4_1.gguf",
+      "8",
+      "1",
+      "48",
+      "Produce a JSON array of twelve fictional books, each with title, author, year, and genre.\n",
+      "/Users/brianfarley/Desktop/ds4-qwen-expert-stream/speed-bench/qwen-expert-stream-20260907/mtp-json-stream.bin"
+    ],
+    "sha256": "8336b5ec83b196f548c60f83c0d25179deb6d7c01da4bf7ba3d74325ec8189b8"
+  }
+]

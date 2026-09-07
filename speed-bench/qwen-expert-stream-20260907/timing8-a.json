@@ -1,0 +1,43 @@
+{
+  "tag": "timing8-a",
+  "command": [
+    "/Users/brianfarley/Desktop/ds4-qwen-expert-stream/ds4-bench",
+    "-m",
+    "/Users/brianfarley/Desktop/ds4/gguf/qwen38-iq2-test/Qwen3.8-Flash-Next-IQ2XXSImatrix-MXFP4Down-MTP.gguf",
+    "--ple",
+    "/Users/brianfarley/Desktop/ds4/gguf/qwen38-iq2-test/Qwen3.8-Flash-Next-PLE-Q4_1.gguf",
+    "--prompt-file",
+    "/Users/brianfarley/Desktop/ds4/speed-bench/qwen-iq2-wide-20260907/fixed-corpus.txt",
+    "--ctx-start",
+    "2048",
+    "--ctx-max",
+    "2048",
+    "--ctx-alloc",
+    "3072",
+    "--gen-tokens",
+    "256",
+    "--teacher-forced-decode",
+    "--csv",
+    "/Users/brianfarley/Desktop/ds4-qwen-expert-stream/speed-bench/qwen-expert-stream-20260907/timing8-a.csv",
+    "--ssd-streaming",
+    "--ssd-streaming-cache-experts",
+    "8GB"
+  ],
+  "exit": 0,
+  "csv": [
+    {
+      "ctx_tokens": "2048",
+      "prefill_tokens": "2048",
+      "prefill_tps": "754.79",
+      "gen_tokens": "256",
+      "gen_tps": "15.88",
+      "gen_first_ms": "232.114",
+      "gen_steady_tokens": "255",
+      "gen_steady_tps": "16.05",
+      "kvcache_bytes": "0",
+      "gen_first64_tps": "14.55",
+      "gen_middle64_tps": "16.20",
+      "gen_final64_tps": "17.25"
+    }
+  ]
+}

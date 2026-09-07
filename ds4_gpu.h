@@ -227,6 +227,18 @@ void ds4_gpu_set_streaming_expert_cache_expert_bytes(uint64_t bytes);
 uint64_t ds4_gpu_recommended_working_set_size(void);
 uint32_t ds4_gpu_stream_expert_cache_configured_count(void);
 uint32_t ds4_gpu_stream_expert_cache_current_count(void);
+#ifdef __APPLE__
+/* Qwen's routed and shared experts, using the bounded SSD cache. */
+int ds4_gpu_qwen4_moe_stream_tensor(
+        ds4_gpu_tensor *mid, ds4_gpu_tensor *part,
+        const ds4_gpu_tensor *x, const ds4_gpu_tensor *selected,
+        const void *model_map, uint64_t model_size, uint32_t layer,
+        uint64_t gate_offset, uint64_t up_offset, uint64_t down_offset,
+        uint32_t gate_type, uint32_t down_type, uint32_t n_experts,
+        uint32_t n_tokens, uint32_t n_slots, uint32_t in_dim, uint32_t ff_dim,
+        uint64_t shared_gate, uint64_t shared_up, uint64_t shared_down,
+        uint32_t shared_type, uint32_t shared_down_type);
+#endif
 typedef struct ds4_gpu_stream_expert_table {
     const void *model_map;
     uint64_t    model_size;

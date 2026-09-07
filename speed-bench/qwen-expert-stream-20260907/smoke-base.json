@@ -1,0 +1,52 @@
+{
+  "tag": "smoke-base",
+  "command": [
+    "/Users/brianfarley/Desktop/ds4/ds4-bench",
+    "-m",
+    "/Users/brianfarley/Desktop/ds4/gguf/qwen38-iq2-test/Qwen3.8-Flash-Next-IQ2XXSImatrix-MXFP4Down-MTP.gguf",
+    "--ple",
+    "/Users/brianfarley/Desktop/ds4/gguf/qwen38-iq2-test/Qwen3.8-Flash-Next-PLE-Q4_1.gguf",
+    "--prompt-file",
+    "/Users/brianfarley/Desktop/ds4/speed-bench/qwen-iq2-wide-20260907/fixed-corpus.txt",
+    "--ctx-start",
+    "128",
+    "--ctx-max",
+    "128",
+    "--ctx-alloc",
+    "1152",
+    "--gen-tokens",
+    "8",
+    "--teacher-forced-decode",
+    "--csv",
+    "/Users/brianfarley/Desktop/ds4-qwen-expert-stream/speed-bench/qwen-expert-stream-20260907/smoke-base.csv",
+    "--dump-decode-logits-dir",
+    "/Users/brianfarley/Desktop/ds4-qwen-expert-stream/speed-bench/qwen-expert-stream-20260907/smoke-base-logits"
+  ],
+  "exit": 0,
+  "csv": [
+    {
+      "ctx_tokens": "128",
+      "prefill_tokens": "128",
+      "prefill_tps": "264.77",
+      "gen_tokens": "8",
+      "gen_tps": "43.14",
+      "gen_first_ms": "23.862",
+      "gen_steady_tokens": "7",
+      "gen_steady_tps": "43.32",
+      "kvcache_bytes": "0",
+      "gen_first64_tps": "43.14",
+      "gen_middle64_tps": "43.14",
+      "gen_final64_tps": "43.14"
+    }
+  ],
+  "hashes": {
+    "frontier_000128_step_000001.f32": "d6d158d703e0186004fd54bae5b58799434605fab02c9901afb5f33be7585979",
+    "frontier_000128_step_000002.f32": "7d746bd82e141b7640c40d1d833630fa03e350a12f60a1a6fe77d1a7d7d4c335",
+    "frontier_000128_step_000003.f32": "189bdaccce689a1a991ea03ef886d456ae5adde140d155052c0ae8ee451ebcc4",
+    "frontier_000128_step_000004.f32": "1a86e06ffc6b3d13e98b395b2e9023d8c35900a75f90c508d318e239b36bdaa8",
+    "frontier_000128_step_000005.f32": "c2e5359826ece1fc945e0affa9a9b2fd43a31f9b132e5167d4b76ee8b40984e6",
+    "frontier_000128_step_000006.f32": "7d893855b9e0f1787901f6ca581bfb5aa4788a839abf696a61fedd69bef4a273",
+    "frontier_000128_step_000007.f32": "bfe6d2b62bdde1b6fdad94c6fb364ad23f520196d51c417f054c62683a3cb2b8",
+    "frontier_000128_step_000008.f32": "07599ea667bbb7c8e81948e9674fcc27b57c6f8d27b63b8d745743e7ed876ba9"
+  }
+}

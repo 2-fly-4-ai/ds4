@@ -1,0 +1,154 @@
+[
+  {
+    "tag": "guard-steady-ds4-resident-0",
+    "command": [
+      "/Users/brianfarley/Desktop/ds4/ds4-bench",
+      "-m",
+      "/Users/brianfarley/Desktop/ds4/ds4flash.gguf",
+      "--prompt-file",
+      "/Users/brianfarley/Desktop/ds4/speed-bench/qwen-iq2-wide-20260907/fixed-corpus.txt",
+      "--ctx-start",
+      "2048",
+      "--ctx-max",
+      "2048",
+      "--ctx-alloc",
+      "4096",
+      "--gen-tokens",
+      "512",
+      "--teacher-forced-decode",
+      "--csv",
+      "/Users/brianfarley/Desktop/ds4-qwen-expert-stream/speed-bench/qwen-expert-stream-20260907/guard-steady-ds4-resident-0.csv"
+    ],
+    "exit": 0,
+    "csv": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "779.67",
+        "gen_tokens": "512",
+        "gen_tps": "38.85",
+        "gen_first_ms": "28.255",
+        "gen_steady_tokens": "511",
+        "gen_steady_tps": "38.86",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "38.93",
+        "gen_middle64_tps": "38.80",
+        "gen_final64_tps": "38.82"
+      }
+    ]
+  },
+  {
+    "tag": "guard-steady-ds4-resident-1",
+    "command": [
+      "/Users/brianfarley/Desktop/ds4-qwen-expert-stream/ds4-bench",
+      "-m",
+      "/Users/brianfarley/Desktop/ds4/ds4flash.gguf",
+      "--prompt-file",
+      "/Users/brianfarley/Desktop/ds4/speed-bench/qwen-iq2-wide-20260907/fixed-corpus.txt",
+      "--ctx-start",
+      "2048",
+      "--ctx-max",
+      "2048",
+      "--ctx-alloc",
+      "4096",
+      "--gen-tokens",
+      "512",
+      "--teacher-forced-decode",
+      "--csv",
+      "/Users/brianfarley/Desktop/ds4-qwen-expert-stream/speed-bench/qwen-expert-stream-20260907/guard-steady-ds4-resident-1.csv"
+    ],
+    "exit": 0,
+    "csv": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "780.61",
+        "gen_tokens": "512",
+        "gen_tps": "38.46",
+        "gen_first_ms": "30.579",
+        "gen_steady_tokens": "511",
+        "gen_steady_tps": "38.47",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "38.88",
+        "gen_middle64_tps": "38.63",
+        "gen_final64_tps": "37.91"
+      }
+    ]
+  },
+  {
+    "tag": "guard-steady-ds4-resident-2",
+    "command": [
+      "/Users/brianfarley/Desktop/ds4-qwen-expert-stream/ds4-bench",
+      "-m",
+      "/Users/brianfarley/Desktop/ds4/ds4flash.gguf",
+      "--prompt-file",
+      "/Users/brianfarley/Desktop/ds4/speed-bench/qwen-iq2-wide-20260907/fixed-corpus.txt",
+      "--ctx-start",
+      "2048",
+      "--ctx-max",
+      "2048",
+      "--ctx-alloc",
+      "4096",
+      "--gen-tokens",
+      "512",
+      "--teacher-forced-decode",
+      "--csv",
+      "/Users/brianfarley/Desktop/ds4-qwen-expert-stream/speed-bench/qwen-expert-stream-20260907/guard-steady-ds4-resident-2.csv"
+    ],
+    "exit": 0,
+    "csv": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "711.88",
+        "gen_tokens": "512",
+        "gen_tps": "38.13",
+        "gen_first_ms": "28.956",
+        "gen_steady_tokens": "511",
+        "gen_steady_tps": "38.14",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "38.71",
+        "gen_middle64_tps": "38.05",
+        "gen_final64_tps": "37.64"
+      }
+    ]
+  },
+  {
+    "tag": "guard-steady-ds4-resident-3",
+    "command": [
+      "/Users/brianfarley/Desktop/ds4/ds4-bench",
+      "-m",
+      "/Users/brianfarley/Desktop/ds4/ds4flash.gguf",
+      "--prompt-file",
+      "/Users/brianfarley/Desktop/ds4/speed-bench/qwen-iq2-wide-20260907/fixed-corpus.txt",
+      "--ctx-start",
+      "2048",
+      "--ctx-max",
+      "2048",
+      "--ctx-alloc",
+      "4096",
+      "--gen-tokens",
+      "512",
+      "--teacher-forced-decode",
+      "--csv",
+      "/Users/brianfarley/Desktop/ds4-qwen-expert-stream/speed-bench/qwen-expert-stream-20260907/guard-steady-ds4-resident-3.csv"
+    ],
+    "exit": 0,
+    "csv": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "668.92",
+        "gen_tokens": "512",
+        "gen_tps": "37.71",
+        "gen_first_ms": "28.437",
+        "gen_steady_tokens": "511",
+        "gen_steady_tps": "37.71",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "38.19",
+        "gen_middle64_tps": "37.85",
+        "gen_final64_tps": "36.91"
+      }
+    ]
+  }
+]

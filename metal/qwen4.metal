@@ -1651,7 +1651,7 @@ struct ds4_metal_args_qwen4_moe {
     uint32_t has_shared;
     uint32_t shared_type;
     uint32_t shared_row_bytes;
-    uint32_t pad0;
+    uint32_t address_table;
 };
 
 /* dot of one quantized expert row with x, lanes split as in the K3 kernels:
@@ -1836,7 +1836,14 @@ kernel void kernel_qwen4_moe_mid(
     const uint row_bytes = shared ? args.shared_row_bytes : args.row_bytes;
     device const char *gb = shared ? sh_gate : gate_base;
     device const char *ub = shared ? sh_up : up_base;
-    const uint64_t ebase = shared ? 0 : (uint64_t)(uint)selected[(uint64_t)tok * args.n_slots + slot] * args.expert_bytes;
+    const uint expert = shared ? 0 : (uint)selected[(uint64_t)tok * args.n_slots + slot];
+    /* SSD mode supplies GPU address tables; row arithmetic and shared-expert
+     * handling remain identical to resident decode. */
+    if (!shared && args.address_table) {
+        gb = (device const char *)((device const uint64_t *)gate_base)[expert];
+        ub = (device const char *)((device const uint64_t *)up_base)[expert];
+    }
+    const uint64_t ebase = shared || args.address_table ? 0 : (uint64_t)expert * args.expert_bytes;
     device const float *xt = x + (uint64_t)tok * args.in_dim;
     for (uint r = row0; r < row0 + QWEN4_MOE_NR0 && r < args.out_rows; r++) {
         const uint64_t off = ebase + (uint64_t)r * row_bytes;
@@ -1869,7 +1876,11 @@ kernel void kernel_qwen4_moe_down(
     const uint row_bytes = shared ? args.shared_row_bytes : args.row_bytes;
     device const char *db = shared ? sh_down : down_base;
     const uint64_t pair = (uint64_t)tok * n_out + slot;
-    const uint64_t ebase = shared ? 0 : (uint64_t)(uint)selected[(uint64_t)tok * args.n_slots + slot] * args.expert_bytes;
+    const uint expert = shared ? 0 : (uint)selected[(uint64_t)tok * args.n_slots + slot];
+    if (!shared && args.address_table) {
+        db = (device const char *)((device const uint64_t *)down_base)[expert];
+    }
+    const uint64_t ebase = shared || args.address_table ? 0 : (uint64_t)expert * args.expert_bytes;
     device const float *m = mid + pair * args.in_dim;
     for (uint r = row0; r < row0 + QWEN4_MOE_NR0 && r < args.out_rows; r++) {
         const float v = qwen4_row_dot(db + ebase + (uint64_t)r * row_bytes, m, type, args.in_dim, tiisg);

@@ -1,0 +1,79 @@
+{
+  "command": [
+    "/Users/brianfarley/Desktop/ds4-qwen-expert-stream/ds4-server",
+    "-m",
+    "/Users/brianfarley/Desktop/ds4/gguf/qwen38-iq2-test/Qwen3.8-Flash-Next-IQ2XXSImatrix-MXFP4Down-MTP.gguf",
+    "--ple",
+    "/Users/brianfarley/Desktop/ds4/gguf/qwen38-iq2-test/Qwen3.8-Flash-Next-PLE-Q4_1.gguf",
+    "--ctx",
+    "4096",
+    "--ssd-streaming",
+    "--ssd-streaming-cache-experts",
+    "8GB",
+    "--mtp",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "18073",
+    "--kv-disk-dir",
+    "/Users/brianfarley/Desktop/ds4-qwen-expert-stream/speed-bench/qwen-expert-stream-20260907/api-kv"
+  ],
+  "results": [
+    {
+      "seconds": 1.347764583,
+      "response": {
+        "id": "chatcmpl-1",
+        "object": "chat.completion",
+        "created": 1788780704,
+        "model": "qwen3.8-flash-next",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "READY"
+            },
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 19,
+          "completion_tokens": 1,
+          "total_tokens": 20,
+          "prompt_tokens_details": {
+            "cached_tokens": 0,
+            "cache_write_tokens": 19
+          }
+        }
+      }
+    },
+    {
+      "seconds": 1.103951875,
+      "response": {
+        "id": "chatcmpl-2",
+        "object": "chat.completion",
+        "created": 1788780705,
+        "model": "qwen3.8-flash-next",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "DONE"
+            },
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 40,
+          "completion_tokens": 1,
+          "total_tokens": 41,
+          "prompt_tokens_details": {
+            "cached_tokens": 20,
+            "cache_write_tokens": 20
+          }
+        }
+      }
+    }
+  ]
+}

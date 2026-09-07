@@ -8076,6 +8076,21 @@ static bool weights_qwen4_gpu_resident_spans(
     return model_map_span_vec_finish(spans);
 }
 
+static bool weights_qwen4_stream_static_spans(const ds4_weights *w,
+                                             ds4_model_map_span_vec *spans, bool mtp) {
+    memset(spans, 0, sizeof(*spans));
+    model_map_span_vec_include_one(spans, w->token_embd);
+    for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
+        /* The optional predictor uses a different quant/size class. Keep its
+         * single layer resident rather than corrupting the trunk cache slab. */
+        if (mtp && il >= DS4_N_LAYER - DS4_N_NEXTN_PREDICT)
+            model_map_span_vec_include_layer(spans, &w->layer[il]);
+        else model_map_span_vec_include_layer_decode_static(spans, &w->layer[il]);
+    }
+    model_map_span_vec_include_output_without_ple(spans, w);
+    return model_map_span_vec_finish(spans);
+}
+
 static const uint8_t *tensor_expert_bytes(
         const ds4_model  *m,
         const ds4_tensor *w,
@@ -8232,10 +8247,10 @@ static DS4_MAYBE_UNUSED bool weights_streaming_non_routed_bytes(
     ds4_model_map_span_vec spans;
     const bool include_token =
         weights_layer_has_required(&w->layer[0], 0);
-    if (!weights_model_map_decode_static_spans(w,
-                                               include_token,
-                                               weights_have_output_head(w),
-                                               &spans)) {
+    if (!(ds4_model_is_qwen4() ?
+          weights_qwen4_stream_static_spans(w, &spans, true) :
+          weights_model_map_decode_static_spans(w, include_token,
+                                               weights_have_output_head(w), &spans))) {
         return false;
     }
     *bytes_out = model_map_span_vec_total_bytes(&spans);
@@ -55499,6 +55514,7 @@ typedef struct {
     uint32_t mtp_pos;
     uint32_t n_logit_rows;
     bool pipeline_enabled; /* M5 + supported Q4 expert layout. */
+    bool ssd_streaming;
     bool snap_after_first;   /* set by the caller for a 2-token verify: snapshot the state after row 0 */
     bool snap_valid;
     /* multimodal: per-position (t, h, w) rope positions, the text counter
@@ -55979,11 +55995,25 @@ static bool qwen4_graph_attention(ds4_qwen4_gpu_graph *g, const ds4_model *m, co
 
 /* router GEMV, top-k (+ shared gate logit), experts with the shared expert as
  * an extra slot, weighted reduce with the hc combine folded in */
-static bool qwen4_graph_moe(ds4_qwen4_gpu_graph *g, const ds4_model *m, const ds4_layer_weights *l, uint32_t T) {
+static bool qwen4_graph_moe(ds4_qwen4_gpu_graph *g, const ds4_model *m, const ds4_layer_weights *l, uint32_t T, uint32_t il) {
     bool ok = qwen4_gemv(g, g->router, m, l->ffn_gate_inp, g->mixed, T) &&
               ds4_gpu_qwen4_router_topk_tensor(g->selected, g->weights, g->router, g->mixed, m->map, m->size,
                                                l->ffn_gate_inp_shexp->abs_offset, l->ffn_gate_inp_shexp->type,
                                                DS4_N_EMBD, g->sh_gate_logit, T, DS4_N_EXPERT, DS4_N_EXPERT_USED);
+#ifdef __APPLE__
+    if (g->ssd_streaming && T <= 8u && il < DS4_N_LAYER - DS4_N_NEXTN_PREDICT) {
+        return ok && ds4_gpu_qwen4_moe_stream_tensor(g->mid, g->part, g->mixed, g->selected,
+            m->map, m->size, il, l->ffn_gate_exps->abs_offset, l->ffn_up_exps->abs_offset,
+            l->ffn_down_exps->abs_offset, l->ffn_gate_exps->type, l->ffn_down_exps->type,
+            DS4_N_EXPERT, T, DS4_N_EXPERT_USED, DS4_N_EMBD, DS4_N_FF_EXP,
+            l->ffn_gate_shexp->abs_offset, l->ffn_up_shexp->abs_offset,
+            l->ffn_down_shexp->abs_offset, l->ffn_gate_shexp->type, l->ffn_down_shexp->type) &&
+            ds4_gpu_qwen4_moe_reduce_tensor(g->blk,g->part,g->weights,g->sh_gate_logit,NULL,
+                g->R,g->inj,T,DS4_N_EXPERT_USED,DS4_N_EXPERT_USED+1u,DS4_N_EMBD,DS4_N_HC);
+    }
+#else
+    (void)il;
+#endif
     /* Prefill-sized batches route each expert's tokens through tiled GEMMs
      * (weights read once per 32 tokens) and run the shared expert as dense
      * GEMMs; decode keeps the per-(token, slot) row kernels with the shared
@@ -56086,6 +56116,14 @@ static void qwen4_graph_stage_inputs(ds4_qwen4_gpu_graph *g, const ds4_model *m,
  * everything is causal by construction because the recurrent kernels walk
  * tokens in order and attention reads the caches written for the same
  * chunk.  g->R keeps the pre-mixer streams of every row afterwards. */
+static bool qwen4_stream_static_map(const ds4_model *m, const ds4_weights *w, bool mtp) {
+    ds4_model_map_span_vec spans;
+    if (!weights_qwen4_stream_static_spans(w, &spans, mtp)) return false;
+    const bool ok = metal_graph_install_model_spans(m, &spans, "Qwen static decode");
+    free(spans.v);
+    return ok;
+}
+
 static bool qwen4_graph_forward_tokens(ds4_qwen4_gpu_graph *g, const ds4_model *m, const ds4_weights *w,
                                        const int *tokens, uint32_t T, float *logits_out, bool all_rows) {
     if (!g || T == 0 || T > g->cap_tokens || g->pos + T > g->ctx_cap) return false;
@@ -56105,6 +56143,7 @@ static bool qwen4_graph_forward_tokens(ds4_qwen4_gpu_graph *g, const ds4_model *
         timing = tv ? (atoi(tv) >= 2 ? 2 : 1) : 0;
     }
     const double t0 = timing ? now_sec() : 0.0;
+    if (g->ssd_streaming && !qwen4_stream_static_map(m, w, g->mtp_R != NULL)) return false;
     qwen4_graph_stage_inputs(g, m, w, tokens, T);
     const double t1 = timing ? now_sec() : 0.0;
     if (!glm_graph_begin_commands_if_needed()) return false;
@@ -56131,6 +56170,13 @@ static bool qwen4_graph_forward_tokens(ds4_qwen4_gpu_graph *g, const ds4_model *
     } while (0)
     for (uint32_t il = 0; il < n_trunk && ok; il++) {
         const ds4_layer_weights *l = &w->layer[il];
+        /* Prefill keeps the resident tiled kernels, with just one explicit
+         * layer buffer live. Decode instead uses cached selected experts. */
+        if (g->ssd_streaming && T > 8u) {
+            ok = ds4_gpu_end_commands() && metal_graph_stream_map_layer(m, w, il) &&
+                 ds4_gpu_begin_commands();
+            if (!ok) break;
+        }
         if (ds4_qwen4_layer_is_ple(il)) {
             ok = qwen4_gemv(g, g->ple_key, m, l->ple_key, g->ple_emb, T) &&
                  qwen4_gemv(g, g->ple_val, m, l->ple_value, g->ple_emb, T) &&
@@ -56153,7 +56199,7 @@ static bool qwen4_graph_forward_tokens(ds4_qwen4_gpu_graph *g, const ds4_model *
         if (ok) ok = ds4_gpu_qwen4_hc_combine_tensor(g->R, g->blk, g->inj, T, DS4_N_EMBD, DS4_N_HC) != 0;
         if (ok) ok = qwen4_graph_hc_mix(g, m, l->hc_ffn_norm, l->hc_ffn_down, l->hc_ffn_up, l->hc_ffn_inject, T);
         QWEN4_PROF(4);
-        if (ok) ok = qwen4_graph_moe(g, m, l, T);   /* the reduce folds the combine in */
+        if (ok) ok = qwen4_graph_moe(g, m, l, T, il);   /* the reduce folds the combine in */
         QWEN4_PROF(5);
         if (!ok) fprintf(stderr, "ds4: Qwen3.8 forward failed in layer %u\n", il);
     }
@@ -56164,6 +56210,10 @@ static bool qwen4_graph_forward_tokens(ds4_qwen4_gpu_graph *g, const ds4_model *
         memset(prof, 0, sizeof(prof));
     }
 #undef QWEN4_PROF
+    if (g->ssd_streaming && T > 8u) {
+        const bool ended = ds4_gpu_end_commands() != 0;
+        ok = ok && ended && qwen4_stream_static_map(m, w, g->mtp_R != NULL) && ds4_gpu_begin_commands();
+    }
     if (ok && logits_out && all_rows) {
         ok = qwen4_graph_hc_mix(g, m, w->output_hc_norm, w->output_hc_down, w->output_hc_up, NULL, T) &&
              qwen4_gemv(g, g->logits, m, w->output, g->mixed, T);
@@ -56278,7 +56328,7 @@ static bool qwen4_graph_mtp_step(ds4_qwen4_gpu_graph *g, const ds4_model *m, con
     if (ok) ok = qwen4_graph_attention(g, m, l, il, idx, 1);
     if (ok) ok = ds4_gpu_qwen4_hc_combine_tensor(g->R, g->blk, g->inj, 1, E, hc) != 0;
     if (ok) ok = qwen4_graph_hc_mix(g, m, l->hc_ffn_norm, l->hc_ffn_down, l->hc_ffn_up, l->hc_ffn_inject, 1);
-    if (ok) ok = qwen4_graph_moe(g, m, l, 1);
+    if (ok) ok = qwen4_graph_moe(g, m, l, 1, il);
     if (ok && want_logits) {
         ok = qwen4_graph_hc_mix(g, m, l->nextn_hc_head_norm, l->nextn_hc_head_down, l->nextn_hc_head_up, NULL, 1) &&
              qwen4_gemv(g, g->logits, m, w->output, g->mixed, 1);
@@ -56329,7 +56379,7 @@ static bool qwen4_graph_mtp_pair_serial(ds4_qwen4_gpu_graph *g, const ds4_model 
         if (ok) ok = qwen4_graph_attention(g, m, l, il, idx + t, 1);
         if (ok) ok = ds4_gpu_qwen4_hc_combine_tensor(g->R, g->blk, g->inj, 1, E, hc) != 0;
         if (ok) ok = qwen4_graph_hc_mix(g, m, l->hc_ffn_norm, l->hc_ffn_down, l->hc_ffn_up, l->hc_ffn_inject, 1);
-        if (ok) ok = qwen4_graph_moe(g, m, l, 1);
+        if (ok) ok = qwen4_graph_moe(g, m, l, 1, il);
         if (ok && t == 1u) {
             ok = qwen4_graph_hc_mix(g, m, l->nextn_hc_head_norm, l->nextn_hc_head_down, l->nextn_hc_head_up, NULL, 1) &&
                  qwen4_gemv(g, g->logits, m, w->output, g->mixed, 1);
@@ -56354,6 +56404,7 @@ static int generate_qwen4_metal_argmax(
         const token_vec   * prompt,
         int                 n_predict,
         int                 ctx_size,
+        bool                ssd_streaming,
         ds4_token_emit_fn   emit,
         ds4_generation_done_fn done,
         void              * emit_ud,
@@ -56369,6 +56420,7 @@ static int generate_qwen4_metal_argmax(
         return 1;
     }
     qwen4_graph_reset(g);
+    g->ssd_streaming = ssd_streaming;
     float *logits = xmalloc((size_t)DS4_N_VOCAB * sizeof(logits[0]));
     const double t_prefill0 = now_sec();
     bool ok = true;
@@ -56464,7 +56516,7 @@ static int generate_metal_graph_raw_swa(
     }
     if (ds4_model_is_qwen4()) {
         return generate_qwen4_metal_argmax(model, vocab, weights, prompt, n_predict, ctx_size,
-                                           emit, done, emit_ud, progress, progress_ud);
+                                           ssd_streaming, emit, done, emit_ud, progress, progress_ud);
     }
     if (DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_GLM_DSA) {
         if (power_percent > 0 && power_percent < 100) {
@@ -67427,14 +67479,33 @@ static int ds4_engine_open_internal(ds4_engine **out,
             (opt->directional_steering_file && opt->directional_steering_file[0]) ||
             opt->directional_steering_attn != 0.0f ||
             opt->directional_steering_ffn != 0.0f ||
-            e->ssd_streaming ||
             e->power_percent < 100) {
             fprintf(stderr,
-                    "ds4: --mtp-model, steering, SSD streaming and "
+                    "ds4: --mtp-model, steering and "
                     "--power are not supported for Qwen3.8\n");
             ds4_engine_close(e);
             *out = NULL;
             return 1;
+        }
+        if (e->ssd_streaming) {
+            if (e->ssd_streaming_cold || e->ssd_streaming_preload_experts ||
+                e->ssd_streaming_full_layers) {
+                fprintf(stderr, "ds4: Qwen SSD mode does not yet support cold, preload, or full-layer-prefix options\n");
+                ds4_engine_close(e);
+                *out = NULL;
+                return 1;
+            }
+            for (uint32_t il = 0; il < DS4_N_LAYER - DS4_N_NEXTN_PREDICT; il++) {
+                const ds4_layer_weights *l = &e->weights.layer[il];
+                if (l->ffn_gate_exps->type != DS4_TENSOR_IQ2_XXS ||
+                    l->ffn_up_exps->type != DS4_TENSOR_IQ2_XXS ||
+                    l->ffn_down_exps->type != DS4_TENSOR_MXFP4) {
+                    fprintf(stderr, "ds4: experimental Qwen SSD mode requires IQ2_XXS gate/up and MXFP4 down\n");
+                    ds4_engine_close(e);
+                    *out = NULL;
+                    return 1;
+                }
+            }
         }
     }
 
@@ -67852,6 +67923,14 @@ static int ds4_engine_open_internal(ds4_engine **out,
             *out = NULL;
             return 1;
         }
+        if (ds4_model_is_qwen4() && e->ssd_streaming &&
+            e->ssd_streaming_cache_experts < 8u * DS4_N_EXPERT_USED) {
+            fprintf(stderr, "ds4: Qwen SSD cache must hold at least %u experts for small-row prefill\n",
+                    8u * DS4_N_EXPERT_USED);
+            ds4_engine_close(e);
+            *out = NULL;
+            return 1;
+        }
         ds4_engine_fit_glm_streaming_budget(
                 e,
                 load_slice,
@@ -67953,7 +68032,9 @@ static int ds4_engine_open_internal(ds4_engine **out,
                                       weights_have_output_head(&e->weights)));
             ds4_model_map_span_vec spans;
             bool spans_ok = false;
-            if (load_slice) {
+            if (ds4_model_is_qwen4()) {
+                spans_ok = weights_qwen4_stream_static_spans(&e->weights, &spans, e->glm_mtp);
+            } else if (load_slice) {
                 if (e->ssd_streaming_static_decode_map) {
                     spans_ok = weights_model_map_decode_runtime_slice_spans(
                             &e->weights,
@@ -68010,6 +68091,11 @@ static int ds4_engine_open_internal(ds4_engine **out,
                         load_end,
                         spans.len,
                         (double)span_bytes / 1073741824.0);
+            } else if (ds4_model_is_qwen4()) {
+                fprintf(stderr,
+                        "ds4: Qwen SSD static weights%s: %u spans, %.2f GiB; PLE stays CPU-mapped\n",
+                        e->glm_mtp ? " including resident MTP block" : "",
+                        spans.len, (double)span_bytes / 1073741824.0);
             } else {
                 fprintf(stderr,
                         "ds4: SSD streaming initial %s model map restricted to token embedding (%u spans, %.2f GiB tensor span)\n",
@@ -69296,6 +69382,7 @@ int ds4_session_create(ds4_session **out, ds4_engine *e, int ctx_size) {
             return 1;
         }
         qwen4_graph_reset(&s->qwen4_graph);
+        s->qwen4_graph.ssd_streaming = e->ssd_streaming;
         s->qwen4_graph_ready = true;
         s->prefill_cap = (uint32_t)ctx_size;
         s->logits = xmalloc((size_t)DS4_N_VOCAB * sizeof(s->logits[0]));
@@ -80554,7 +80641,8 @@ bool ds4_session_prompt_lookup_supported(const ds4_session *s) {
         return false;
     }
     if (ds4_session_is_qwen4(s)) {
-        return s->qwen4_graph_ready && s->qwen4_graph.snap_ple_hist != NULL &&
+        return s->qwen4_graph_ready && !s->qwen4_graph.ssd_streaming &&
+               s->qwen4_graph.snap_ple_hist != NULL &&
                s->qwen4_graph.n_logit_rows >= 2u;
     }
     if (ds4_session_is_glm(s)) {

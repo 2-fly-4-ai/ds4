@@ -630,8 +630,10 @@ static uint32_t g_model_view_count;
 
 enum {
     DS4_METAL_STREAM_EXPERT_CACHE_MAX_LAYER = 80,
-    DS4_METAL_STREAM_EXPERT_CACHE_MAX_EXPERT = 384,
-    DS4_METAL_STREAM_EXPERT_CACHE_MAX_SELECTED = DS4_METAL_MAX_ROUTED_EXPERT_USED,
+    DS4_METAL_STREAM_EXPERT_CACHE_MAX_EXPERT = 512,
+    /* Cache I/O also serves Qwen's ten routed experts. This is deliberately
+     * independent of the six/eight-expert DeepSeek/GLM compute kernel limit. */
+    DS4_METAL_STREAM_EXPERT_CACHE_MAX_SELECTED = 10,
     DS4_METAL_STREAM_EXPERT_CACHE_MAX_ENTRIES =
         DS4_METAL_STREAM_EXPERT_CACHE_MAX_LAYER *
         DS4_METAL_STREAM_EXPERT_CACHE_MAX_EXPERT,
@@ -48272,7 +48274,7 @@ int ds4_gpu_qwen4_attn_decode_tensor(
 typedef struct {
     uint32_t n_tokens, n_slots, in_dim, out_rows, weight_type, row_bytes;
     uint64_t expert_bytes;
-    uint32_t has_shared, shared_type, shared_row_bytes, pad0;
+    uint32_t has_shared, shared_type, shared_row_bytes, address_table;
 } qwen4_moe_args;
 
 int ds4_gpu_qwen4_moe_mid_tensor(
@@ -48346,6 +48348,82 @@ int ds4_gpu_qwen4_moe_down_tensor(
     return qwen4_dispatch(QWEN4_K_MOE_DOWN, &args, sizeof(args), b, 5,
                           MTLSizeMake((out_dim + rows_per_tg - 1) / rows_per_tg, n_out, n_tokens),
                           MTLSizeMake(128, 1, 1), 0);
+}
+
+int ds4_gpu_qwen4_moe_stream_tensor(
+        ds4_gpu_tensor *mid, ds4_gpu_tensor *part,
+        const ds4_gpu_tensor *x, const ds4_gpu_tensor *selected,
+        const void *model_map, uint64_t model_size, uint32_t layer,
+        uint64_t gate_offset, uint64_t up_offset, uint64_t down_offset,
+        uint32_t gate_type, uint32_t down_type, uint32_t n_experts,
+        uint32_t n_tokens, uint32_t n_slots, uint32_t in_dim, uint32_t ff_dim,
+        uint64_t shared_gate, uint64_t shared_up, uint64_t shared_down,
+        uint32_t shared_type, uint32_t shared_down_type) {
+    const uint32_t gr = qwen4_expert_row_bytes(gate_type, in_dim);
+    const uint32_t dr = qwen4_expert_row_bytes(down_type, ff_dim);
+    const uint32_t sgr = qwen4_expert_row_bytes(shared_type, in_dim);
+    const uint32_t sdr = qwen4_expert_row_bytes(shared_down_type, ff_dim);
+    const uint64_t ge = (uint64_t)gr * ff_dim, de = (uint64_t)dr * in_dim;
+    /* Small-row decode/verifier only. Prefill retains its existing tiled
+     * arithmetic and loads one layer at a time. Never overflow into mmap
+     * expert views when the user's explicit cache is too small. */
+    if (!g_ssd_streaming_mode || !gr || !dr || !sgr || !sdr ||
+        !n_tokens || n_tokens > 8 || !n_slots || n_slots > 10 ||
+        ds4_gpu_stream_expert_cache_configured_count() < n_tokens * n_slots) return 0;
+    const int had_batch = g_batch_cb != nil;
+    if (had_batch && !ds4_gpu_end_commands()) return 0;
+    id<MTLBuffer> ga = nil, ua = nil, da = nil, og = nil, ou = nil, od = nil;
+    ds4_gpu_stream_expert_cache_entry *entries[DS4_METAL_STREAM_EXPERT_CACHE_MAX_EXPERT];
+    uint32_t count = 0, unique = 0;
+    g_stream_prefill_batch_selected_addr_building++;
+    int ok = ds4_gpu_stream_expert_cache_prepare_selected_batch(
+        model_map, model_size, layer, selected, n_tokens, n_experts, n_slots,
+        gate_offset, up_offset, down_offset, ge, de, &ga, &ua, &da,
+        entries, &count, &unique, &og, &ou, &od);
+    g_stream_prefill_batch_selected_addr_building--;
+    if (!ok || !unique || og || ou || od) return 0;
+    qwen4_bind b[7], d[5];
+    b[0] = (qwen4_bind){ga, 0}; b[1] = (qwen4_bind){ua, 0};
+    d[0] = (qwen4_bind){da, 0};
+    const uint32_t stride = n_slots + 1;
+    if (!qwen4_bind_tensor(&b[2], selected, (uint64_t)n_tokens*n_slots*4, "stream selected") ||
+        !qwen4_bind_tensor(&b[3], x, (uint64_t)n_tokens*in_dim*4, "stream input") ||
+        !qwen4_bind_tensor(&b[4], mid, (uint64_t)n_tokens*stride*ff_dim*4, "stream mid") ||
+        !qwen4_bind_weight(&b[5], model_map, model_size, shared_gate, (uint64_t)sgr*ff_dim, "stream shared gate") ||
+        !qwen4_bind_weight(&b[6], model_map, model_size, shared_up, (uint64_t)sgr*ff_dim, "stream shared up") ||
+        !qwen4_bind_tensor(&d[3], part, (uint64_t)n_tokens*stride*in_dim*4, "stream part") ||
+        !qwen4_bind_weight(&d[4], model_map, model_size, shared_down, (uint64_t)sdr*in_dim, "stream shared down")) return 0;
+    d[1] = b[2]; d[2] = b[4];
+    qwen4_moe_args a[2] = {
+        {n_tokens,n_slots,in_dim,ff_dim,gate_type,gr,ge,1,shared_type,sgr,1},
+        {n_tokens,n_slots,ff_dim,in_dim,down_type,dr,de,1,shared_down_type,sdr,1}
+    };
+    if (had_batch && !ds4_gpu_begin_commands()) return 0;
+    int owned = 0;
+    id<MTLCommandBuffer> cb = ds4_gpu_command_buffer(&owned);
+    if (!cb || !ds4_gpu_stream_expert_cache_mark_entries_inflight(entries, count, 0)) return 0;
+    for (int pass = 0; pass < 2; pass++) {
+        const int k = pass ? QWEN4_K_MOE_DOWN : QWEN4_K_MOE_MID;
+        if (!g_qwen4_pipelines[k]) g_qwen4_pipelines[k] = ds4_gpu_get_pipeline(qwen4_kernel_names[k]);
+        if (!g_qwen4_pipelines[k]) return 0;
+        id<MTLComputeCommandEncoder> enc = ds4_gpu_compute_encoder(cb);
+        [enc setComputePipelineState:g_qwen4_pipelines[k]];
+        [enc setBytes:&a[pass] length:sizeof(a[pass]) atIndex:0];
+        qwen4_bind *binds = pass ? d : b;
+        for (int i=0; i<(pass ? 5 : 7); i++)
+            [enc setBuffer:binds[i].buf offset:binds[i].off atIndex:i+1];
+        for (uint32_t i=0; i<count; i++) {
+            if (pass) [enc useResource:entries[i]->down_buffer usage:MTLResourceUsageRead];
+            else {
+                [enc useResource:entries[i]->gate_buffer usage:MTLResourceUsageRead];
+                [enc useResource:entries[i]->up_buffer usage:MTLResourceUsageRead];
+            }
+        }
+        [enc dispatchThreadgroups:MTLSizeMake((a[pass].out_rows+7)/8,stride,n_tokens)
+             threadsPerThreadgroup:MTLSizeMake(128,1,1)];
+        ds4_gpu_end_compute_encoder(cb, enc);
+    }
+    return ds4_gpu_finish_command_buffer(cb, owned, "Qwen streaming experts");
 }
 
 int ds4_gpu_qwen4_moe_reduce_tensor(
