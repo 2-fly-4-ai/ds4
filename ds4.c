@@ -45924,6 +45924,7 @@ static bool glm_graph_forward_output_head(
         const ds4_gpu_tensor *hidden,
         float                *logits_out) {
     if (!g || !model || !weights || !hidden || !logits_out) return false;
+#ifdef __APPLE__
     /* A verifier can finish with only its last layer mapped and defer the
      * output head. Restore the static decode set before this separate head;
      * it also contains the nextn weights consumed by the following draft. */
@@ -45933,6 +45934,7 @@ static bool glm_graph_forward_output_head(
         g->streaming_static_decode_map_current =
             metal_graph_stream_decode_static_map_state_cache_enabled();
     }
+#endif
     const ds4_gpu_tensor *plain = hidden;
     bool ok = ds4_gpu_begin_commands() != 0;
     if (ok && g->glm53 &&
@@ -45984,12 +45986,14 @@ static bool glm53_graph_forward_output_head_rows_impl(
         !glm53_graph_session_batch_logits_ensure(g, rows)) {
         return false;
     }
+#ifdef __APPLE__
     if (g->ssd_streaming && weights_model_map_decode_static_supported(weights) &&
         !g->streaming_static_decode_map_current) {
         if (!metal_graph_stream_map_decode_static_all(model, weights)) return false;
         g->streaming_static_decode_map_current =
             metal_graph_stream_decode_static_map_state_cache_enabled();
     }
+#endif
     const uint64_t hc_row_elems = (uint64_t)DS4_N_HC * DS4_N_EMBD;
     if (!ds4_gpu_tensor_write(g->batch_hc_cur,
                               0,
