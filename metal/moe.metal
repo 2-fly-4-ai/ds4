@@ -4490,6 +4490,40 @@ kernel void kernel_mul_mv_addr_iq2_xxs_f32(
         sgitg);
 }
 
+/* Cached Q2_K experts use the resident dot-product implementation and write
+ * separate expert rows. The existing reduction then preserves its numerical
+ * order; extending the six-expert fused sum would change that order. */
+kernel void kernel_mul_mv_addr_q2_K_f32(
+        constant ds4_metal_args_mul_mv_id & args,
+        device const uint64_t * addrs,
+        device const char * src1,
+        device       char * dst,
+        device const char * ids,
+        threadgroup char * shmem [[threadgroup(0)]],
+        uint3 tgpig [[threadgroup_position_in_grid]],
+        ushort tiisg [[thread_index_in_simdgroup]],
+        ushort sgitg [[simdgroup_index_in_threadgroup]]) {
+    const int token = tgpig.z / args.nei0;
+    const int slot = tgpig.z % args.nei0;
+    const int32_t expert = ((device const int32_t *)(ids + token * args.nbi1))[slot];
+    if (expert < 0 || expert >= args.ne02 || expert >= 384) return;
+    const uint64_t addr = addrs[(uint)expert];
+    if (!addr) return;
+    device const char *input = src1 + (slot % args.ne11) * args.nb11 + token * args.nb12;
+    device char *output = dst + (slot * args.ne0 + token * args.ne1 * args.ne0) * sizeof(float);
+    ds4_metal_args_mul_mv inner = {
+        args.ne00, args.ne01, 1,
+        args.nb00, args.nb01, args.nb02, args.nb02,
+        args.ne10, 1, 1,
+        args.nb10, args.nb11, args.nb12, args.nb12,
+        args.ne0, 1, args.nr0, 1, 1,
+    };
+    tgpig.z = 0;
+    kernel_mul_mv_q2_K_f32_impl<N_R0_Q2_K>(inner,
+        reinterpret_cast<device const char *>(addr), input, output,
+        shmem, tgpig, tiisg, sgitg);
+}
+
 kernel void kernel_mul_mv_addr_iq2_xxs_pair_swiglu_masked_f32(
         constant ds4_metal_args_mul_mv_id & args,
         constant ds4_metal_dsv4_moe_swiglu_weight_args & act,

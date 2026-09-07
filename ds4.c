@@ -7899,9 +7899,11 @@ static bool glm_stream_selected_expert_cache_supported(
 
     if (l->ffn_down_exps->type == DS4_TENSOR_Q2_K) {
 #ifdef __APPLE__
-        /* Metal's IQ2/Q2 selected-slot down kernel sums six experts. The
-         * separate IQ2/IQ2 address-table path below supports up to eight. */
-        if (DS4_N_EXPERT_USED != 6) return false;
+        /* Six experts retain the fused selected-slot path. Eight use cached
+         * addresses and per-expert Q2_K outputs, preserving resident reduction. */
+        if (DS4_N_EXPERT_USED != 6 && DS4_N_EXPERT_USED != 8) return false;
+        if (DS4_N_EXPERT_USED == 8 &&
+            getenv("DS4_METAL_DISABLE_IQ2_STREAM_ADDR_TABLE") != NULL) return false;
 #endif
         return !glm_graph_env_present("DS4_ROCM_DISABLE_IQ2_SELECTED_EXPERT_VIEWS",
                                       "DS4_METAL_DISABLE_IQ2_SELECTED_EXPERT_VIEWS");
@@ -45922,6 +45924,15 @@ static bool glm_graph_forward_output_head(
         const ds4_gpu_tensor *hidden,
         float                *logits_out) {
     if (!g || !model || !weights || !hidden || !logits_out) return false;
+    /* A verifier can finish with only its last layer mapped and defer the
+     * output head. Restore the static decode set before this separate head;
+     * it also contains the nextn weights consumed by the following draft. */
+    if (g->ssd_streaming && weights_model_map_decode_static_supported(weights) &&
+        !g->streaming_static_decode_map_current) {
+        if (!metal_graph_stream_map_decode_static_all(model, weights)) return false;
+        g->streaming_static_decode_map_current =
+            metal_graph_stream_decode_static_map_state_cache_enabled();
+    }
     const ds4_gpu_tensor *plain = hidden;
     bool ok = ds4_gpu_begin_commands() != 0;
     if (ok && g->glm53 &&
@@ -45972,6 +45983,12 @@ static bool glm53_graph_forward_output_head_rows_impl(
         !g->batch_ffn_norm ||
         !glm53_graph_session_batch_logits_ensure(g, rows)) {
         return false;
+    }
+    if (g->ssd_streaming && weights_model_map_decode_static_supported(weights) &&
+        !g->streaming_static_decode_map_current) {
+        if (!metal_graph_stream_map_decode_static_all(model, weights)) return false;
+        g->streaming_static_decode_map_current =
+            metal_graph_stream_decode_static_map_state_cache_enabled();
     }
     const uint64_t hc_row_elems = (uint64_t)DS4_N_HC * DS4_N_EMBD;
     if (!ds4_gpu_tensor_write(g->batch_hc_cur,
