@@ -24,6 +24,14 @@ Model: existing `Qwen3.8-Flash-Next-DS4-Ivan-Q4-Compat.gguf`; no new quant downl
 No kernels, quantization, automatic router policy, or MTP defaults changed.
 No wholesale upstream merge or unrelated new tool-parser implementation.
 
+## Promotion
+
+Experiment saved as `ab3e3a5`, focused cherry-pick promoted to main as `c4997b4`.
+After promotion all five frontends rebuilt, snapshot/server unit tests passed,
+and real Qwen MTP snapshot plus corrected rewind tests passed again. Main source
+matches the tested experiment. No model/server left running; no GitHub push.
+Existing unrelated untracked benchmarks were preserved.
+
 ## Measured live API A/B
 
 `tool_ab.py` starts exactly one server at a time on a random loopback port.
