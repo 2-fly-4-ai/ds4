@@ -1,0 +1,498 @@
+[
+  {
+    "wall_s": 3.6712747500000003,
+    "ttft_s": null,
+    "usage": {
+      "prompt_tokens": 1933,
+      "completion_tokens": 47,
+      "total_tokens": 1980,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1933
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mode": "base",
+    "rep": 0,
+    "stream": false,
+    "turn": 0,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "",
+      "reasoning_content": "The user wants me to read package.json and report the project version. Let me do that.",
+      "tool_calls": [
+        {
+          "id": "call_084fc80879fb2c3064f8de6292764a7d",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"package.json\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 3.772711709,
+    "ttft_s": null,
+    "usage": {
+      "prompt_tokens": 1990,
+      "completion_tokens": 34,
+      "total_tokens": 2024,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1990
+      }
+    },
+    "finish": "stop",
+    "content_sha256": "04c00a796f1d85fb87e4eefc38d103158e32894e1a6787cd1dd9c01de8f68697",
+    "mode": "base",
+    "rep": 0,
+    "stream": false,
+    "turn": 1,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "The project version in package.json is **2.7.4**.",
+      "reasoning_content": "The project version is 2.7.4. Report in one short sentence."
+    }
+  },
+  {
+    "wall_s": 3.831111290999999,
+    "ttft_s": 3.0515835409999994,
+    "usage": {
+      "prompt_tokens": 1933,
+      "completion_tokens": 47,
+      "total_tokens": 1980,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1933
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mode": "base",
+    "rep": 0,
+    "stream": true,
+    "turn": 0,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "",
+      "reasoning_content": "The user wants me to read package.json and report the project version. Let me do that.\n",
+      "tool_calls": [
+        {
+          "id": "call_dfa165de44bcd51778d7c656e283be72",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"package.json\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 4.101069209000002,
+    "ttft_s": 3.33131425,
+    "usage": {
+      "prompt_tokens": 1990,
+      "completion_tokens": 40,
+      "total_tokens": 2030,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1990
+      }
+    },
+    "finish": "stop",
+    "content_sha256": "fe7e4659b42820ac6a1c633943b0cb794d91403ad1a3d9bd027baf3147bda952",
+    "mode": "base",
+    "rep": 0,
+    "stream": true,
+    "turn": 1,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "\n\nThe project version in package.json is **2.7.4** (for the package \"fixture-project\").",
+      "reasoning_content": "The file exists and shows the version. Report it in one short sentence.\n"
+    }
+  },
+  {
+    "wall_s": 3.2681992499999986,
+    "ttft_s": null,
+    "usage": {
+      "prompt_tokens": 1933,
+      "completion_tokens": 47,
+      "total_tokens": 1980,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1933
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mode": "candidate",
+    "rep": 0,
+    "stream": false,
+    "turn": 0,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "",
+      "reasoning_content": "The user wants me to read package.json and report the project version. Let me do that.",
+      "tool_calls": [
+        {
+          "id": "call_489df4ed9dd0431ba4dbcd7e5edac83e",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"package.json\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 0.9672081659999989,
+    "ttft_s": null,
+    "usage": {
+      "prompt_tokens": 2010,
+      "completion_tokens": 38,
+      "total_tokens": 2048,
+      "prompt_tokens_details": {
+        "cached_tokens": 1980,
+        "cache_write_tokens": 30
+      }
+    },
+    "finish": "stop",
+    "content_sha256": "8ea494ce39f8bee0bee5339766a4a69a5f089ef3bd4cc82c956fa9d12052c2ce",
+    "mode": "candidate",
+    "rep": 0,
+    "stream": false,
+    "turn": 1,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "The project version is 2.7.4.",
+      "reasoning_content": "The file contains the name \"fixture-project\" and version \"2.7.4\". Report in one short sentence."
+    }
+  },
+  {
+    "wall_s": 4.020314708999997,
+    "ttft_s": 3.216421541999999,
+    "usage": {
+      "prompt_tokens": 1933,
+      "completion_tokens": 47,
+      "total_tokens": 1980,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1933
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mode": "candidate",
+    "rep": 0,
+    "stream": true,
+    "turn": 0,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "",
+      "reasoning_content": "The user wants me to read package.json and report the project version. Let me do that.\n",
+      "tool_calls": [
+        {
+          "id": "call_77589369fc2ed110db00a8f92f947f78",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"package.json\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 1.0774710830000025,
+    "ttft_s": 0.3032507500000001,
+    "usage": {
+      "prompt_tokens": 2010,
+      "completion_tokens": 40,
+      "total_tokens": 2050,
+      "prompt_tokens_details": {
+        "cached_tokens": 1980,
+        "cache_write_tokens": 30
+      }
+    },
+    "finish": "stop",
+    "content_sha256": "a4fda0d5cd608f381d1c2752f1252043474570d0d760909ac807724a04527349",
+    "mode": "candidate",
+    "rep": 0,
+    "stream": true,
+    "turn": 1,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "\n\nThe project version in package.json is 2.7.4.",
+      "reasoning_content": "The file contains name \"fixture-project\" and version \"2.7.4\". Report in one short sentence.\n"
+    }
+  },
+  {
+    "wall_s": 4.2789949589999985,
+    "ttft_s": null,
+    "usage": {
+      "prompt_tokens": 1933,
+      "completion_tokens": 47,
+      "total_tokens": 1980,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1933
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mode": "candidate",
+    "rep": 1,
+    "stream": false,
+    "turn": 0,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "",
+      "reasoning_content": "The user wants me to read package.json and report the project version. Let me do that.",
+      "tool_calls": [
+        {
+          "id": "call_dc29f0786f802c8120bf9a279acb33b9",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"package.json\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 1.0555639580000005,
+    "ttft_s": null,
+    "usage": {
+      "prompt_tokens": 2010,
+      "completion_tokens": 38,
+      "total_tokens": 2048,
+      "prompt_tokens_details": {
+        "cached_tokens": 1980,
+        "cache_write_tokens": 30
+      }
+    },
+    "finish": "stop",
+    "content_sha256": "8ea494ce39f8bee0bee5339766a4a69a5f089ef3bd4cc82c956fa9d12052c2ce",
+    "mode": "candidate",
+    "rep": 1,
+    "stream": false,
+    "turn": 1,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "The project version is 2.7.4.",
+      "reasoning_content": "The file contains the name \"fixture-project\" and version \"2.7.4\". Report in one short sentence."
+    }
+  },
+  {
+    "wall_s": 4.418682541999999,
+    "ttft_s": 3.6263286669999957,
+    "usage": {
+      "prompt_tokens": 1933,
+      "completion_tokens": 47,
+      "total_tokens": 1980,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1933
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mode": "candidate",
+    "rep": 1,
+    "stream": true,
+    "turn": 0,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "",
+      "reasoning_content": "The user wants me to read package.json and report the project version. Let me do that.\n",
+      "tool_calls": [
+        {
+          "id": "call_7b2bf3fef85978da270478e8bd7d9704",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"package.json\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 0.9933671670000024,
+    "ttft_s": 0.29010995800000217,
+    "usage": {
+      "prompt_tokens": 2010,
+      "completion_tokens": 40,
+      "total_tokens": 2050,
+      "prompt_tokens_details": {
+        "cached_tokens": 1980,
+        "cache_write_tokens": 30
+      }
+    },
+    "finish": "stop",
+    "content_sha256": "a4fda0d5cd608f381d1c2752f1252043474570d0d760909ac807724a04527349",
+    "mode": "candidate",
+    "rep": 1,
+    "stream": true,
+    "turn": 1,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "\n\nThe project version in package.json is 2.7.4.",
+      "reasoning_content": "The file contains name \"fixture-project\" and version \"2.7.4\". Report in one short sentence.\n"
+    }
+  },
+  {
+    "wall_s": 3.419213125000006,
+    "ttft_s": null,
+    "usage": {
+      "prompt_tokens": 1933,
+      "completion_tokens": 47,
+      "total_tokens": 1980,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1933
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mode": "base",
+    "rep": 1,
+    "stream": false,
+    "turn": 0,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "",
+      "reasoning_content": "The user wants me to read package.json and report the project version. Let me do that.",
+      "tool_calls": [
+        {
+          "id": "call_5bf5599873feb613a91670e28a5aedc3",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"package.json\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 3.9119307090000035,
+    "ttft_s": null,
+    "usage": {
+      "prompt_tokens": 1990,
+      "completion_tokens": 34,
+      "total_tokens": 2024,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1990
+      }
+    },
+    "finish": "stop",
+    "content_sha256": "04c00a796f1d85fb87e4eefc38d103158e32894e1a6787cd1dd9c01de8f68697",
+    "mode": "base",
+    "rep": 1,
+    "stream": false,
+    "turn": 1,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "The project version in package.json is **2.7.4**.",
+      "reasoning_content": "The project version is 2.7.4. Report in one short sentence."
+    }
+  },
+  {
+    "wall_s": 4.012539917000005,
+    "ttft_s": 3.2350567500000054,
+    "usage": {
+      "prompt_tokens": 1933,
+      "completion_tokens": 47,
+      "total_tokens": 1980,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1933
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mode": "base",
+    "rep": 1,
+    "stream": true,
+    "turn": 0,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "",
+      "reasoning_content": "The user wants me to read package.json and report the project version. Let me do that.\n",
+      "tool_calls": [
+        {
+          "id": "call_484cc27a69455e755aa6292ad85e4b6b",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"package.json\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 4.191064959000002,
+    "ttft_s": 3.4502462089999995,
+    "usage": {
+      "prompt_tokens": 1990,
+      "completion_tokens": 40,
+      "total_tokens": 2030,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1990
+      }
+    },
+    "finish": "stop",
+    "content_sha256": "fe7e4659b42820ac6a1c633943b0cb794d91403ad1a3d9bd027baf3147bda952",
+    "mode": "base",
+    "rep": 1,
+    "stream": true,
+    "turn": 1,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "\n\nThe project version in package.json is **2.7.4** (for the package \"fixture-project\").",
+      "reasoning_content": "The file exists and shows the version. Report it in one short sentence.\n"
+    }
+  }
+]

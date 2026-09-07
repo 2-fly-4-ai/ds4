@@ -1,0 +1,858 @@
+
+===== request 1 2026-09-07 13:28:16 =====
+kind: chat
+model: qwen3.8-flash-next-chat
+stream: 0
+tools: 1
+think_mode: none
+prompt_tokens: 1897
+effective_prompt_tokens: 1897
+cached_tokens: 0
+max_tokens: 128
+temperature: 0.000
+top_k: 0
+top_p: 1.000
+min_p: 0.050
+ignore_eos: 0
+seed: 0
+stream_include_usage: 1
+
+--- cache decision ---
+live_tokens_before: 0
+prompt_tokens: 1897
+live_prompt_common: 0
+memory_token_reusable: 0
+memory_miss_reason: no-live-checkpoint
+tool_replay: mem=0 disk=0 canonical=0 missing_ids=0
+cache_source: none
+cached_tokens: 0
+disk_cached_tokens: 0
+
+--- raw request json ---
+{"model": "qwen3.8-flash-next-chat", "messages": [{"role": "system", "content": "You are a coding assistant. Use read_file to inspect the requested file, then report its project version in one short sentence. Do not invent file contents.\nReference item 0: preserve public interfaces and test changes before release.\nReference item 1: preserve public interfaces and test changes before release.\nReference item 2: preserve public interfaces and test changes before release.\nReference item 3: preserve public interfaces and test changes before release.\nReference item 4: preserve public interfaces and test changes before release.\nReference item 5: preserve public interfaces and test changes before release.\nReference item 6: preserve public interfaces and test changes before release.\nReference item 7: preserve public interfaces and test changes before release.\nReference item 8: preserve public interfaces and test changes before release.\nReference item 9: preserve public interfaces and test changes before release.\nReference item 10: preserve public interfaces and test changes before release.\nReference item 11: preserve public interfaces and test changes before release.\nReference item 12: preserve public interfaces and test changes before release.\nReference item 13: preserve public interfaces and test changes before release.\nReference item 14: preserve public interfaces and test changes before release.\nReference item 15: preserve public interfaces and test changes before release.\nReference item 16: preserve public interfaces and test changes before release.\nReference item 17: preserve public interfaces and test changes before release.\nReference item 18: preserve public interfaces and test changes before release.\nReference item 19: preserve public interfaces and test changes before release.\nReference item 20: preserve public interfaces and test changes before release.\nReference item 21: preserve public interfaces and test changes before release.\nReference item 22: preserve public interfaces and test changes before release.\nReference item 23: preserve public interfaces and test changes before release.\nReference item 24: preserve public interfaces and test changes before release.\nReference item 25: preserve public interfaces and test changes before release.\nReference item 26: preserve public interfaces and test changes before release.\nReference item 27: preserve public interfaces and test changes before release.\nReference item 28: preserve public interfaces and test changes before release.\nReference item 29: preserve public interfaces and test changes before release.\nReference item 30: preserve public interfaces and test changes before release.\nReference item 31: preserve public interfaces and test changes before release.\nReference item 32: preserve public interfaces and test changes before release.\nReference item 33: preserve public interfaces and test changes before release.\nReference item 34: preserve public interfaces and test changes before release.\nReference item 35: preserve public interfaces and test changes before release.\nReference item 36: preserve public interfaces and test changes before release.\nReference item 37: preserve public interfaces and test changes before release.\nReference item 38: preserve public interfaces and test changes before release.\nReference item 39: preserve public interfaces and test changes before release.\nReference item 40: preserve public interfaces and test changes before release.\nReference item 41: preserve public interfaces and test changes before release.\nReference item 42: preserve public interfaces and test changes before release.\nReference item 43: preserve public interfaces and test changes before release.\nReference item 44: preserve public interfaces and test changes before release.\nReference item 45: preserve public interfaces and test changes before release.\nReference item 46: preserve public interfaces and test changes before release.\nReference item 47: preserve public interfaces and test changes before release.\nReference item 48: preserve public interfaces and test changes before release.\nReference item 49: preserve public interfaces and test changes before release.\nReference item 50: preserve public interfaces and test changes before release.\nReference item 51: preserve public interfaces and test changes before release.\nReference item 52: preserve public interfaces and test changes before release.\nReference item 53: preserve public interfaces and test changes before release.\nReference item 54: preserve public interfaces and test changes before release.\nReference item 55: preserve public interfaces and test changes before release.\nReference item 56: preserve public interfaces and test changes before release.\nReference item 57: preserve public interfaces and test changes before release.\nReference item 58: preserve public interfaces and test changes before release.\nReference item 59: preserve public interfaces and test changes before release.\nReference item 60: preserve public interfaces and test changes before release.\nReference item 61: preserve public interfaces and test changes before release.\nReference item 62: preserve public interfaces and test changes before release.\nReference item 63: preserve public interfaces and test changes before release.\nReference item 64: preserve public interfaces and test changes before release.\nReference item 65: preserve public interfaces and test changes before release.\nReference item 66: preserve public interfaces and test changes before release.\nReference item 67: preserve public interfaces and test changes before release.\nReference item 68: preserve public interfaces and test changes before release.\nReference item 69: preserve public interfaces and test changes before release.\nReference item 70: preserve public interfaces and test changes before release.\nReference item 71: preserve public interfaces and test changes before release.\nReference item 72: preserve public interfaces and test changes before release.\nReference item 73: preserve public interfaces and test changes before release.\nReference item 74: preserve public interfaces and test changes before release.\nReference item 75: preserve public interfaces and test changes before release.\nReference item 76: preserve public interfaces and test changes before release.\nReference item 77: preserve public interfaces and test changes before release.\nReference item 78: preserve public interfaces and test changes before release.\nReference item 79: preserve public interfaces and test changes before release.\nReference item 80: preserve public interfaces and test changes before release.\nReference item 81: preserve public interfaces and test changes before release.\nReference item 82: preserve public interfaces and test changes before release.\nReference item 83: preserve public interfaces and test changes before release.\nReference item 84: preserve public interfaces and test changes before release.\nReference item 85: preserve public interfaces and test changes before release.\nReference item 86: preserve public interfaces and test changes before release.\nReference item 87: preserve public interfaces and test changes before release.\nReference item 88: preserve public interfaces and test changes before release.\nReference item 89: preserve public interfaces and test changes before release.\nReference item 90: preserve public interfaces and test changes before release.\nReference item 91: preserve public interfaces and test changes before release.\nReference item 92: preserve public interfaces and test changes before release.\nReference item 93: preserve public interfaces and test changes before release.\nReference item 94: preserve public interfaces and test changes before release.\nReference item 95: preserve public interfaces and test changes before release.\nReference item 96: preserve public interfaces and test changes before release.\nReference item 97: preserve public interfaces and test changes before release.\nReference item 98: preserve public interfaces and test changes before release.\nReference item 99: preserve public interfaces and test changes before release."}, {"role": "user", "content": "Case 0: read package.json and tell me the project version."}], "tools": [{"type": "function", "function": {"name": "read_file", "description": "Read a project file.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}}], "temperature": 0, "max_tokens": 128, "stream": false, "thinking": false, "chat_template_kwargs": {"enable_thinking": false}, "stream_options": {"include_usage": true}}
+
+--- rendered prompt ---
+<|im_start|>system
+# Tools
+
+You have access to the following functions:
+
+<tools>
+{"type": "function", "function": {"name": "read_file", "description": "Read a project file.", "parameters": {"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}}}
+</tools>
+
+If you choose to call a function ONLY reply in the following format with NO suffix:
+
+<tool_call>
+<function=example_function_name>
+<parameter=example_parameter_1>
+value_1
+</parameter>
+<parameter=example_parameter_2>
+This is the value for the second parameter
+that can span
+multiple lines
+</parameter>
+</function>
+</tool_call>
+
+<IMPORTANT>
+Reminder:
+- Function calls MUST follow the specified format: an inner <function=...></function> block must be nested within <tool_call></tool_call> XML tags
+- Required parameters MUST be specified
+- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after
+- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls
+</IMPORTANT>
+
+You are a coding assistant. Use read_file to inspect the requested file, then report its project version in one short sentence. Do not invent file contents.
+Reference item 0: preserve public interfaces and test changes before release.
+Reference item 1: preserve public interfaces and test changes before release.
+Reference item 2: preserve public interfaces and test changes before release.
+Reference item 3: preserve public interfaces and test changes before release.
+Reference item 4: preserve public interfaces and test changes before release.
+Reference item 5: preserve public interfaces and test changes before release.
+Reference item 6: preserve public interfaces and test changes before release.
+Reference item 7: preserve public interfaces and test changes before release.
+Reference item 8: preserve public interfaces and test changes before release.
+Reference item 9: preserve public interfaces and test changes before release.
+Reference item 10: preserve public interfaces and test changes before release.
+Reference item 11: preserve public interfaces and test changes before release.
+Reference item 12: preserve public interfaces and test changes before release.
+Reference item 13: preserve public interfaces and test changes before release.
+Reference item 14: preserve public interfaces and test changes before release.
+Reference item 15: preserve public interfaces and test changes before release.
+Reference item 16: preserve public interfaces and test changes before release.
+Reference item 17: preserve public interfaces and test changes before release.
+Reference item 18: preserve public interfaces and test changes before release.
+Reference item 19: preserve public interfaces and test changes before release.
+Reference item 20: preserve public interfaces and test changes before release.
+Reference item 21: preserve public interfaces and test changes before release.
+Reference item 22: preserve public interfaces and test changes before release.
+Reference item 23: preserve public interfaces and test changes before release.
+Reference item 24: preserve public interfaces and test changes before release.
+Reference item 25: preserve public interfaces and test changes before release.
+Reference item 26: preserve public interfaces and test changes before release.
+Reference item 27: preserve public interfaces and test changes before release.
+Reference item 28: preserve public interfaces and test changes before release.
+Reference item 29: preserve public interfaces and test changes before release.
+Reference item 30: preserve public interfaces and test changes before release.
+Reference item 31: preserve public interfaces and test changes before release.
+Reference item 32: preserve public interfaces and test changes before release.
+Reference item 33: preserve public interfaces and test changes before release.
+Reference item 34: preserve public interfaces and test changes before release.
+Reference item 35: preserve public interfaces and test changes before release.
+Reference item 36: preserve public interfaces and test changes before release.
+Reference item 37: preserve public interfaces and test changes before release.
+Reference item 38: preserve public interfaces and test changes before release.
+Reference item 39: preserve public interfaces and test changes before release.
+Reference item 40: preserve public interfaces and test changes before release.
+Reference item 41: preserve public interfaces and test changes before release.
+Reference item 42: preserve public interfaces and test changes before release.
+Reference item 43: preserve public interfaces and test changes before release.
+Reference item 44: preserve public interfaces and test changes before release.
+Reference item 45: preserve public interfaces and test changes before release.
+Reference item 46: preserve public interfaces and test changes before release.
+Reference item 47: preserve public interfaces and test changes before release.
+Reference item 48: preserve public interfaces and test changes before release.
+Reference item 49: preserve public interfaces and test changes before release.
+Reference item 50: preserve public interfaces and test changes before release.
+Reference item 51: preserve public interfaces and test changes before release.
+Reference item 52: preserve public interfaces and test changes before release.
+Reference item 53: preserve public interfaces and test changes before release.
+Reference item 54: preserve public interfaces and test changes before release.
+Reference item 55: preserve public interfaces and test changes before release.
+Reference item 56: preserve public interfaces and test changes before release.
+Reference item 57: preserve public interfaces and test changes before release.
+Reference item 58: preserve public interfaces and test changes before release.
+Reference item 59: preserve public interfaces and test changes before release.
+Reference item 60: preserve public interfaces and test changes before release.
+Reference item 61: preserve public interfaces and test changes before release.
+Reference item 62: preserve public interfaces and test changes before release.
+Reference item 63: preserve public interfaces and test changes before release.
+Reference item 64: preserve public interfaces and test changes before release.
+Reference item 65: preserve public interfaces and test changes before release.
+Reference item 66: preserve public interfaces and test changes before release.
+Reference item 67: preserve public interfaces and test changes before release.
+Reference item 68: preserve public interfaces and test changes before release.
+Reference item 69: preserve public interfaces and test changes before release.
+Reference item 70: preserve public interfaces and test changes before release.
+Reference item 71: preserve public interfaces and test changes before release.
+Reference item 72: preserve public interfaces and test changes before release.
+Reference item 73: preserve public interfaces and test changes before release.
+Reference item 74: preserve public interfaces and test changes before release.
+Reference item 75: preserve public interfaces and test changes before release.
+Reference item 76: preserve public interfaces and test changes before release.
+Reference item 77: preserve public interfaces and test changes before release.
+Reference item 78: preserve public interfaces and test changes before release.
+Reference item 79: preserve public interfaces and test changes before release.
+Reference item 80: preserve public interfaces and test changes before release.
+Reference item 81: preserve public interfaces and test changes before release.
+Reference item 82: preserve public interfaces and test changes before release.
+Reference item 83: preserve public interfaces and test changes before release.
+Reference item 84: preserve public interfaces and test changes before release.
+Reference item 85: preserve public interfaces and test changes before release.
+Reference item 86: preserve public interfaces and test changes before release.
+Reference item 87: preserve public interfaces and test changes before release.
+Reference item 88: preserve public interfaces and test changes before release.
+Reference item 89: preserve public interfaces and test changes before release.
+Reference item 90: preserve public interfaces and test changes before release.
+Reference item 91: preserve public interfaces and test changes before release.
+Reference item 92: preserve public interfaces and test changes before release.
+Reference item 93: preserve public interfaces and test changes before release.
+Reference item 94: preserve public interfaces and test changes before release.
+Reference item 95: preserve public interfaces and test changes before release.
+Reference item 96: preserve public interfaces and test changes before release.
+Reference item 97: preserve public interfaces and test changes before release.
+Reference item 98: preserve public interfaces and test changes before release.
+Reference item 99: preserve public interfaces and test changes before release.<|im_end|>
+<|im_start|>user
+Case 0: read package.json and tell me the project version.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+
+--- generated text ---
+
+
+--- trace: prefill done; decode_max=128 ctx_room=6295 ---
+
+<tool_call>
+
+--- trace: entered tool-call block after 1 generated tokens ---
+
+
+<function=read_file>
+<parameter=path>
+package.json
+</parameter>
+</function>
+</tool_call>
+
+--- trace: closed tool-call block after 25 generated tokens ---
+
+
+
+--- parsed message ---
+finish: tool_calls
+generated_tokens: 25
+dsml_start: 1
+dsml_end: 1
+elapsed_sec: 3.258
+
+tool_call[0]:
+id: call_59b40d08ed8044948b5703a9f00c9672
+name: read_file
+arguments:
+{"path": "package.json"}
+
+===== end request 1 =====
+
+===== request 2 2026-09-07 13:28:20 =====
+kind: chat
+model: qwen3.8-flash-next-chat
+stream: 0
+tools: 1
+think_mode: none
+prompt_tokens: 1954
+effective_prompt_tokens: 1954
+cached_tokens: 1922
+max_tokens: 128
+temperature: 0.000
+top_k: 0
+top_p: 1.000
+min_p: 0.050
+ignore_eos: 0
+seed: 0
+stream_include_usage: 1
+
+--- cache decision ---
+live_tokens_before: 1922
+prompt_tokens: 1954
+live_prompt_common: 1922
+memory_token_reusable: 1
+memory_miss_reason: live-prefix-match
+tool_replay: mem=1 disk=0 canonical=0 missing_ids=0
+cache_source: memory-token
+cached_tokens: 1922
+disk_cached_tokens: 0
+
+--- raw request json ---
+{"model": "qwen3.8-flash-next-chat", "messages": [{"role": "system", "content": "You are a coding assistant. Use read_file to inspect the requested file, then report its project version in one short sentence. Do not invent file contents.\nReference item 0: preserve public interfaces and test changes before release.\nReference item 1: preserve public interfaces and test changes before release.\nReference item 2: preserve public interfaces and test changes before release.\nReference item 3: preserve public interfaces and test changes before release.\nReference item 4: preserve public interfaces and test changes before release.\nReference item 5: preserve public interfaces and test changes before release.\nReference item 6: preserve public interfaces and test changes before release.\nReference item 7: preserve public interfaces and test changes before release.\nReference item 8: preserve public interfaces and test changes before release.\nReference item 9: preserve public interfaces and test changes before release.\nReference item 10: preserve public interfaces and test changes before release.\nReference item 11: preserve public interfaces and test changes before release.\nReference item 12: preserve public interfaces and test changes before release.\nReference item 13: preserve public interfaces and test changes before release.\nReference item 14: preserve public interfaces and test changes before release.\nReference item 15: preserve public interfaces and test changes before release.\nReference item 16: preserve public interfaces and test changes before release.\nReference item 17: preserve public interfaces and test changes before release.\nReference item 18: preserve public interfaces and test changes before release.\nReference item 19: preserve public interfaces and test changes before release.\nReference item 20: preserve public interfaces and test changes before release.\nReference item 21: preserve public interfaces and test changes before release.\nReference item 22: preserve public interfaces and test changes before release.\nReference item 23: preserve public interfaces and test changes before release.\nReference item 24: preserve public interfaces and test changes before release.\nReference item 25: preserve public interfaces and test changes before release.\nReference item 26: preserve public interfaces and test changes before release.\nReference item 27: preserve public interfaces and test changes before release.\nReference item 28: preserve public interfaces and test changes before release.\nReference item 29: preserve public interfaces and test changes before release.\nReference item 30: preserve public interfaces and test changes before release.\nReference item 31: preserve public interfaces and test changes before release.\nReference item 32: preserve public interfaces and test changes before release.\nReference item 33: preserve public interfaces and test changes before release.\nReference item 34: preserve public interfaces and test changes before release.\nReference item 35: preserve public interfaces and test changes before release.\nReference item 36: preserve public interfaces and test changes before release.\nReference item 37: preserve public interfaces and test changes before release.\nReference item 38: preserve public interfaces and test changes before release.\nReference item 39: preserve public interfaces and test changes before release.\nReference item 40: preserve public interfaces and test changes before release.\nReference item 41: preserve public interfaces and test changes before release.\nReference item 42: preserve public interfaces and test changes before release.\nReference item 43: preserve public interfaces and test changes before release.\nReference item 44: preserve public interfaces and test changes before release.\nReference item 45: preserve public interfaces and test changes before release.\nReference item 46: preserve public interfaces and test changes before release.\nReference item 47: preserve public interfaces and test changes before release.\nReference item 48: preserve public interfaces and test changes before release.\nReference item 49: preserve public interfaces and test changes before release.\nReference item 50: preserve public interfaces and test changes before release.\nReference item 51: preserve public interfaces and test changes before release.\nReference item 52: preserve public interfaces and test changes before release.\nReference item 53: preserve public interfaces and test changes before release.\nReference item 54: preserve public interfaces and test changes before release.\nReference item 55: preserve public interfaces and test changes before release.\nReference item 56: preserve public interfaces and test changes before release.\nReference item 57: preserve public interfaces and test changes before release.\nReference item 58: preserve public interfaces and test changes before release.\nReference item 59: preserve public interfaces and test changes before release.\nReference item 60: preserve public interfaces and test changes before release.\nReference item 61: preserve public interfaces and test changes before release.\nReference item 62: preserve public interfaces and test changes before release.\nReference item 63: preserve public interfaces and test changes before release.\nReference item 64: preserve public interfaces and test changes before release.\nReference item 65: preserve public interfaces and test changes before release.\nReference item 66: preserve public interfaces and test changes before release.\nReference item 67: preserve public interfaces and test changes before release.\nReference item 68: preserve public interfaces and test changes before release.\nReference item 69: preserve public interfaces and test changes before release.\nReference item 70: preserve public interfaces and test changes before release.\nReference item 71: preserve public interfaces and test changes before release.\nReference item 72: preserve public interfaces and test changes before release.\nReference item 73: preserve public interfaces and test changes before release.\nReference item 74: preserve public interfaces and test changes before release.\nReference item 75: preserve public interfaces and test changes before release.\nReference item 76: preserve public interfaces and test changes before release.\nReference item 77: preserve public interfaces and test changes before release.\nReference item 78: preserve public interfaces and test changes before release.\nReference item 79: preserve public interfaces and test changes before release.\nReference item 80: preserve public interfaces and test changes before release.\nReference item 81: preserve public interfaces and test changes before release.\nReference item 82: preserve public interfaces and test changes before release.\nReference item 83: preserve public interfaces and test changes before release.\nReference item 84: preserve public interfaces and test changes before release.\nReference item 85: preserve public interfaces and test changes before release.\nReference item 86: preserve public interfaces and test changes before release.\nReference item 87: preserve public interfaces and test changes before release.\nReference item 88: preserve public interfaces and test changes before release.\nReference item 89: preserve public interfaces and test changes before release.\nReference item 90: preserve public interfaces and test changes before release.\nReference item 91: preserve public interfaces and test changes before release.\nReference item 92: preserve public interfaces and test changes before release.\nReference item 93: preserve public interfaces and test changes before release.\nReference item 94: preserve public interfaces and test changes before release.\nReference item 95: preserve public interfaces and test changes before release.\nReference item 96: preserve public interfaces and test changes before release.\nReference item 97: preserve public interfaces and test changes before release.\nReference item 98: preserve public interfaces and test changes before release.\nReference item 99: preserve public interfaces and test changes before release."}, {"role": "user", "content": "Case 0: read package.json and tell me the project version."}, {"role": "assistant", "content": "", "tool_calls": [{"id": "call_59b40d08ed8044948b5703a9f00c9672", "type": "function", "function": {"name": "read_file", "arguments": "{\"path\":\"package.json\"}"}}]}, {"role": "tool", "tool_call_id": "call_59b40d08ed8044948b5703a9f00c9672", "content": "{\"name\":\"fixture-project\",\"version\":\"2.7.4\"}"}], "tools": [{"type": "function", "function": {"name": "read_file", "description": "Read a project file.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}}], "temperature": 0, "max_tokens": 128, "stream": false, "thinking": false, "chat_template_kwargs": {"enable_thinking": false}, "stream_options": {"include_usage": true}}
+
+--- rendered prompt ---
+<|im_start|>system
+# Tools
+
+You have access to the following functions:
+
+<tools>
+{"type": "function", "function": {"name": "read_file", "description": "Read a project file.", "parameters": {"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}}}
+</tools>
+
+If you choose to call a function ONLY reply in the following format with NO suffix:
+
+<tool_call>
+<function=example_function_name>
+<parameter=example_parameter_1>
+value_1
+</parameter>
+<parameter=example_parameter_2>
+This is the value for the second parameter
+that can span
+multiple lines
+</parameter>
+</function>
+</tool_call>
+
+<IMPORTANT>
+Reminder:
+- Function calls MUST follow the specified format: an inner <function=...></function> block must be nested within <tool_call></tool_call> XML tags
+- Required parameters MUST be specified
+- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after
+- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls
+</IMPORTANT>
+
+You are a coding assistant. Use read_file to inspect the requested file, then report its project version in one short sentence. Do not invent file contents.
+Reference item 0: preserve public interfaces and test changes before release.
+Reference item 1: preserve public interfaces and test changes before release.
+Reference item 2: preserve public interfaces and test changes before release.
+Reference item 3: preserve public interfaces and test changes before release.
+Reference item 4: preserve public interfaces and test changes before release.
+Reference item 5: preserve public interfaces and test changes before release.
+Reference item 6: preserve public interfaces and test changes before release.
+Reference item 7: preserve public interfaces and test changes before release.
+Reference item 8: preserve public interfaces and test changes before release.
+Reference item 9: preserve public interfaces and test changes before release.
+Reference item 10: preserve public interfaces and test changes before release.
+Reference item 11: preserve public interfaces and test changes before release.
+Reference item 12: preserve public interfaces and test changes before release.
+Reference item 13: preserve public interfaces and test changes before release.
+Reference item 14: preserve public interfaces and test changes before release.
+Reference item 15: preserve public interfaces and test changes before release.
+Reference item 16: preserve public interfaces and test changes before release.
+Reference item 17: preserve public interfaces and test changes before release.
+Reference item 18: preserve public interfaces and test changes before release.
+Reference item 19: preserve public interfaces and test changes before release.
+Reference item 20: preserve public interfaces and test changes before release.
+Reference item 21: preserve public interfaces and test changes before release.
+Reference item 22: preserve public interfaces and test changes before release.
+Reference item 23: preserve public interfaces and test changes before release.
+Reference item 24: preserve public interfaces and test changes before release.
+Reference item 25: preserve public interfaces and test changes before release.
+Reference item 26: preserve public interfaces and test changes before release.
+Reference item 27: preserve public interfaces and test changes before release.
+Reference item 28: preserve public interfaces and test changes before release.
+Reference item 29: preserve public interfaces and test changes before release.
+Reference item 30: preserve public interfaces and test changes before release.
+Reference item 31: preserve public interfaces and test changes before release.
+Reference item 32: preserve public interfaces and test changes before release.
+Reference item 33: preserve public interfaces and test changes before release.
+Reference item 34: preserve public interfaces and test changes before release.
+Reference item 35: preserve public interfaces and test changes before release.
+Reference item 36: preserve public interfaces and test changes before release.
+Reference item 37: preserve public interfaces and test changes before release.
+Reference item 38: preserve public interfaces and test changes before release.
+Reference item 39: preserve public interfaces and test changes before release.
+Reference item 40: preserve public interfaces and test changes before release.
+Reference item 41: preserve public interfaces and test changes before release.
+Reference item 42: preserve public interfaces and test changes before release.
+Reference item 43: preserve public interfaces and test changes before release.
+Reference item 44: preserve public interfaces and test changes before release.
+Reference item 45: preserve public interfaces and test changes before release.
+Reference item 46: preserve public interfaces and test changes before release.
+Reference item 47: preserve public interfaces and test changes before release.
+Reference item 48: preserve public interfaces and test changes before release.
+Reference item 49: preserve public interfaces and test changes before release.
+Reference item 50: preserve public interfaces and test changes before release.
+Reference item 51: preserve public interfaces and test changes before release.
+Reference item 52: preserve public interfaces and test changes before release.
+Reference item 53: preserve public interfaces and test changes before release.
+Reference item 54: preserve public interfaces and test changes before release.
+Reference item 55: preserve public interfaces and test changes before release.
+Reference item 56: preserve public interfaces and test changes before release.
+Reference item 57: preserve public interfaces and test changes before release.
+Reference item 58: preserve public interfaces and test changes before release.
+Reference item 59: preserve public interfaces and test changes before release.
+Reference item 60: preserve public interfaces and test changes before release.
+Reference item 61: preserve public interfaces and test changes before release.
+Reference item 62: preserve public interfaces and test changes before release.
+Reference item 63: preserve public interfaces and test changes before release.
+Reference item 64: preserve public interfaces and test changes before release.
+Reference item 65: preserve public interfaces and test changes before release.
+Reference item 66: preserve public interfaces and test changes before release.
+Reference item 67: preserve public interfaces and test changes before release.
+Reference item 68: preserve public interfaces and test changes before release.
+Reference item 69: preserve public interfaces and test changes before release.
+Reference item 70: preserve public interfaces and test changes before release.
+Reference item 71: preserve public interfaces and test changes before release.
+Reference item 72: preserve public interfaces and test changes before release.
+Reference item 73: preserve public interfaces and test changes before release.
+Reference item 74: preserve public interfaces and test changes before release.
+Reference item 75: preserve public interfaces and test changes before release.
+Reference item 76: preserve public interfaces and test changes before release.
+Reference item 77: preserve public interfaces and test changes before release.
+Reference item 78: preserve public interfaces and test changes before release.
+Reference item 79: preserve public interfaces and test changes before release.
+Reference item 80: preserve public interfaces and test changes before release.
+Reference item 81: preserve public interfaces and test changes before release.
+Reference item 82: preserve public interfaces and test changes before release.
+Reference item 83: preserve public interfaces and test changes before release.
+Reference item 84: preserve public interfaces and test changes before release.
+Reference item 85: preserve public interfaces and test changes before release.
+Reference item 86: preserve public interfaces and test changes before release.
+Reference item 87: preserve public interfaces and test changes before release.
+Reference item 88: preserve public interfaces and test changes before release.
+Reference item 89: preserve public interfaces and test changes before release.
+Reference item 90: preserve public interfaces and test changes before release.
+Reference item 91: preserve public interfaces and test changes before release.
+Reference item 92: preserve public interfaces and test changes before release.
+Reference item 93: preserve public interfaces and test changes before release.
+Reference item 94: preserve public interfaces and test changes before release.
+Reference item 95: preserve public interfaces and test changes before release.
+Reference item 96: preserve public interfaces and test changes before release.
+Reference item 97: preserve public interfaces and test changes before release.
+Reference item 98: preserve public interfaces and test changes before release.
+Reference item 99: preserve public interfaces and test changes before release.<|im_end|>
+<|im_start|>user
+Case 0: read package.json and tell me the project version.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+<tool_call>
+<function=read_file>
+<parameter=path>
+package.json
+</parameter>
+</function>
+</tool_call><|im_end|>
+<|im_start|>user
+<tool_response>
+{"name":"fixture-project","version":"2.7.4"}
+</tool_response><|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+
+--- generated text ---
+
+
+--- trace: prefill done; decode_max=128 ctx_room=6238 ---
+
+The project version is 2.7.4.
+
+--- parsed message ---
+finish: stop
+generated_tokens: 11
+dsml_start: 0
+dsml_end: 0
+elapsed_sec: 0.471
+
+content:
+The project version is 2.7.4.
+
+===== end request 2 =====
+
+===== request 3 2026-09-07 13:28:20 =====
+kind: chat
+model: qwen3.8-flash-next-chat
+stream: 1
+tools: 1
+think_mode: none
+prompt_tokens: 1897
+effective_prompt_tokens: 1897
+cached_tokens: 0
+max_tokens: 128
+temperature: 0.000
+top_k: 0
+top_p: 1.000
+min_p: 0.050
+ignore_eos: 0
+seed: 0
+stream_include_usage: 1
+
+--- cache decision ---
+live_tokens_before: 1965
+prompt_tokens: 1897
+live_prompt_common: 1876
+memory_token_reusable: 0
+memory_miss_reason: token-mismatch
+tool_replay: mem=0 disk=0 canonical=0 missing_ids=0
+cache_source: none
+cached_tokens: 0
+disk_cached_tokens: 0
+
+first_mismatch_token: 1876
+token_window: [1868..1885)
+   1868 ==          live 13 "." | prompt 13 "."
+   1869 ==          live 248046 "<|im_end|>" | prompt 248046 "<|im_end|>"
+   1870 ==          live 198 "\n" | prompt 198 "\n"
+   1871 ==          live 248045 "<|im_start|>" | prompt 248045 "<|im_start|>"
+   1872 ==          live 846 "user" | prompt 846 "user"
+   1873 ==          live 198 "\n" | prompt 198 "\n"
+   1874 ==          live 4068 "Case" | prompt 4068 "Case"
+   1875 ==          live 220 " " | prompt 220 " "
+   1876 !=          live 15 "0" | prompt 16 "1"
+   1877 ==          live 25 ":" | prompt 25 ":"
+   1878 ==          live 1301 " read" | prompt 1301 " read"
+   1879 ==          live 6129 " package" | prompt 6129 " package"
+   1880 ==          live 4182 ".json" | prompt 4182 ".json"
+   1881 ==          live 321 " and" | prompt 321 " and"
+   1882 ==          live 3184 " tell" | prompt 3184 " tell"
+   1883 ==          live 728 " me" | prompt 728 " me"
+   1884 ==          live 279 " the" | prompt 279 " the"
+
+--- raw request json ---
+{"model": "qwen3.8-flash-next-chat", "messages": [{"role": "system", "content": "You are a coding assistant. Use read_file to inspect the requested file, then report its project version in one short sentence. Do not invent file contents.\nReference item 0: preserve public interfaces and test changes before release.\nReference item 1: preserve public interfaces and test changes before release.\nReference item 2: preserve public interfaces and test changes before release.\nReference item 3: preserve public interfaces and test changes before release.\nReference item 4: preserve public interfaces and test changes before release.\nReference item 5: preserve public interfaces and test changes before release.\nReference item 6: preserve public interfaces and test changes before release.\nReference item 7: preserve public interfaces and test changes before release.\nReference item 8: preserve public interfaces and test changes before release.\nReference item 9: preserve public interfaces and test changes before release.\nReference item 10: preserve public interfaces and test changes before release.\nReference item 11: preserve public interfaces and test changes before release.\nReference item 12: preserve public interfaces and test changes before release.\nReference item 13: preserve public interfaces and test changes before release.\nReference item 14: preserve public interfaces and test changes before release.\nReference item 15: preserve public interfaces and test changes before release.\nReference item 16: preserve public interfaces and test changes before release.\nReference item 17: preserve public interfaces and test changes before release.\nReference item 18: preserve public interfaces and test changes before release.\nReference item 19: preserve public interfaces and test changes before release.\nReference item 20: preserve public interfaces and test changes before release.\nReference item 21: preserve public interfaces and test changes before release.\nReference item 22: preserve public interfaces and test changes before release.\nReference item 23: preserve public interfaces and test changes before release.\nReference item 24: preserve public interfaces and test changes before release.\nReference item 25: preserve public interfaces and test changes before release.\nReference item 26: preserve public interfaces and test changes before release.\nReference item 27: preserve public interfaces and test changes before release.\nReference item 28: preserve public interfaces and test changes before release.\nReference item 29: preserve public interfaces and test changes before release.\nReference item 30: preserve public interfaces and test changes before release.\nReference item 31: preserve public interfaces and test changes before release.\nReference item 32: preserve public interfaces and test changes before release.\nReference item 33: preserve public interfaces and test changes before release.\nReference item 34: preserve public interfaces and test changes before release.\nReference item 35: preserve public interfaces and test changes before release.\nReference item 36: preserve public interfaces and test changes before release.\nReference item 37: preserve public interfaces and test changes before release.\nReference item 38: preserve public interfaces and test changes before release.\nReference item 39: preserve public interfaces and test changes before release.\nReference item 40: preserve public interfaces and test changes before release.\nReference item 41: preserve public interfaces and test changes before release.\nReference item 42: preserve public interfaces and test changes before release.\nReference item 43: preserve public interfaces and test changes before release.\nReference item 44: preserve public interfaces and test changes before release.\nReference item 45: preserve public interfaces and test changes before release.\nReference item 46: preserve public interfaces and test changes before release.\nReference item 47: preserve public interfaces and test changes before release.\nReference item 48: preserve public interfaces and test changes before release.\nReference item 49: preserve public interfaces and test changes before release.\nReference item 50: preserve public interfaces and test changes before release.\nReference item 51: preserve public interfaces and test changes before release.\nReference item 52: preserve public interfaces and test changes before release.\nReference item 53: preserve public interfaces and test changes before release.\nReference item 54: preserve public interfaces and test changes before release.\nReference item 55: preserve public interfaces and test changes before release.\nReference item 56: preserve public interfaces and test changes before release.\nReference item 57: preserve public interfaces and test changes before release.\nReference item 58: preserve public interfaces and test changes before release.\nReference item 59: preserve public interfaces and test changes before release.\nReference item 60: preserve public interfaces and test changes before release.\nReference item 61: preserve public interfaces and test changes before release.\nReference item 62: preserve public interfaces and test changes before release.\nReference item 63: preserve public interfaces and test changes before release.\nReference item 64: preserve public interfaces and test changes before release.\nReference item 65: preserve public interfaces and test changes before release.\nReference item 66: preserve public interfaces and test changes before release.\nReference item 67: preserve public interfaces and test changes before release.\nReference item 68: preserve public interfaces and test changes before release.\nReference item 69: preserve public interfaces and test changes before release.\nReference item 70: preserve public interfaces and test changes before release.\nReference item 71: preserve public interfaces and test changes before release.\nReference item 72: preserve public interfaces and test changes before release.\nReference item 73: preserve public interfaces and test changes before release.\nReference item 74: preserve public interfaces and test changes before release.\nReference item 75: preserve public interfaces and test changes before release.\nReference item 76: preserve public interfaces and test changes before release.\nReference item 77: preserve public interfaces and test changes before release.\nReference item 78: preserve public interfaces and test changes before release.\nReference item 79: preserve public interfaces and test changes before release.\nReference item 80: preserve public interfaces and test changes before release.\nReference item 81: preserve public interfaces and test changes before release.\nReference item 82: preserve public interfaces and test changes before release.\nReference item 83: preserve public interfaces and test changes before release.\nReference item 84: preserve public interfaces and test changes before release.\nReference item 85: preserve public interfaces and test changes before release.\nReference item 86: preserve public interfaces and test changes before release.\nReference item 87: preserve public interfaces and test changes before release.\nReference item 88: preserve public interfaces and test changes before release.\nReference item 89: preserve public interfaces and test changes before release.\nReference item 90: preserve public interfaces and test changes before release.\nReference item 91: preserve public interfaces and test changes before release.\nReference item 92: preserve public interfaces and test changes before release.\nReference item 93: preserve public interfaces and test changes before release.\nReference item 94: preserve public interfaces and test changes before release.\nReference item 95: preserve public interfaces and test changes before release.\nReference item 96: preserve public interfaces and test changes before release.\nReference item 97: preserve public interfaces and test changes before release.\nReference item 98: preserve public interfaces and test changes before release.\nReference item 99: preserve public interfaces and test changes before release."}, {"role": "user", "content": "Case 1: read package.json and tell me the project version."}], "tools": [{"type": "function", "function": {"name": "read_file", "description": "Read a project file.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}}], "temperature": 0, "max_tokens": 128, "stream": true, "thinking": false, "chat_template_kwargs": {"enable_thinking": false}, "stream_options": {"include_usage": true}}
+
+--- rendered prompt ---
+<|im_start|>system
+# Tools
+
+You have access to the following functions:
+
+<tools>
+{"type": "function", "function": {"name": "read_file", "description": "Read a project file.", "parameters": {"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}}}
+</tools>
+
+If you choose to call a function ONLY reply in the following format with NO suffix:
+
+<tool_call>
+<function=example_function_name>
+<parameter=example_parameter_1>
+value_1
+</parameter>
+<parameter=example_parameter_2>
+This is the value for the second parameter
+that can span
+multiple lines
+</parameter>
+</function>
+</tool_call>
+
+<IMPORTANT>
+Reminder:
+- Function calls MUST follow the specified format: an inner <function=...></function> block must be nested within <tool_call></tool_call> XML tags
+- Required parameters MUST be specified
+- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after
+- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls
+</IMPORTANT>
+
+You are a coding assistant. Use read_file to inspect the requested file, then report its project version in one short sentence. Do not invent file contents.
+Reference item 0: preserve public interfaces and test changes before release.
+Reference item 1: preserve public interfaces and test changes before release.
+Reference item 2: preserve public interfaces and test changes before release.
+Reference item 3: preserve public interfaces and test changes before release.
+Reference item 4: preserve public interfaces and test changes before release.
+Reference item 5: preserve public interfaces and test changes before release.
+Reference item 6: preserve public interfaces and test changes before release.
+Reference item 7: preserve public interfaces and test changes before release.
+Reference item 8: preserve public interfaces and test changes before release.
+Reference item 9: preserve public interfaces and test changes before release.
+Reference item 10: preserve public interfaces and test changes before release.
+Reference item 11: preserve public interfaces and test changes before release.
+Reference item 12: preserve public interfaces and test changes before release.
+Reference item 13: preserve public interfaces and test changes before release.
+Reference item 14: preserve public interfaces and test changes before release.
+Reference item 15: preserve public interfaces and test changes before release.
+Reference item 16: preserve public interfaces and test changes before release.
+Reference item 17: preserve public interfaces and test changes before release.
+Reference item 18: preserve public interfaces and test changes before release.
+Reference item 19: preserve public interfaces and test changes before release.
+Reference item 20: preserve public interfaces and test changes before release.
+Reference item 21: preserve public interfaces and test changes before release.
+Reference item 22: preserve public interfaces and test changes before release.
+Reference item 23: preserve public interfaces and test changes before release.
+Reference item 24: preserve public interfaces and test changes before release.
+Reference item 25: preserve public interfaces and test changes before release.
+Reference item 26: preserve public interfaces and test changes before release.
+Reference item 27: preserve public interfaces and test changes before release.
+Reference item 28: preserve public interfaces and test changes before release.
+Reference item 29: preserve public interfaces and test changes before release.
+Reference item 30: preserve public interfaces and test changes before release.
+Reference item 31: preserve public interfaces and test changes before release.
+Reference item 32: preserve public interfaces and test changes before release.
+Reference item 33: preserve public interfaces and test changes before release.
+Reference item 34: preserve public interfaces and test changes before release.
+Reference item 35: preserve public interfaces and test changes before release.
+Reference item 36: preserve public interfaces and test changes before release.
+Reference item 37: preserve public interfaces and test changes before release.
+Reference item 38: preserve public interfaces and test changes before release.
+Reference item 39: preserve public interfaces and test changes before release.
+Reference item 40: preserve public interfaces and test changes before release.
+Reference item 41: preserve public interfaces and test changes before release.
+Reference item 42: preserve public interfaces and test changes before release.
+Reference item 43: preserve public interfaces and test changes before release.
+Reference item 44: preserve public interfaces and test changes before release.
+Reference item 45: preserve public interfaces and test changes before release.
+Reference item 46: preserve public interfaces and test changes before release.
+Reference item 47: preserve public interfaces and test changes before release.
+Reference item 48: preserve public interfaces and test changes before release.
+Reference item 49: preserve public interfaces and test changes before release.
+Reference item 50: preserve public interfaces and test changes before release.
+Reference item 51: preserve public interfaces and test changes before release.
+Reference item 52: preserve public interfaces and test changes before release.
+Reference item 53: preserve public interfaces and test changes before release.
+Reference item 54: preserve public interfaces and test changes before release.
+Reference item 55: preserve public interfaces and test changes before release.
+Reference item 56: preserve public interfaces and test changes before release.
+Reference item 57: preserve public interfaces and test changes before release.
+Reference item 58: preserve public interfaces and test changes before release.
+Reference item 59: preserve public interfaces and test changes before release.
+Reference item 60: preserve public interfaces and test changes before release.
+Reference item 61: preserve public interfaces and test changes before release.
+Reference item 62: preserve public interfaces and test changes before release.
+Reference item 63: preserve public interfaces and test changes before release.
+Reference item 64: preserve public interfaces and test changes before release.
+Reference item 65: preserve public interfaces and test changes before release.
+Reference item 66: preserve public interfaces and test changes before release.
+Reference item 67: preserve public interfaces and test changes before release.
+Reference item 68: preserve public interfaces and test changes before release.
+Reference item 69: preserve public interfaces and test changes before release.
+Reference item 70: preserve public interfaces and test changes before release.
+Reference item 71: preserve public interfaces and test changes before release.
+Reference item 72: preserve public interfaces and test changes before release.
+Reference item 73: preserve public interfaces and test changes before release.
+Reference item 74: preserve public interfaces and test changes before release.
+Reference item 75: preserve public interfaces and test changes before release.
+Reference item 76: preserve public interfaces and test changes before release.
+Reference item 77: preserve public interfaces and test changes before release.
+Reference item 78: preserve public interfaces and test changes before release.
+Reference item 79: preserve public interfaces and test changes before release.
+Reference item 80: preserve public interfaces and test changes before release.
+Reference item 81: preserve public interfaces and test changes before release.
+Reference item 82: preserve public interfaces and test changes before release.
+Reference item 83: preserve public interfaces and test changes before release.
+Reference item 84: preserve public interfaces and test changes before release.
+Reference item 85: preserve public interfaces and test changes before release.
+Reference item 86: preserve public interfaces and test changes before release.
+Reference item 87: preserve public interfaces and test changes before release.
+Reference item 88: preserve public interfaces and test changes before release.
+Reference item 89: preserve public interfaces and test changes before release.
+Reference item 90: preserve public interfaces and test changes before release.
+Reference item 91: preserve public interfaces and test changes before release.
+Reference item 92: preserve public interfaces and test changes before release.
+Reference item 93: preserve public interfaces and test changes before release.
+Reference item 94: preserve public interfaces and test changes before release.
+Reference item 95: preserve public interfaces and test changes before release.
+Reference item 96: preserve public interfaces and test changes before release.
+Reference item 97: preserve public interfaces and test changes before release.
+Reference item 98: preserve public interfaces and test changes before release.
+Reference item 99: preserve public interfaces and test changes before release.<|im_end|>
+<|im_start|>user
+Case 1: read package.json and tell me the project version.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+
+--- generated text ---
+
+
+--- trace: prefill done; decode_max=128 ctx_room=6295 ---
+
+<tool_call>
+
+--- trace: entered tool-call block after 1 generated tokens ---
+
+
+<function=read_file>
+<parameter=path>
+package.json
+</parameter>
+</function>
+</tool_call>
+
+--- trace: closed tool-call block after 25 generated tokens ---
+
+
+
+--- parsed message ---
+finish: tool_calls
+generated_tokens: 25
+dsml_start: 1
+dsml_end: 1
+elapsed_sec: 2.938
+
+tool_call[0]:
+id: call_47d46b1738dcbf1a1fd6789674e6c0a1
+name: read_file
+arguments:
+{"path": "package.json"}
+
+===== end request 3 =====
+
+===== request 4 2026-09-07 13:28:23 =====
+kind: chat
+model: qwen3.8-flash-next-chat
+stream: 1
+tools: 1
+think_mode: none
+prompt_tokens: 1954
+effective_prompt_tokens: 1954
+cached_tokens: 1922
+max_tokens: 128
+temperature: 0.000
+top_k: 0
+top_p: 1.000
+min_p: 0.050
+ignore_eos: 0
+seed: 0
+stream_include_usage: 1
+
+--- cache decision ---
+live_tokens_before: 1922
+prompt_tokens: 1954
+live_prompt_common: 1922
+memory_token_reusable: 1
+memory_miss_reason: live-prefix-match
+tool_replay: mem=1 disk=0 canonical=0 missing_ids=0
+cache_source: memory-token
+cached_tokens: 1922
+disk_cached_tokens: 0
+
+--- raw request json ---
+{"model": "qwen3.8-flash-next-chat", "messages": [{"role": "system", "content": "You are a coding assistant. Use read_file to inspect the requested file, then report its project version in one short sentence. Do not invent file contents.\nReference item 0: preserve public interfaces and test changes before release.\nReference item 1: preserve public interfaces and test changes before release.\nReference item 2: preserve public interfaces and test changes before release.\nReference item 3: preserve public interfaces and test changes before release.\nReference item 4: preserve public interfaces and test changes before release.\nReference item 5: preserve public interfaces and test changes before release.\nReference item 6: preserve public interfaces and test changes before release.\nReference item 7: preserve public interfaces and test changes before release.\nReference item 8: preserve public interfaces and test changes before release.\nReference item 9: preserve public interfaces and test changes before release.\nReference item 10: preserve public interfaces and test changes before release.\nReference item 11: preserve public interfaces and test changes before release.\nReference item 12: preserve public interfaces and test changes before release.\nReference item 13: preserve public interfaces and test changes before release.\nReference item 14: preserve public interfaces and test changes before release.\nReference item 15: preserve public interfaces and test changes before release.\nReference item 16: preserve public interfaces and test changes before release.\nReference item 17: preserve public interfaces and test changes before release.\nReference item 18: preserve public interfaces and test changes before release.\nReference item 19: preserve public interfaces and test changes before release.\nReference item 20: preserve public interfaces and test changes before release.\nReference item 21: preserve public interfaces and test changes before release.\nReference item 22: preserve public interfaces and test changes before release.\nReference item 23: preserve public interfaces and test changes before release.\nReference item 24: preserve public interfaces and test changes before release.\nReference item 25: preserve public interfaces and test changes before release.\nReference item 26: preserve public interfaces and test changes before release.\nReference item 27: preserve public interfaces and test changes before release.\nReference item 28: preserve public interfaces and test changes before release.\nReference item 29: preserve public interfaces and test changes before release.\nReference item 30: preserve public interfaces and test changes before release.\nReference item 31: preserve public interfaces and test changes before release.\nReference item 32: preserve public interfaces and test changes before release.\nReference item 33: preserve public interfaces and test changes before release.\nReference item 34: preserve public interfaces and test changes before release.\nReference item 35: preserve public interfaces and test changes before release.\nReference item 36: preserve public interfaces and test changes before release.\nReference item 37: preserve public interfaces and test changes before release.\nReference item 38: preserve public interfaces and test changes before release.\nReference item 39: preserve public interfaces and test changes before release.\nReference item 40: preserve public interfaces and test changes before release.\nReference item 41: preserve public interfaces and test changes before release.\nReference item 42: preserve public interfaces and test changes before release.\nReference item 43: preserve public interfaces and test changes before release.\nReference item 44: preserve public interfaces and test changes before release.\nReference item 45: preserve public interfaces and test changes before release.\nReference item 46: preserve public interfaces and test changes before release.\nReference item 47: preserve public interfaces and test changes before release.\nReference item 48: preserve public interfaces and test changes before release.\nReference item 49: preserve public interfaces and test changes before release.\nReference item 50: preserve public interfaces and test changes before release.\nReference item 51: preserve public interfaces and test changes before release.\nReference item 52: preserve public interfaces and test changes before release.\nReference item 53: preserve public interfaces and test changes before release.\nReference item 54: preserve public interfaces and test changes before release.\nReference item 55: preserve public interfaces and test changes before release.\nReference item 56: preserve public interfaces and test changes before release.\nReference item 57: preserve public interfaces and test changes before release.\nReference item 58: preserve public interfaces and test changes before release.\nReference item 59: preserve public interfaces and test changes before release.\nReference item 60: preserve public interfaces and test changes before release.\nReference item 61: preserve public interfaces and test changes before release.\nReference item 62: preserve public interfaces and test changes before release.\nReference item 63: preserve public interfaces and test changes before release.\nReference item 64: preserve public interfaces and test changes before release.\nReference item 65: preserve public interfaces and test changes before release.\nReference item 66: preserve public interfaces and test changes before release.\nReference item 67: preserve public interfaces and test changes before release.\nReference item 68: preserve public interfaces and test changes before release.\nReference item 69: preserve public interfaces and test changes before release.\nReference item 70: preserve public interfaces and test changes before release.\nReference item 71: preserve public interfaces and test changes before release.\nReference item 72: preserve public interfaces and test changes before release.\nReference item 73: preserve public interfaces and test changes before release.\nReference item 74: preserve public interfaces and test changes before release.\nReference item 75: preserve public interfaces and test changes before release.\nReference item 76: preserve public interfaces and test changes before release.\nReference item 77: preserve public interfaces and test changes before release.\nReference item 78: preserve public interfaces and test changes before release.\nReference item 79: preserve public interfaces and test changes before release.\nReference item 80: preserve public interfaces and test changes before release.\nReference item 81: preserve public interfaces and test changes before release.\nReference item 82: preserve public interfaces and test changes before release.\nReference item 83: preserve public interfaces and test changes before release.\nReference item 84: preserve public interfaces and test changes before release.\nReference item 85: preserve public interfaces and test changes before release.\nReference item 86: preserve public interfaces and test changes before release.\nReference item 87: preserve public interfaces and test changes before release.\nReference item 88: preserve public interfaces and test changes before release.\nReference item 89: preserve public interfaces and test changes before release.\nReference item 90: preserve public interfaces and test changes before release.\nReference item 91: preserve public interfaces and test changes before release.\nReference item 92: preserve public interfaces and test changes before release.\nReference item 93: preserve public interfaces and test changes before release.\nReference item 94: preserve public interfaces and test changes before release.\nReference item 95: preserve public interfaces and test changes before release.\nReference item 96: preserve public interfaces and test changes before release.\nReference item 97: preserve public interfaces and test changes before release.\nReference item 98: preserve public interfaces and test changes before release.\nReference item 99: preserve public interfaces and test changes before release."}, {"role": "user", "content": "Case 1: read package.json and tell me the project version."}, {"role": "assistant", "content": "", "tool_calls": [{"id": "call_47d46b1738dcbf1a1fd6789674e6c0a1", "type": "function", "function": {"name": "read_file", "arguments": "{\"path\":\"package.json\"}"}}]}, {"role": "tool", "tool_call_id": "call_47d46b1738dcbf1a1fd6789674e6c0a1", "content": "{\"name\":\"fixture-project\",\"version\":\"2.7.4\"}"}], "tools": [{"type": "function", "function": {"name": "read_file", "description": "Read a project file.", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}}], "temperature": 0, "max_tokens": 128, "stream": true, "thinking": false, "chat_template_kwargs": {"enable_thinking": false}, "stream_options": {"include_usage": true}}
+
+--- rendered prompt ---
+<|im_start|>system
+# Tools
+
+You have access to the following functions:
+
+<tools>
+{"type": "function", "function": {"name": "read_file", "description": "Read a project file.", "parameters": {"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}}}
+</tools>
+
+If you choose to call a function ONLY reply in the following format with NO suffix:
+
+<tool_call>
+<function=example_function_name>
+<parameter=example_parameter_1>
+value_1
+</parameter>
+<parameter=example_parameter_2>
+This is the value for the second parameter
+that can span
+multiple lines
+</parameter>
+</function>
+</tool_call>
+
+<IMPORTANT>
+Reminder:
+- Function calls MUST follow the specified format: an inner <function=...></function> block must be nested within <tool_call></tool_call> XML tags
+- Required parameters MUST be specified
+- You may provide optional reasoning for your function call in natural language BEFORE the function call, but NOT after
+- If there is no function call available, answer the question like normal with your current knowledge and do not tell the user about function calls
+</IMPORTANT>
+
+You are a coding assistant. Use read_file to inspect the requested file, then report its project version in one short sentence. Do not invent file contents.
+Reference item 0: preserve public interfaces and test changes before release.
+Reference item 1: preserve public interfaces and test changes before release.
+Reference item 2: preserve public interfaces and test changes before release.
+Reference item 3: preserve public interfaces and test changes before release.
+Reference item 4: preserve public interfaces and test changes before release.
+Reference item 5: preserve public interfaces and test changes before release.
+Reference item 6: preserve public interfaces and test changes before release.
+Reference item 7: preserve public interfaces and test changes before release.
+Reference item 8: preserve public interfaces and test changes before release.
+Reference item 9: preserve public interfaces and test changes before release.
+Reference item 10: preserve public interfaces and test changes before release.
+Reference item 11: preserve public interfaces and test changes before release.
+Reference item 12: preserve public interfaces and test changes before release.
+Reference item 13: preserve public interfaces and test changes before release.
+Reference item 14: preserve public interfaces and test changes before release.
+Reference item 15: preserve public interfaces and test changes before release.
+Reference item 16: preserve public interfaces and test changes before release.
+Reference item 17: preserve public interfaces and test changes before release.
+Reference item 18: preserve public interfaces and test changes before release.
+Reference item 19: preserve public interfaces and test changes before release.
+Reference item 20: preserve public interfaces and test changes before release.
+Reference item 21: preserve public interfaces and test changes before release.
+Reference item 22: preserve public interfaces and test changes before release.
+Reference item 23: preserve public interfaces and test changes before release.
+Reference item 24: preserve public interfaces and test changes before release.
+Reference item 25: preserve public interfaces and test changes before release.
+Reference item 26: preserve public interfaces and test changes before release.
+Reference item 27: preserve public interfaces and test changes before release.
+Reference item 28: preserve public interfaces and test changes before release.
+Reference item 29: preserve public interfaces and test changes before release.
+Reference item 30: preserve public interfaces and test changes before release.
+Reference item 31: preserve public interfaces and test changes before release.
+Reference item 32: preserve public interfaces and test changes before release.
+Reference item 33: preserve public interfaces and test changes before release.
+Reference item 34: preserve public interfaces and test changes before release.
+Reference item 35: preserve public interfaces and test changes before release.
+Reference item 36: preserve public interfaces and test changes before release.
+Reference item 37: preserve public interfaces and test changes before release.
+Reference item 38: preserve public interfaces and test changes before release.
+Reference item 39: preserve public interfaces and test changes before release.
+Reference item 40: preserve public interfaces and test changes before release.
+Reference item 41: preserve public interfaces and test changes before release.
+Reference item 42: preserve public interfaces and test changes before release.
+Reference item 43: preserve public interfaces and test changes before release.
+Reference item 44: preserve public interfaces and test changes before release.
+Reference item 45: preserve public interfaces and test changes before release.
+Reference item 46: preserve public interfaces and test changes before release.
+Reference item 47: preserve public interfaces and test changes before release.
+Reference item 48: preserve public interfaces and test changes before release.
+Reference item 49: preserve public interfaces and test changes before release.
+Reference item 50: preserve public interfaces and test changes before release.
+Reference item 51: preserve public interfaces and test changes before release.
+Reference item 52: preserve public interfaces and test changes before release.
+Reference item 53: preserve public interfaces and test changes before release.
+Reference item 54: preserve public interfaces and test changes before release.
+Reference item 55: preserve public interfaces and test changes before release.
+Reference item 56: preserve public interfaces and test changes before release.
+Reference item 57: preserve public interfaces and test changes before release.
+Reference item 58: preserve public interfaces and test changes before release.
+Reference item 59: preserve public interfaces and test changes before release.
+Reference item 60: preserve public interfaces and test changes before release.
+Reference item 61: preserve public interfaces and test changes before release.
+Reference item 62: preserve public interfaces and test changes before release.
+Reference item 63: preserve public interfaces and test changes before release.
+Reference item 64: preserve public interfaces and test changes before release.
+Reference item 65: preserve public interfaces and test changes before release.
+Reference item 66: preserve public interfaces and test changes before release.
+Reference item 67: preserve public interfaces and test changes before release.
+Reference item 68: preserve public interfaces and test changes before release.
+Reference item 69: preserve public interfaces and test changes before release.
+Reference item 70: preserve public interfaces and test changes before release.
+Reference item 71: preserve public interfaces and test changes before release.
+Reference item 72: preserve public interfaces and test changes before release.
+Reference item 73: preserve public interfaces and test changes before release.
+Reference item 74: preserve public interfaces and test changes before release.
+Reference item 75: preserve public interfaces and test changes before release.
+Reference item 76: preserve public interfaces and test changes before release.
+Reference item 77: preserve public interfaces and test changes before release.
+Reference item 78: preserve public interfaces and test changes before release.
+Reference item 79: preserve public interfaces and test changes before release.
+Reference item 80: preserve public interfaces and test changes before release.
+Reference item 81: preserve public interfaces and test changes before release.
+Reference item 82: preserve public interfaces and test changes before release.
+Reference item 83: preserve public interfaces and test changes before release.
+Reference item 84: preserve public interfaces and test changes before release.
+Reference item 85: preserve public interfaces and test changes before release.
+Reference item 86: preserve public interfaces and test changes before release.
+Reference item 87: preserve public interfaces and test changes before release.
+Reference item 88: preserve public interfaces and test changes before release.
+Reference item 89: preserve public interfaces and test changes before release.
+Reference item 90: preserve public interfaces and test changes before release.
+Reference item 91: preserve public interfaces and test changes before release.
+Reference item 92: preserve public interfaces and test changes before release.
+Reference item 93: preserve public interfaces and test changes before release.
+Reference item 94: preserve public interfaces and test changes before release.
+Reference item 95: preserve public interfaces and test changes before release.
+Reference item 96: preserve public interfaces and test changes before release.
+Reference item 97: preserve public interfaces and test changes before release.
+Reference item 98: preserve public interfaces and test changes before release.
+Reference item 99: preserve public interfaces and test changes before release.<|im_end|>
+<|im_start|>user
+Case 1: read package.json and tell me the project version.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+<tool_call>
+<function=read_file>
+<parameter=path>
+package.json
+</parameter>
+</function>
+</tool_call><|im_end|>
+<|im_start|>user
+<tool_response>
+{"name":"fixture-project","version":"2.7.4"}
+</tool_response><|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+
+--- generated text ---
+
+
+--- trace: prefill done; decode_max=128 ctx_room=6238 ---
+
+The project version is 2.7.4.
+
+--- parsed message ---
+finish: stop
+generated_tokens: 11
+dsml_start: 0
+dsml_end: 0
+elapsed_sec: 0.449
+
+content:
+The project version is 2.7.4.
+
+===== end request 4 =====

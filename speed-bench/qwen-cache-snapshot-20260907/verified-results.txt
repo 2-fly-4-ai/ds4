@@ -1,0 +1,9 @@
+MTP=0 thinking=0 base: 456.7 ms
+MTP=0 thinking=0 candidate: 452.1 ms
+MTP=0 thinking=1 base: 3325.3 ms
+MTP=0 thinking=1 candidate: 1153.1 ms
+MTP=1 thinking=0 base: 428.9 ms
+MTP=1 thinking=0 candidate: 433.3 ms
+MTP=1 thinking=1 base: 3994.2 ms
+MTP=1 thinking=1 candidate: 1023.4 ms
+PASS: 80 API responses; cached-token and matched-history controls

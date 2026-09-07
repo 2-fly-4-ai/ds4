@@ -1,0 +1,482 @@
+[
+  {
+    "wall_s": 2.8675566669999997,
+    "ttft_s": null,
+    "usage": {
+      "prompt_tokens": 1897,
+      "completion_tokens": 25,
+      "total_tokens": 1922,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1897
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mode": "base",
+    "rep": 0,
+    "stream": false,
+    "turn": 0,
+    "mtp": true,
+    "thinking": false,
+    "message": {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "call_0acba0a3bf267e7d05a0e10a118574d6",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"package.json\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 0.4260872080000002,
+    "ttft_s": null,
+    "usage": {
+      "prompt_tokens": 1954,
+      "completion_tokens": 11,
+      "total_tokens": 1965,
+      "prompt_tokens_details": {
+        "cached_tokens": 1922,
+        "cache_write_tokens": 32
+      }
+    },
+    "finish": "stop",
+    "content_sha256": "8ea494ce39f8bee0bee5339766a4a69a5f089ef3bd4cc82c956fa9d12052c2ce",
+    "mode": "base",
+    "rep": 0,
+    "stream": false,
+    "turn": 1,
+    "mtp": true,
+    "thinking": false,
+    "message": {
+      "role": "assistant",
+      "content": "The project version is 2.7.4."
+    }
+  },
+  {
+    "wall_s": 2.88960725,
+    "ttft_s": 2.889570417,
+    "usage": {
+      "prompt_tokens": 1897,
+      "completion_tokens": 25,
+      "total_tokens": 1922,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1897
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mode": "base",
+    "rep": 0,
+    "stream": true,
+    "turn": 0,
+    "mtp": true,
+    "thinking": false,
+    "message": {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "call_cf9484fd5d9876d37cc515997088bf3a",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"package.json\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 0.4262408330000005,
+    "ttft_s": 0.2270169580000001,
+    "usage": {
+      "prompt_tokens": 1954,
+      "completion_tokens": 11,
+      "total_tokens": 1965,
+      "prompt_tokens_details": {
+        "cached_tokens": 1922,
+        "cache_write_tokens": 32
+      }
+    },
+    "finish": "stop",
+    "content_sha256": "8ea494ce39f8bee0bee5339766a4a69a5f089ef3bd4cc82c956fa9d12052c2ce",
+    "mode": "base",
+    "rep": 0,
+    "stream": true,
+    "turn": 1,
+    "mtp": true,
+    "thinking": false,
+    "message": {
+      "role": "assistant",
+      "content": "The project version is 2.7.4."
+    }
+  },
+  {
+    "wall_s": 2.8343539159999995,
+    "ttft_s": null,
+    "usage": {
+      "prompt_tokens": 1897,
+      "completion_tokens": 25,
+      "total_tokens": 1922,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1897
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mode": "candidate",
+    "rep": 0,
+    "stream": false,
+    "turn": 0,
+    "mtp": true,
+    "thinking": false,
+    "message": {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "call_4ec4450fb2a5a6e72f5f30ad9a91d07a",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"package.json\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 0.4174845000000005,
+    "ttft_s": null,
+    "usage": {
+      "prompt_tokens": 1954,
+      "completion_tokens": 11,
+      "total_tokens": 1965,
+      "prompt_tokens_details": {
+        "cached_tokens": 1922,
+        "cache_write_tokens": 32
+      }
+    },
+    "finish": "stop",
+    "content_sha256": "8ea494ce39f8bee0bee5339766a4a69a5f089ef3bd4cc82c956fa9d12052c2ce",
+    "mode": "candidate",
+    "rep": 0,
+    "stream": false,
+    "turn": 1,
+    "mtp": true,
+    "thinking": false,
+    "message": {
+      "role": "assistant",
+      "content": "The project version is 2.7.4."
+    }
+  },
+  {
+    "wall_s": 2.876519457999999,
+    "ttft_s": 2.8764779160000007,
+    "usage": {
+      "prompt_tokens": 1897,
+      "completion_tokens": 25,
+      "total_tokens": 1922,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1897
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mode": "candidate",
+    "rep": 0,
+    "stream": true,
+    "turn": 0,
+    "mtp": true,
+    "thinking": false,
+    "message": {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "call_b67255a26a4a29e9fa4ec8f1284bdfe9",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"package.json\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 0.4332033330000016,
+    "ttft_s": 0.23590929200000232,
+    "usage": {
+      "prompt_tokens": 1954,
+      "completion_tokens": 11,
+      "total_tokens": 1965,
+      "prompt_tokens_details": {
+        "cached_tokens": 1922,
+        "cache_write_tokens": 32
+      }
+    },
+    "finish": "stop",
+    "content_sha256": "8ea494ce39f8bee0bee5339766a4a69a5f089ef3bd4cc82c956fa9d12052c2ce",
+    "mode": "candidate",
+    "rep": 0,
+    "stream": true,
+    "turn": 1,
+    "mtp": true,
+    "thinking": false,
+    "message": {
+      "role": "assistant",
+      "content": "The project version is 2.7.4."
+    }
+  },
+  {
+    "wall_s": 3.057222624999998,
+    "ttft_s": null,
+    "usage": {
+      "prompt_tokens": 1897,
+      "completion_tokens": 25,
+      "total_tokens": 1922,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1897
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mode": "candidate",
+    "rep": 1,
+    "stream": false,
+    "turn": 0,
+    "mtp": true,
+    "thinking": false,
+    "message": {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "call_7a8261678caa5ca9712ecf6383da2093",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"package.json\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 0.4312522080000001,
+    "ttft_s": null,
+    "usage": {
+      "prompt_tokens": 1954,
+      "completion_tokens": 11,
+      "total_tokens": 1965,
+      "prompt_tokens_details": {
+        "cached_tokens": 1922,
+        "cache_write_tokens": 32
+      }
+    },
+    "finish": "stop",
+    "content_sha256": "8ea494ce39f8bee0bee5339766a4a69a5f089ef3bd4cc82c956fa9d12052c2ce",
+    "mode": "candidate",
+    "rep": 1,
+    "stream": false,
+    "turn": 1,
+    "mtp": true,
+    "thinking": false,
+    "message": {
+      "role": "assistant",
+      "content": "The project version is 2.7.4."
+    }
+  },
+  {
+    "wall_s": 3.3769839170000004,
+    "ttft_s": 3.376942207999999,
+    "usage": {
+      "prompt_tokens": 1897,
+      "completion_tokens": 25,
+      "total_tokens": 1922,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1897
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mode": "candidate",
+    "rep": 1,
+    "stream": true,
+    "turn": 0,
+    "mtp": true,
+    "thinking": false,
+    "message": {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "call_acb47def4ee3753f6f76cb8e8f1d6beb",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"package.json\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 0.45139825000000044,
+    "ttft_s": 0.23990200000000073,
+    "usage": {
+      "prompt_tokens": 1954,
+      "completion_tokens": 11,
+      "total_tokens": 1965,
+      "prompt_tokens_details": {
+        "cached_tokens": 1922,
+        "cache_write_tokens": 32
+      }
+    },
+    "finish": "stop",
+    "content_sha256": "8ea494ce39f8bee0bee5339766a4a69a5f089ef3bd4cc82c956fa9d12052c2ce",
+    "mode": "candidate",
+    "rep": 1,
+    "stream": true,
+    "turn": 1,
+    "mtp": true,
+    "thinking": false,
+    "message": {
+      "role": "assistant",
+      "content": "The project version is 2.7.4."
+    }
+  },
+  {
+    "wall_s": 2.8711165409999992,
+    "ttft_s": null,
+    "usage": {
+      "prompt_tokens": 1897,
+      "completion_tokens": 25,
+      "total_tokens": 1922,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1897
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mode": "base",
+    "rep": 1,
+    "stream": false,
+    "turn": 0,
+    "mtp": true,
+    "thinking": false,
+    "message": {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "call_d6600a2aa8d2cf5514e2676a93dbd15d",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"package.json\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 0.42245637499999944,
+    "ttft_s": null,
+    "usage": {
+      "prompt_tokens": 1954,
+      "completion_tokens": 11,
+      "total_tokens": 1965,
+      "prompt_tokens_details": {
+        "cached_tokens": 1922,
+        "cache_write_tokens": 32
+      }
+    },
+    "finish": "stop",
+    "content_sha256": "8ea494ce39f8bee0bee5339766a4a69a5f089ef3bd4cc82c956fa9d12052c2ce",
+    "mode": "base",
+    "rep": 1,
+    "stream": false,
+    "turn": 1,
+    "mtp": true,
+    "thinking": false,
+    "message": {
+      "role": "assistant",
+      "content": "The project version is 2.7.4."
+    }
+  },
+  {
+    "wall_s": 3.1968017080000024,
+    "ttft_s": 3.196766291000003,
+    "usage": {
+      "prompt_tokens": 1897,
+      "completion_tokens": 25,
+      "total_tokens": 1922,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1897
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mode": "base",
+    "rep": 1,
+    "stream": true,
+    "turn": 0,
+    "mtp": true,
+    "thinking": false,
+    "message": {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "call_5a8dd989fac4f931ef57aec2d9f3ddf0",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"package.json\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 0.44075558299999784,
+    "ttft_s": 0.23635787499999594,
+    "usage": {
+      "prompt_tokens": 1954,
+      "completion_tokens": 11,
+      "total_tokens": 1965,
+      "prompt_tokens_details": {
+        "cached_tokens": 1922,
+        "cache_write_tokens": 32
+      }
+    },
+    "finish": "stop",
+    "content_sha256": "8ea494ce39f8bee0bee5339766a4a69a5f089ef3bd4cc82c956fa9d12052c2ce",
+    "mode": "base",
+    "rep": 1,
+    "stream": true,
+    "turn": 1,
+    "mtp": true,
+    "thinking": false,
+    "message": {
+      "role": "assistant",
+      "content": "The project version is 2.7.4."
+    }
+  }
+]

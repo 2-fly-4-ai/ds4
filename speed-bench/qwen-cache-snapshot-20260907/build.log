@@ -1,0 +1,145 @@
+cc -O3 -ffast-math -g -mcpu=native -Wall -Wextra -std=c99 -c -o ds4_cli.o ds4_cli.c
+cc -O3 -ffast-math -g -mcpu=native -Wall -Wextra -std=c99 -c -o ds4_prompt_prefix.o ds4_prompt_prefix.c
+cc -O3 -ffast-math -g -mcpu=native -Wall -Wextra -std=c99 -c -o linenoise.o linenoise.c
+cc -O3 -ffast-math -g -mcpu=native -Wall -Wextra -std=c99 -c -o ds4_bench.o ds4_bench.c
+cc -O3 -ffast-math -g -mcpu=native -Wall -Wextra -std=c99 -c -o ds4_eval.o ds4_eval.c
+cc -O3 -ffast-math -g -mcpu=native -Wall -Wextra -std=c99 -c -o ds4_agent.o ds4_agent.c
+cc -O3 -ffast-math -g -mcpu=native -Wall -Wextra -std=c99 -c -o ds4_web.o ds4_web.c
+cc -O3 -ffast-math -g -mcpu=native -Wall -Wextra -std=c99 -Wno-unused-function -c -o ds4_agent_test.o tests/ds4_agent_test.c
+cc -O3 -ffast-math -g -mcpu=native -Wall -Wextra -std=c99 -DDS4_NO_GPU -I. -o tests/test_snapshot_bytes tests/test_snapshot_bytes.c ds4_image.o ds4_distributed.o ds4_tp.o ds4_ssd.o ds4_layer_pack.o rax.o -lm -pthread
+cc -O3 -ffast-math -g -mcpu=native -Wall -Wextra -std=c99 -o ds4 ds4_cli.o ds4_help.o ds4_prompt_prefix.o linenoise.o ds4_gpu_args.o ds4.o ds4_image.o ds4_distributed.o ds4_tp.o ds4_ssd.o ds4_metal.o ds4_layer_pack.o -lm -pthread -framework Foundation -framework Metal
+cc -O3 -ffast-math -g -mcpu=native -Wall -Wextra -std=c99 -o ds4-bench ds4_bench.o ds4_help.o ds4_gpu_args.o ds4.o ds4_image.o ds4_distributed.o ds4_tp.o ds4_ssd.o ds4_metal.o ds4_layer_pack.o -lm -pthread -framework Foundation -framework Metal
+cc -O3 -ffast-math -g -mcpu=native -Wall -Wextra -std=c99 -o ds4-eval ds4_eval.o ds4_help.o ds4.o ds4_image.o ds4_distributed.o ds4_tp.o ds4_ssd.o ds4_metal.o ds4_layer_pack.o -lm -pthread -framework Foundation -framework Metal
+In file included from tests/test_snapshot_bytes.c:1:
+tests/../ds4.c:397:13: warning: unused function 'ds4_backend_supports_streaming_auto_cache' [-Wunused-function]
+  397 | static bool ds4_backend_supports_streaming_auto_cache(ds4_backend backend) {
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:407:13: warning: unused function 'ds4_backend_supports_glm_streaming_full_layers' [-Wunused-function]
+  407 | static bool ds4_backend_supports_glm_streaming_full_layers(ds4_backend backend) {
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:426:20: warning: unused function 'glm_graph_env_value' [-Wunused-function]
+  426 | static const char *glm_graph_env_value(const char *rocm_name,
+      |                    ^~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:1585:13: warning: unused function 'ds4_expert_profile_record' [-Wunused-function]
+ 1585 | static void ds4_expert_profile_record(
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:1868:13: warning: unused function 'sleep_sec' [-Wunused-function]
+ 1868 | static void sleep_sec(double sec) {
+      |             ^~~~~~~~~
+tests/../ds4.c:4882:13: warning: unused function 'ds4_streaming_prefill_headroom_bytes' [-Wunused-function]
+ 4882 | static bool ds4_streaming_prefill_headroom_bytes(
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:4933:17: warning: unused function 'ds4_streaming_cache_experts_for_byte_budget' [-Wunused-function]
+ 4933 | static uint32_t ds4_streaming_cache_experts_for_byte_budget(
+      |                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:5013:17: warning: unused function 'ds4_mul_sat_u64' [-Wunused-function]
+ 5013 | static uint64_t ds4_mul_sat_u64(uint64_t a, uint64_t b) {
+      |                 ^~~~~~~~~~~~~~~
+tests/../ds4.c:5419:33: warning: unused function 'weights_first_bound_layer' [-Wunused-function]
+ 5419 | static const ds4_layer_weights *weights_first_bound_layer(const ds4_weights *w) {
+      |                                 ^~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:7921:13: warning: unused function 'glm_stream_decode_expert_cache_ready' [-Wunused-function]
+ 7921 | static bool glm_stream_decode_expert_cache_ready(
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:7966:13: warning: unused function 'weights_model_map_decode_static_supported' [-Wunused-function]
+ 7966 | static bool weights_model_map_decode_static_supported(const ds4_weights *w) {
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:8060:13: warning: unused function 'weights_qwen4_gpu_resident_spans' [-Wunused-function]
+ 8060 | static bool weights_qwen4_gpu_resident_spans(
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:15876:13: warning: unused function 'layer_glm_attention_prefill_f32_ref' [-Wunused-function]
+ 15876 | static void layer_glm_attention_prefill_f32_ref(
+       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:16403:13: warning: unused function 'forward_glm_first_token_cpu_f32_ref' [-Wunused-function]
+ 16403 | static void forward_glm_first_token_cpu_f32_ref(
+       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:16426:13: warning: unused function 'output_logits_glm_one_f32_ref' [-Wunused-function]
+ 16426 | static void output_logits_glm_one_f32_ref(
+       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:40067:17: warning: unused function 'glm_graph_streaming_active_model_bytes' [-Wunused-function]
+ 40067 | static uint64_t glm_graph_streaming_active_model_bytes(
+       |                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:40070:17: warning: unused function 'ds4_engine_streaming_transient_guard_bytes' [-Wunused-function]
+ 40070 | static uint64_t ds4_engine_streaming_transient_guard_bytes(
+       |                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:41797:13: warning: unused function 'sample_build_probabilities' [-Wunused-function]
+ 41797 | static bool sample_build_probabilities(
+       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:41927:12: warning: unused function 'sample_probabilities' [-Wunused-function]
+ 41927 | static int sample_probabilities(const float *probs, uint32_t n_vocab,
+       |            ^~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:59571:17: warning: unused function 'qwen4_payload_tensor_bytes' [-Wunused-function]
+ 59571 | static uint64_t qwen4_payload_tensor_bytes(uint32_t rows, uint32_t mtp_rows) {
+       |                 ^~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:61983:12: warning: unused function 'glm_metal_compare_f32' [-Wunused-function]
+ 61983 | static int glm_metal_compare_f32(
+       |            ^~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:62011:12: warning: unused function 'glm_metal_compare_i32_list' [-Wunused-function]
+ 62011 | static int glm_metal_compare_i32_list(
+       |            ^~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:64777:13: warning: unused function 'ds4_engine_configure_streaming_auto_cache' [-Wunused-function]
+ 64777 | static bool ds4_engine_configure_streaming_auto_cache(ds4_engine *e) {
+       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:65011:17: warning: unused function 'ds4_glm_streaming_supported_resident_prefix_layers' [-Wunused-function]
+ 65011 | static uint32_t ds4_glm_streaming_supported_resident_prefix_layers(
+       |                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:65070:17: warning: unused function 'ds4_glm_streaming_auto_full_layers' [-Wunused-function]
+ 65070 | static uint32_t ds4_glm_streaming_auto_full_layers(
+       |                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:65099:13: warning: unused function 'ds4_engine_configure_streaming_cache_budget' [-Wunused-function]
+ 65099 | static bool ds4_engine_configure_streaming_cache_budget(ds4_engine *e) {
+       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:65401:13: warning: unused function 'ds4_glm_streaming_runtime_decode_map_bytes' [-Wunused-function]
+ 65401 | static bool ds4_glm_streaming_runtime_decode_map_bytes(
+       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:65419:13: warning: unused function 'ds4_engine_fit_glm_streaming_budget' [-Wunused-function]
+ 65419 | static void ds4_engine_fit_glm_streaming_budget(
+       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:65610:13: warning: unused function 'ds4_engine_glm_streaming_memory_guard' [-Wunused-function]
+ 65610 | static bool ds4_engine_glm_streaming_memory_guard(
+       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:65661:13: warning: unused function 'ds4_engine_preload_pro_q4_expert_tables' [-Wunused-function]
+ 65661 | static bool ds4_engine_preload_pro_q4_expert_tables(
+       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:65754:13: warning: unused function 'model_warm_weights_sharded' [-Wunused-function]
+ 65754 | static void model_warm_weights_sharded(const ds4_model *m,
+       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:67054:12: warning: unused function 'engine_install_dspark_support_cache' [-Wunused-function]
+ 67054 | static int engine_install_dspark_support_cache(ds4_engine *e);
+       |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:67055:12: warning: unused function 'engine_install_gpu_placement' [-Wunused-function]
+ 67055 | static int engine_install_gpu_placement(ds4_engine *e);
+       |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:69733:13: warning: unused function 'ds4_session_cancelled_cb' [-Wunused-function]
+ 69733 | static bool ds4_session_cancelled_cb(void *ud) {
+       |             ^~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:71328:13: warning: unused function 'ds4_session_vision_range_overlaps' [-Wunused-function]
+ 71328 | static bool ds4_session_vision_range_overlaps(
+       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:79151:12: warning: unused function 'ds4_sessions_eval_batch_cuda' [-Wunused-function]
+ 79151 | static int ds4_sessions_eval_batch_cuda(ds4_decode_item *items, int count,
+       |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:79286:12: warning: unused function 'ds4_sessions_eval_batch_with_prefill_cuda' [-Wunused-function]
+ 79286 | static int ds4_sessions_eval_batch_with_prefill_cuda(
+       |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:80250:12: warning: unused function 'prompt_lookup_effective_draft_cap' [-Wunused-function]
+ 80250 | static int prompt_lookup_effective_draft_cap(ds4_session *s, int shallow_cap) {
+       |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:80264:13: warning: unused function 'prompt_lookup_adaptive_note' [-Wunused-function]
+ 80264 | static void prompt_lookup_adaptive_note(ds4_session *s, bool full_accept) {
+       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:80276:13: warning: unused function 'prompt_lookup_glm_gpu_top1_enabled' [-Wunused-function]
+ 80276 | static bool prompt_lookup_glm_gpu_top1_enabled(const ds4_session *s,
+       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:80291:13: warning: unused function 'prompt_lookup_gate_enabled' [-Wunused-function]
+ 80291 | static bool prompt_lookup_gate_enabled(void) {
+       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:80305:14: warning: unused function 'prompt_lookup_parity_margin' [-Wunused-function]
+ 80305 | static float prompt_lookup_parity_margin(void) {
+       |              ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+tests/../ds4.c:80781:12: warning: unused function 'ds4_session_eval_qwen_prompt_lookup' [-Wunused-function]
+ 80781 | static int ds4_session_eval_qwen_prompt_lookup(
+       |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+cc -O3 -ffast-math -g -mcpu=native -Wall -Wextra -std=c99 -o ds4_agent_test ds4_agent_test.o ds4_help.o ds4_prompt_prefix.o ds4_web.o ds4_kvstore.o linenoise.o ds4.o ds4_image.o ds4_distributed.o ds4_tp.o ds4_ssd.o ds4_metal.o ds4_layer_pack.o -lm -pthread -framework Foundation -framework Metal
+cc -O3 -ffast-math -g -mcpu=native -Wall -Wextra -std=c99 -o ds4-agent ds4_agent.o ds4_help.o ds4_prompt_prefix.o ds4_web.o ds4_kvstore.o linenoise.o ds4_gpu_args.o ds4.o ds4_image.o ds4_distributed.o ds4_tp.o ds4_ssd.o ds4_metal.o ds4_layer_pack.o -lm -pthread -framework Foundation -framework Metal
+43 warnings generated.

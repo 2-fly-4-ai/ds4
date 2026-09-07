@@ -38,6 +38,7 @@
 /tests/test_mxfp4_metal
 /tests/test_q4k_dot
 /tests/test_sampling
+/tests/test_snapshot_bytes
 /tests/test_glm53_kda
 /tests/test_qwen4_kernels
 /tests/test_qwen4_vision
