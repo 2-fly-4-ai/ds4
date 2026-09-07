@@ -4447,13 +4447,53 @@ static bool agent_mkdir_p(const char *path) {
     return ok;
 }
 
-static char *agent_default_cache_dir(void) {
+static void agent_cache_file_identity(agent_buf *key, const char *path) {
+    char *resolved = path && path[0] ? realpath(path, NULL) : NULL;
+    const char *name = resolved ? resolved : (path ? path : "");
+    char meta[160];
+    snprintf(meta, sizeof(meta), "%zu:", strlen(name));
+    agent_buf_puts(key, meta);
+    agent_buf_puts(key, name);
+    struct stat st;
+    if (name[0] && stat(name, &st) == 0) {
+        long mtime_nsec = 0;
+#if defined(__APPLE__)
+        mtime_nsec = st.st_mtimespec.tv_nsec;
+#elif defined(__linux__)
+        mtime_nsec = st.st_mtim.tv_nsec;
+#endif
+        snprintf(meta, sizeof(meta), ":%llu:%llu:%llu:%lld:%ld;",
+                 (unsigned long long)st.st_dev, (unsigned long long)st.st_ino,
+                 (unsigned long long)st.st_size, (long long)st.st_mtime,
+                 mtime_nsec);
+        agent_buf_puts(key, meta);
+    } else {
+        agent_buf_puts(key, ":missing;");
+    }
+    free(resolved);
+}
+
+static char *agent_default_cache_dir(const agent_config *cfg) {
     const char *home = getenv("HOME");
     if (!home || !home[0]) home = ".";
     agent_buf b = {0};
     agent_buf_puts(&b, home);
     if (b.len == 0 || b.ptr[b.len - 1] != '/') agent_buf_puts(&b, "/");
     agent_buf_puts(&b, ".ds4/kvcache");
+    if (cfg && cfg->engine.ple_path && cfg->engine.ple_path[0]) {
+        /* Legacy checkpoint tags do not identify a Qwen weight/PLE recipe.
+         * Isolate new external-PLE configurations, leaving existing sessions
+         * untouched. These local file identities are not portable weight hashes. */
+        agent_buf key = {0};
+        agent_cache_file_identity(&key, cfg->engine.model_path);
+        agent_cache_file_identity(&key, cfg->engine.ple_path);
+        agent_cache_file_identity(&key, cfg->engine.vision_path);
+        char sha[41];
+        ds4_kvstore_sha1_bytes_hex(key.ptr, key.len, sha);
+        agent_buf_puts(&b, "/qwen-ple-");
+        agent_buf_puts(&b, sha);
+        free(key.ptr);
+    }
     return agent_buf_take(&b);
 }
 
@@ -11576,7 +11616,7 @@ static int agent_worker_init(agent_worker *w, ds4_engine *engine, agent_config *
         fprintf(stderr, "ds4-agent: session backend is required\n");
         return -1;
     }
-    w->cache_dir = agent_default_cache_dir();
+    w->cache_dir = agent_default_cache_dir(cfg);
     if (!agent_mkdir_p(w->cache_dir)) {
         fprintf(stderr, "ds4-agent: failed to create %s: %s\n",
                 w->cache_dir, strerror(errno));
