@@ -10,7 +10,7 @@ prompt = main/'speed-bench/qwen-iq2-wide-20260907/fixed-corpus.txt'
 models = {'glm': main/'gguf/GLM-5.3-Flash-Q2-Q4K-Attention-SharedDownQ4K.gguf',
           'ds4': main/'ds4flash.gguf'}
 parser = argparse.ArgumentParser()
-parser.add_argument('phase', choices=['parity', 'timing', 'state', 'diagnose', 'aligned'])
+parser.add_argument('phase', choices=['parity', 'timing', 'state', 'diagnose', 'aligned', 'guard'])
 args = parser.parse_args()
 results = []
 
@@ -46,7 +46,11 @@ def bench(tag, model, root, ctx, count, cache=None, dump=False, disable=False, a
     if p.returncode: raise SystemExit(f'{tag} failed')
     return row
 
-if args.phase == 'aligned':
+if args.phase == 'guard':
+    for model in ['glm', 'ds4']:
+        for i, root in enumerate([work, main, main, work]):
+            bench(f'{model}-resident-baab-{i}', model, root, 2048, 128)
+elif args.phase == 'aligned':
     # At 64K allocation BOTH modes use the existing 4K attention/work cap.
     # Actual prompt remains 8K; no 64K prefill is performed.
     ref = bench('glm-8192-aligned-ref', 'glm', main, 8192, 64, dump=True, alloc=65536)

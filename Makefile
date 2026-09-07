@@ -610,6 +610,16 @@ else
 	$(DS4_LINK) -o $@ ds4_test.o ds4_help.o ds4_kvstore.o rax.o $(CORE_OBJS) $(DS4_LINK_LIBS)
 endif
 
+ifeq ($(UNAME_S),Darwin)
+# Explicit live test: one GLM model, bounded SSD cache, serial session switching.
+tests/test_glm_stream_interleave: tests/test_glm_stream_interleave.c ds4.h $(CORE_OBJS)
+	$(CC) $(CFLAGS) -I. -o $@ tests/test_glm_stream_interleave.c $(CORE_OBJS) $(METAL_LDLIBS)
+
+.PHONY: test-glm-stream-interleave
+test-glm-stream-interleave: tests/test_glm_stream_interleave
+	./tests/test_glm_stream_interleave "$(DS4_TEST_MODEL)"
+endif
+
 ds4_agent_test: ds4_agent_test.o ds4_help.o ds4_prompt_prefix.o ds4_web.o ds4_kvstore.o linenoise.o $(CORE_OBJS)
 ifeq ($(UNAME_S),Darwin)
 	$(CC) $(CFLAGS) -o $@ ds4_agent_test.o ds4_help.o ds4_prompt_prefix.o ds4_web.o ds4_kvstore.o linenoise.o $(CORE_OBJS) $(METAL_LDLIBS)
