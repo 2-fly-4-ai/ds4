@@ -1,0 +1,170 @@
+[
+  {
+    "tag": "glm-base-resident-timing",
+    "exit": 0,
+    "csv": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "677.52",
+        "gen_tokens": "64",
+        "gen_tps": "33.88",
+        "gen_first_ms": "35.222",
+        "gen_steady_tokens": "63",
+        "gen_steady_tps": "33.98",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "33.88",
+        "gen_middle64_tps": "33.88",
+        "gen_final64_tps": "33.88"
+      }
+    ],
+    "logits": {}
+  },
+  {
+    "tag": "glm-base-8-timing",
+    "exit": 0,
+    "csv": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "487.17",
+        "gen_tokens": "64",
+        "gen_tps": "1.30",
+        "gen_first_ms": "705.710",
+        "gen_steady_tokens": "63",
+        "gen_steady_tps": "1.30",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "1.30",
+        "gen_middle64_tps": "1.30",
+        "gen_final64_tps": "1.30"
+      }
+    ],
+    "logits": {}
+  },
+  {
+    "tag": "glm-candidate-8-timing",
+    "exit": 0,
+    "csv": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "484.20",
+        "gen_tokens": "64",
+        "gen_tps": "1.30",
+        "gen_first_ms": "678.818",
+        "gen_steady_tokens": "63",
+        "gen_steady_tps": "1.30",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "1.30",
+        "gen_middle64_tps": "1.30",
+        "gen_final64_tps": "1.30"
+      }
+    ],
+    "logits": {}
+  },
+  {
+    "tag": "glm-candidate-32-timing",
+    "exit": 0,
+    "csv": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "486.08",
+        "gen_tokens": "64",
+        "gen_tps": "1.30",
+        "gen_first_ms": "722.367",
+        "gen_steady_tokens": "63",
+        "gen_steady_tps": "1.29",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "1.30",
+        "gen_middle64_tps": "1.30",
+        "gen_final64_tps": "1.30"
+      }
+    ],
+    "logits": {}
+  },
+  {
+    "tag": "ds4-base-resident-timing",
+    "exit": 0,
+    "csv": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "885.56",
+        "gen_tokens": "64",
+        "gen_tps": "44.65",
+        "gen_first_ms": "29.224",
+        "gen_steady_tokens": "63",
+        "gen_steady_tps": "44.87",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "44.65",
+        "gen_middle64_tps": "44.65",
+        "gen_final64_tps": "44.65"
+      }
+    ],
+    "logits": {}
+  },
+  {
+    "tag": "ds4-base-8-timing",
+    "exit": 0,
+    "csv": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "576.62",
+        "gen_tokens": "64",
+        "gen_tps": "16.09",
+        "gen_first_ms": "124.111",
+        "gen_steady_tokens": "63",
+        "gen_steady_tps": "16.35",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "16.09",
+        "gen_middle64_tps": "16.09",
+        "gen_final64_tps": "16.09"
+      }
+    ],
+    "logits": {}
+  },
+  {
+    "tag": "ds4-candidate-8-timing",
+    "exit": 0,
+    "csv": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "581.74",
+        "gen_tokens": "64",
+        "gen_tps": "16.19",
+        "gen_first_ms": "123.492",
+        "gen_steady_tokens": "63",
+        "gen_steady_tps": "16.45",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "16.19",
+        "gen_middle64_tps": "16.19",
+        "gen_final64_tps": "16.19"
+      }
+    ],
+    "logits": {}
+  },
+  {
+    "tag": "ds4-candidate-32-timing",
+    "exit": 0,
+    "csv": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "389.11",
+        "gen_tokens": "64",
+        "gen_tps": "17.13",
+        "gen_first_ms": "501.604",
+        "gen_steady_tokens": "63",
+        "gen_steady_tps": "19.48",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "17.13",
+        "gen_middle64_tps": "17.13",
+        "gen_final64_tps": "17.13"
+      }
+    ],
+    "logits": {}
+  }
+]

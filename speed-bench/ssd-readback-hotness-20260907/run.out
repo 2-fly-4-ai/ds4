@@ -1,0 +1,17 @@
+START glm-base-resident
+DONE glm-base-resident 0 [{'ctx_tokens': '2048', 'prefill_tokens': '2048', 'prefill_tps': '678.38', 'gen_tokens': '64', 'gen_tps': '33.63', 'gen_first_ms': '35.449', 'gen_steady_tokens': '63', 'gen_steady_tps': '33.74', 'kvcache_bytes': '0', 'gen_first64_tps': '33.63', 'gen_middle64_tps': '33.63', 'gen_final64_tps': '33.63'}]
+START glm-base-8
+DONE glm-base-8 0 [{'ctx_tokens': '2048', 'prefill_tokens': '2048', 'prefill_tps': '476.11', 'gen_tokens': '64', 'gen_tps': '1.24', 'gen_first_ms': '761.453', 'gen_steady_tokens': '63', 'gen_steady_tps': '1.24', 'kvcache_bytes': '0', 'gen_first64_tps': '1.24', 'gen_middle64_tps': '1.24', 'gen_final64_tps': '1.24'}]
+START glm-candidate-8
+DONE glm-candidate-8 0 [{'ctx_tokens': '2048', 'prefill_tokens': '2048', 'prefill_tps': '476.80', 'gen_tokens': '64', 'gen_tps': '1.24', 'gen_first_ms': '793.855', 'gen_steady_tokens': '63', 'gen_steady_tps': '1.24', 'kvcache_bytes': '0', 'gen_first64_tps': '1.24', 'gen_middle64_tps': '1.24', 'gen_final64_tps': '1.24'}]
+START glm-candidate-32
+DONE glm-candidate-32 0 [{'ctx_tokens': '2048', 'prefill_tokens': '2048', 'prefill_tps': '480.78', 'gen_tokens': '64', 'gen_tps': '1.25', 'gen_first_ms': '743.954', 'gen_steady_tokens': '63', 'gen_steady_tps': '1.25', 'kvcache_bytes': '0', 'gen_first64_tps': '1.25', 'gen_middle64_tps': '1.25', 'gen_final64_tps': '1.25'}]
+START ds4-base-resident
+DONE ds4-base-resident 0 [{'ctx_tokens': '2048', 'prefill_tokens': '2048', 'prefill_tps': '884.03', 'gen_tokens': '64', 'gen_tps': '44.44', 'gen_first_ms': '25.086', 'gen_steady_tokens': '63', 'gen_steady_tps': '44.52', 'kvcache_bytes': '0', 'gen_first64_tps': '44.44', 'gen_middle64_tps': '44.44', 'gen_final64_tps': '44.44'}]
+START ds4-base-8
+DONE ds4-base-8 0 [{'ctx_tokens': '2048', 'prefill_tokens': '2048', 'prefill_tps': '587.86', 'gen_tokens': '64', 'gen_tps': '16.57', 'gen_first_ms': '121.632', 'gen_steady_tokens': '63', 'gen_steady_tps': '16.85', 'kvcache_bytes': '0', 'gen_first64_tps': '16.57', 'gen_middle64_tps': '16.57', 'gen_final64_tps': '16.57'}]
+START ds4-candidate-8
+DONE ds4-candidate-8 0 [{'ctx_tokens': '2048', 'prefill_tokens': '2048', 'prefill_tps': '588.56', 'gen_tokens': '64', 'gen_tps': '16.74', 'gen_first_ms': '118.099', 'gen_steady_tokens': '63', 'gen_steady_tps': '17.01', 'kvcache_bytes': '0', 'gen_first64_tps': '16.74', 'gen_middle64_tps': '16.74', 'gen_final64_tps': '16.74'}]
+START ds4-candidate-32
+DONE ds4-candidate-32 0 [{'ctx_tokens': '2048', 'prefill_tokens': '2048', 'prefill_tps': '425.36', 'gen_tokens': '64', 'gen_tps': '17.05', 'gen_first_ms': '586.212', 'gen_steady_tokens': '63', 'gen_steady_tps': '19.89', 'kvcache_bytes': '0', 'gen_first64_tps': '17.05', 'gen_middle64_tps': '17.05', 'gen_final64_tps': '17.05'}]
+Download resumed

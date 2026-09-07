@@ -1,0 +1,17 @@
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal SSD streaming mode enabled; full model residency and warmup are skipped
+ds4: GLM SSD streaming full resident layers: 2 (3.80 GiB, auto)
+ds4: metal SSD streaming cache target 32.00 GiB; effective 32.00 GiB = 3.80 GiB prefill headroom + 3.80 GiB full layers + 24.40 GiB dynamic cache (3702 experts, 6.75 MiB each)
+ds4: GLM SSD streaming request adjusted to fit memory: full layers 2 -> 0, cache 3702 -> 3702 experts, prefill reserve 3.80 -> 3.80 GiB
+ds4: GLM SSD streaming decode map: per-layer fallback
+ds4: SSD streaming initial metal model map restricted to token embedding (1 spans, 0.63 GiB tensor span)
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 0.05 GiB (raw 0.00 + compressed 0.05) + buffers 5.69 GiB + resident model 2.12 GiB + expert cache 24.40 GiB + prefill expert reserve 3.80 GiB = 36.06 GiB planned
+ds4: memory detail: ctx=4096 prefill_cap=4096 raw_kv_rows=0 compressed_kv_rows=4096 backend=metal
+ds4-bench: context buffers 5875.94 MiB (ctx=4096, backend=metal, prefill_chunk=4096, raw_kv_rows=0, compressed_kv_rows=4096)
+ds4: GLM SSD streaming decode map: per-layer fallback
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=4096 logical_ctx=4096 kv_layers=45 indexer_layers=11 f16 0.05 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=16.00 MiB
