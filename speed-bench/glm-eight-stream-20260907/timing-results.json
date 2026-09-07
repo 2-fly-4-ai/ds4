@@ -1,0 +1,552 @@
+[
+  {
+    "tag": "glm-stream-abba-0",
+    "command": [
+      "/Users/brianfarley/Desktop/ds4/ds4-bench",
+      "-m",
+      "/Users/brianfarley/Desktop/ds4/gguf/GLM-5.3-Flash-Q2-Q4K-Attention-SharedDownQ4K.gguf",
+      "--prompt-file",
+      "/Users/brianfarley/Desktop/ds4/speed-bench/qwen-iq2-wide-20260907/fixed-corpus.txt",
+      "--ctx-start",
+      "2048",
+      "--ctx-max",
+      "2048",
+      "--ctx-alloc",
+      "4096",
+      "--gen-tokens",
+      "256",
+      "--teacher-forced-decode",
+      "--csv",
+      "/Users/brianfarley/Desktop/ds4-glm-eight-stream/speed-bench/glm-eight-stream-20260907/glm-stream-abba-0.csv",
+      "--ssd-streaming",
+      "--ssd-streaming-cache-experts",
+      "8GB"
+    ],
+    "exit": 0,
+    "csv": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "425.54",
+        "gen_tokens": "256",
+        "gen_tps": "1.00",
+        "gen_first_ms": "952.495",
+        "gen_steady_tokens": "255",
+        "gen_steady_tps": "1.00",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "1.00",
+        "gen_middle64_tps": "1.00",
+        "gen_final64_tps": "1.00"
+      }
+    ]
+  },
+  {
+    "tag": "glm-stream-abba-1",
+    "command": [
+      "/Users/brianfarley/Desktop/ds4-glm-eight-stream/ds4-bench",
+      "-m",
+      "/Users/brianfarley/Desktop/ds4/gguf/GLM-5.3-Flash-Q2-Q4K-Attention-SharedDownQ4K.gguf",
+      "--prompt-file",
+      "/Users/brianfarley/Desktop/ds4/speed-bench/qwen-iq2-wide-20260907/fixed-corpus.txt",
+      "--ctx-start",
+      "2048",
+      "--ctx-max",
+      "2048",
+      "--ctx-alloc",
+      "4096",
+      "--gen-tokens",
+      "256",
+      "--teacher-forced-decode",
+      "--csv",
+      "/Users/brianfarley/Desktop/ds4-glm-eight-stream/speed-bench/glm-eight-stream-20260907/glm-stream-abba-1.csv",
+      "--ssd-streaming",
+      "--ssd-streaming-cache-experts",
+      "8GB"
+    ],
+    "exit": 0,
+    "csv": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "422.62",
+        "gen_tokens": "256",
+        "gen_tps": "12.07",
+        "gen_first_ms": "250.035",
+        "gen_steady_tokens": "255",
+        "gen_steady_tps": "12.17",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "11.77",
+        "gen_middle64_tps": "12.53",
+        "gen_final64_tps": "11.37"
+      }
+    ]
+  },
+  {
+    "tag": "glm-stream-abba-2",
+    "command": [
+      "/Users/brianfarley/Desktop/ds4-glm-eight-stream/ds4-bench",
+      "-m",
+      "/Users/brianfarley/Desktop/ds4/gguf/GLM-5.3-Flash-Q2-Q4K-Attention-SharedDownQ4K.gguf",
+      "--prompt-file",
+      "/Users/brianfarley/Desktop/ds4/speed-bench/qwen-iq2-wide-20260907/fixed-corpus.txt",
+      "--ctx-start",
+      "2048",
+      "--ctx-max",
+      "2048",
+      "--ctx-alloc",
+      "4096",
+      "--gen-tokens",
+      "256",
+      "--teacher-forced-decode",
+      "--csv",
+      "/Users/brianfarley/Desktop/ds4-glm-eight-stream/speed-bench/glm-eight-stream-20260907/glm-stream-abba-2.csv",
+      "--ssd-streaming",
+      "--ssd-streaming-cache-experts",
+      "8GB"
+    ],
+    "exit": 0,
+    "csv": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "422.40",
+        "gen_tokens": "256",
+        "gen_tps": "12.33",
+        "gen_first_ms": "240.482",
+        "gen_steady_tokens": "255",
+        "gen_steady_tps": "12.43",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "11.96",
+        "gen_middle64_tps": "13.05",
+        "gen_final64_tps": "11.41"
+      }
+    ]
+  },
+  {
+    "tag": "glm-stream-abba-3",
+    "command": [
+      "/Users/brianfarley/Desktop/ds4/ds4-bench",
+      "-m",
+      "/Users/brianfarley/Desktop/ds4/gguf/GLM-5.3-Flash-Q2-Q4K-Attention-SharedDownQ4K.gguf",
+      "--prompt-file",
+      "/Users/brianfarley/Desktop/ds4/speed-bench/qwen-iq2-wide-20260907/fixed-corpus.txt",
+      "--ctx-start",
+      "2048",
+      "--ctx-max",
+      "2048",
+      "--ctx-alloc",
+      "4096",
+      "--gen-tokens",
+      "256",
+      "--teacher-forced-decode",
+      "--csv",
+      "/Users/brianfarley/Desktop/ds4-glm-eight-stream/speed-bench/glm-eight-stream-20260907/glm-stream-abba-3.csv",
+      "--ssd-streaming",
+      "--ssd-streaming-cache-experts",
+      "8GB"
+    ],
+    "exit": 0,
+    "csv": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "300.25",
+        "gen_tokens": "256",
+        "gen_tps": "1.00",
+        "gen_first_ms": "1005.026",
+        "gen_steady_tokens": "255",
+        "gen_steady_tps": "1.00",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "1.00",
+        "gen_middle64_tps": "1.00",
+        "gen_final64_tps": "1.00"
+      }
+    ]
+  },
+  {
+    "tag": "glm-stream-budget16",
+    "command": [
+      "/Users/brianfarley/Desktop/ds4-glm-eight-stream/ds4-bench",
+      "-m",
+      "/Users/brianfarley/Desktop/ds4/gguf/GLM-5.3-Flash-Q2-Q4K-Attention-SharedDownQ4K.gguf",
+      "--prompt-file",
+      "/Users/brianfarley/Desktop/ds4/speed-bench/qwen-iq2-wide-20260907/fixed-corpus.txt",
+      "--ctx-start",
+      "2048",
+      "--ctx-max",
+      "2048",
+      "--ctx-alloc",
+      "4096",
+      "--gen-tokens",
+      "256",
+      "--teacher-forced-decode",
+      "--csv",
+      "/Users/brianfarley/Desktop/ds4-glm-eight-stream/speed-bench/glm-eight-stream-20260907/glm-stream-budget16.csv",
+      "--ssd-streaming",
+      "--ssd-streaming-cache-experts",
+      "16GB"
+    ],
+    "exit": 0,
+    "csv": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "347.20",
+        "gen_tokens": "256",
+        "gen_tps": "13.24",
+        "gen_first_ms": "247.935",
+        "gen_steady_tokens": "255",
+        "gen_steady_tps": "13.36",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "10.50",
+        "gen_middle64_tps": "15.40",
+        "gen_final64_tps": "13.23"
+      }
+    ]
+  },
+  {
+    "tag": "glm-stream-budget32",
+    "command": [
+      "/Users/brianfarley/Desktop/ds4-glm-eight-stream/ds4-bench",
+      "-m",
+      "/Users/brianfarley/Desktop/ds4/gguf/GLM-5.3-Flash-Q2-Q4K-Attention-SharedDownQ4K.gguf",
+      "--prompt-file",
+      "/Users/brianfarley/Desktop/ds4/speed-bench/qwen-iq2-wide-20260907/fixed-corpus.txt",
+      "--ctx-start",
+      "2048",
+      "--ctx-max",
+      "2048",
+      "--ctx-alloc",
+      "4096",
+      "--gen-tokens",
+      "256",
+      "--teacher-forced-decode",
+      "--csv",
+      "/Users/brianfarley/Desktop/ds4-glm-eight-stream/speed-bench/glm-eight-stream-20260907/glm-stream-budget32.csv",
+      "--ssd-streaming",
+      "--ssd-streaming-cache-experts",
+      "32GB"
+    ],
+    "exit": 0,
+    "csv": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "381.53",
+        "gen_tokens": "256",
+        "gen_tps": "14.08",
+        "gen_first_ms": "250.744",
+        "gen_steady_tokens": "255",
+        "gen_steady_tps": "14.22",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "9.61",
+        "gen_middle64_tps": "17.34",
+        "gen_final64_tps": "15.41"
+      }
+    ]
+  },
+  {
+    "tag": "glm-resident-abba-0",
+    "command": [
+      "/Users/brianfarley/Desktop/ds4/ds4-bench",
+      "-m",
+      "/Users/brianfarley/Desktop/ds4/gguf/GLM-5.3-Flash-Q2-Q4K-Attention-SharedDownQ4K.gguf",
+      "--prompt-file",
+      "/Users/brianfarley/Desktop/ds4/speed-bench/qwen-iq2-wide-20260907/fixed-corpus.txt",
+      "--ctx-start",
+      "2048",
+      "--ctx-max",
+      "2048",
+      "--ctx-alloc",
+      "4096",
+      "--gen-tokens",
+      "256",
+      "--teacher-forced-decode",
+      "--csv",
+      "/Users/brianfarley/Desktop/ds4-glm-eight-stream/speed-bench/glm-eight-stream-20260907/glm-resident-abba-0.csv"
+    ],
+    "exit": 0,
+    "csv": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "508.15",
+        "gen_tokens": "256",
+        "gen_tps": "24.65",
+        "gen_first_ms": "42.845",
+        "gen_steady_tokens": "255",
+        "gen_steady_tps": "24.65",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "26.59",
+        "gen_middle64_tps": "24.03",
+        "gen_final64_tps": "23.67"
+      }
+    ]
+  },
+  {
+    "tag": "glm-resident-abba-1",
+    "command": [
+      "/Users/brianfarley/Desktop/ds4-glm-eight-stream/ds4-bench",
+      "-m",
+      "/Users/brianfarley/Desktop/ds4/gguf/GLM-5.3-Flash-Q2-Q4K-Attention-SharedDownQ4K.gguf",
+      "--prompt-file",
+      "/Users/brianfarley/Desktop/ds4/speed-bench/qwen-iq2-wide-20260907/fixed-corpus.txt",
+      "--ctx-start",
+      "2048",
+      "--ctx-max",
+      "2048",
+      "--ctx-alloc",
+      "4096",
+      "--gen-tokens",
+      "256",
+      "--teacher-forced-decode",
+      "--csv",
+      "/Users/brianfarley/Desktop/ds4-glm-eight-stream/speed-bench/glm-eight-stream-20260907/glm-resident-abba-1.csv"
+    ],
+    "exit": 0,
+    "csv": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "392.72",
+        "gen_tokens": "256",
+        "gen_tps": "23.17",
+        "gen_first_ms": "47.542",
+        "gen_steady_tokens": "255",
+        "gen_steady_tps": "23.18",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "24.45",
+        "gen_middle64_tps": "22.55",
+        "gen_final64_tps": "23.07"
+      }
+    ]
+  },
+  {
+    "tag": "glm-resident-abba-2",
+    "command": [
+      "/Users/brianfarley/Desktop/ds4-glm-eight-stream/ds4-bench",
+      "-m",
+      "/Users/brianfarley/Desktop/ds4/gguf/GLM-5.3-Flash-Q2-Q4K-Attention-SharedDownQ4K.gguf",
+      "--prompt-file",
+      "/Users/brianfarley/Desktop/ds4/speed-bench/qwen-iq2-wide-20260907/fixed-corpus.txt",
+      "--ctx-start",
+      "2048",
+      "--ctx-max",
+      "2048",
+      "--ctx-alloc",
+      "4096",
+      "--gen-tokens",
+      "256",
+      "--teacher-forced-decode",
+      "--csv",
+      "/Users/brianfarley/Desktop/ds4-glm-eight-stream/speed-bench/glm-eight-stream-20260907/glm-resident-abba-2.csv"
+    ],
+    "exit": 0,
+    "csv": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "385.30",
+        "gen_tokens": "256",
+        "gen_tps": "23.86",
+        "gen_first_ms": "46.487",
+        "gen_steady_tokens": "255",
+        "gen_steady_tps": "23.87",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "24.10",
+        "gen_middle64_tps": "23.76",
+        "gen_final64_tps": "23.84"
+      }
+    ]
+  },
+  {
+    "tag": "glm-resident-abba-3",
+    "command": [
+      "/Users/brianfarley/Desktop/ds4/ds4-bench",
+      "-m",
+      "/Users/brianfarley/Desktop/ds4/gguf/GLM-5.3-Flash-Q2-Q4K-Attention-SharedDownQ4K.gguf",
+      "--prompt-file",
+      "/Users/brianfarley/Desktop/ds4/speed-bench/qwen-iq2-wide-20260907/fixed-corpus.txt",
+      "--ctx-start",
+      "2048",
+      "--ctx-max",
+      "2048",
+      "--ctx-alloc",
+      "4096",
+      "--gen-tokens",
+      "256",
+      "--teacher-forced-decode",
+      "--csv",
+      "/Users/brianfarley/Desktop/ds4-glm-eight-stream/speed-bench/glm-eight-stream-20260907/glm-resident-abba-3.csv"
+    ],
+    "exit": 0,
+    "csv": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "407.79",
+        "gen_tokens": "256",
+        "gen_tps": "23.68",
+        "gen_first_ms": "47.859",
+        "gen_steady_tokens": "255",
+        "gen_steady_tps": "23.69",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "24.39",
+        "gen_middle64_tps": "23.50",
+        "gen_final64_tps": "23.35"
+      }
+    ]
+  },
+  {
+    "tag": "ds4-resident-abba-0",
+    "command": [
+      "/Users/brianfarley/Desktop/ds4/ds4-bench",
+      "-m",
+      "/Users/brianfarley/Desktop/ds4/ds4flash.gguf",
+      "--prompt-file",
+      "/Users/brianfarley/Desktop/ds4/speed-bench/qwen-iq2-wide-20260907/fixed-corpus.txt",
+      "--ctx-start",
+      "2048",
+      "--ctx-max",
+      "2048",
+      "--ctx-alloc",
+      "4096",
+      "--gen-tokens",
+      "256",
+      "--teacher-forced-decode",
+      "--csv",
+      "/Users/brianfarley/Desktop/ds4-glm-eight-stream/speed-bench/glm-eight-stream-20260907/ds4-resident-abba-0.csv"
+    ],
+    "exit": 0,
+    "csv": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "723.14",
+        "gen_tokens": "256",
+        "gen_tps": "25.69",
+        "gen_first_ms": "34.694",
+        "gen_steady_tokens": "255",
+        "gen_steady_tps": "25.68",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "31.35",
+        "gen_middle64_tps": "24.18",
+        "gen_final64_tps": "25.71"
+      }
+    ]
+  },
+  {
+    "tag": "ds4-resident-abba-1",
+    "command": [
+      "/Users/brianfarley/Desktop/ds4-glm-eight-stream/ds4-bench",
+      "-m",
+      "/Users/brianfarley/Desktop/ds4/ds4flash.gguf",
+      "--prompt-file",
+      "/Users/brianfarley/Desktop/ds4/speed-bench/qwen-iq2-wide-20260907/fixed-corpus.txt",
+      "--ctx-start",
+      "2048",
+      "--ctx-max",
+      "2048",
+      "--ctx-alloc",
+      "4096",
+      "--gen-tokens",
+      "256",
+      "--teacher-forced-decode",
+      "--csv",
+      "/Users/brianfarley/Desktop/ds4-glm-eight-stream/speed-bench/glm-eight-stream-20260907/ds4-resident-abba-1.csv"
+    ],
+    "exit": 0,
+    "csv": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "480.96",
+        "gen_tokens": "256",
+        "gen_tps": "26.97",
+        "gen_first_ms": "38.446",
+        "gen_steady_tokens": "255",
+        "gen_steady_tps": "26.98",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "28.17",
+        "gen_middle64_tps": "26.46",
+        "gen_final64_tps": "26.81"
+      }
+    ]
+  },
+  {
+    "tag": "ds4-resident-abba-2",
+    "command": [
+      "/Users/brianfarley/Desktop/ds4-glm-eight-stream/ds4-bench",
+      "-m",
+      "/Users/brianfarley/Desktop/ds4/ds4flash.gguf",
+      "--prompt-file",
+      "/Users/brianfarley/Desktop/ds4/speed-bench/qwen-iq2-wide-20260907/fixed-corpus.txt",
+      "--ctx-start",
+      "2048",
+      "--ctx-max",
+      "2048",
+      "--ctx-alloc",
+      "4096",
+      "--gen-tokens",
+      "256",
+      "--teacher-forced-decode",
+      "--csv",
+      "/Users/brianfarley/Desktop/ds4-glm-eight-stream/speed-bench/glm-eight-stream-20260907/ds4-resident-abba-2.csv"
+    ],
+    "exit": 0,
+    "csv": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "507.11",
+        "gen_tokens": "256",
+        "gen_tps": "26.67",
+        "gen_first_ms": "36.760",
+        "gen_steady_tokens": "255",
+        "gen_steady_tps": "26.67",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "28.31",
+        "gen_middle64_tps": "25.82",
+        "gen_final64_tps": "26.62"
+      }
+    ]
+  },
+  {
+    "tag": "ds4-resident-abba-3",
+    "command": [
+      "/Users/brianfarley/Desktop/ds4/ds4-bench",
+      "-m",
+      "/Users/brianfarley/Desktop/ds4/ds4flash.gguf",
+      "--prompt-file",
+      "/Users/brianfarley/Desktop/ds4/speed-bench/qwen-iq2-wide-20260907/fixed-corpus.txt",
+      "--ctx-start",
+      "2048",
+      "--ctx-max",
+      "2048",
+      "--ctx-alloc",
+      "4096",
+      "--gen-tokens",
+      "256",
+      "--teacher-forced-decode",
+      "--csv",
+      "/Users/brianfarley/Desktop/ds4-glm-eight-stream/speed-bench/glm-eight-stream-20260907/ds4-resident-abba-3.csv"
+    ],
+    "exit": 0,
+    "csv": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "508.22",
+        "gen_tokens": "256",
+        "gen_tps": "26.65",
+        "gen_first_ms": "38.403",
+        "gen_steady_tokens": "255",
+        "gen_steady_tps": "26.65",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "27.99",
+        "gen_middle64_tps": "26.21",
+        "gen_final64_tps": "26.53"
+      }
+    ]
+  }
+]
