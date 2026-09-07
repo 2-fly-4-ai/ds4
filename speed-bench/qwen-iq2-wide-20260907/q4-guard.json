@@ -1,0 +1,82 @@
+[
+  {
+    "mode": "main",
+    "rep": 0,
+    "data": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "892.11",
+        "gen_tokens": "512",
+        "gen_tps": "43.33",
+        "gen_first_ms": "25.356",
+        "gen_steady_tokens": "511",
+        "gen_steady_tps": "43.34",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "46.03",
+        "gen_middle64_tps": "42.60",
+        "gen_final64_tps": "43.50"
+      }
+    ]
+  },
+  {
+    "mode": "candidate",
+    "rep": 1,
+    "data": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "1033.18",
+        "gen_tokens": "512",
+        "gen_tps": "45.44",
+        "gen_first_ms": "20.927",
+        "gen_steady_tokens": "511",
+        "gen_steady_tps": "45.44",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "48.73",
+        "gen_middle64_tps": "43.36",
+        "gen_final64_tps": "43.41"
+      }
+    ]
+  },
+  {
+    "mode": "candidate",
+    "rep": 2,
+    "data": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "939.38",
+        "gen_tokens": "512",
+        "gen_tps": "44.41",
+        "gen_first_ms": "23.974",
+        "gen_steady_tokens": "511",
+        "gen_steady_tps": "44.41",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "47.43",
+        "gen_middle64_tps": "43.15",
+        "gen_final64_tps": "43.64"
+      }
+    ]
+  },
+  {
+    "mode": "main",
+    "rep": 3,
+    "data": [
+      {
+        "ctx_tokens": "2048",
+        "prefill_tokens": "2048",
+        "prefill_tps": "1034.48",
+        "gen_tokens": "512",
+        "gen_tps": "45.97",
+        "gen_first_ms": "21.093",
+        "gen_steady_tokens": "511",
+        "gen_steady_tps": "45.96",
+        "kvcache_bytes": "0",
+        "gen_first64_tps": "48.80",
+        "gen_middle64_tps": "46.84",
+        "gen_final64_tps": "43.65"
+      }
+    ]
+  }
+]

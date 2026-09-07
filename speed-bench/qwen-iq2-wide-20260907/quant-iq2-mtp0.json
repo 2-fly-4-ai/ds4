@@ -1,0 +1,302 @@
+[
+  {
+    "wall_s": 7.116939875000001,
+    "ttft_s": 2.008678834,
+    "usage": {
+      "prompt_tokens": 1851,
+      "completion_tokens": 256,
+      "total_tokens": 2107,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1851
+      }
+    },
+    "finish": "length",
+    "content_sha256": "88b3bd30eb58f1c773eb192196d8e02f93d4b9876a1b4ec1351ef65c07c8fa79",
+    "quant": "iq2",
+    "mtp": false,
+    "context_target": 2048,
+    "task": "coding",
+    "message": {
+      "role": "assistant",
+      "content": "```python\nfrom collections import OrderedDict\n\n\nclass LRUCache:\n    def __init__(self, capacity: int):\n        if capacity <= 0:\n            raise ValueError(\"Capacity must be a positive integer\")\n        self.capacity = capacity\n        self.cache = OrderedDict()\n\n    def get(self, key: int) -> int:\n        if key not in self.cache:\n            return -1\n        # Move accessed item to end (most recently used)\n        self.cache.move_to_end(key)\n        return self.cache[key]\n\n    def put(self, key: int, value: int) -> None:\n        if key in self.cache:\n            # Update value and move to end\n            self.cache.move_to_end(key)\n        elif len(self.cache) >= self.capacity:\n            # Remove least recently used item (first item)\n            self.cache.popitem(last=False)\n        self.cache[key] = value\n\n\n# Usage examples\nif __name__ == \"__main__\":\n    # Example 1: Basic get and put\n    cache = LRUCache(2)\n    cache.put(1, 1)\n    cache.put(2, 2)\n    print(cache"
+    },
+    "runtime": "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide",
+    "stream_after_first_tps": 49.919140379341464
+  },
+  {
+    "wall_s": 7.138230792,
+    "ttft_s": 2.0601656669999997,
+    "usage": {
+      "prompt_tokens": 1850,
+      "completion_tokens": 256,
+      "total_tokens": 2106,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1850
+      }
+    },
+    "finish": "length",
+    "content_sha256": "d851cbbabc270526ed793c2cc17c570f8b0e5341c6518af21f118d2ca915b90c",
+    "quant": "iq2",
+    "mtp": false,
+    "context_target": 2048,
+    "task": "story",
+    "message": {
+      "role": "assistant",
+      "content": "The wind screamed against the reinforced glass of the lantern room, a high-pitched shriek that vibrated through Elias\u2019s teeth. Rain lashed the tower in horizontal sheets, turning the world outside into a churning gray void. Inside, the air smelled of ozone, kerosene, and the damp rot of old wood. Elias wiped his brow with a sleeve stained by decades of salt and soot. He was checking the lens mechanism, a routine he had performed every night for thirty years, when his hand brushed against something wedged behind the brass housing.\n\nIt was a cylinder of oilskin, brittle and cracked. Curiosity, a dangerous habit for a man who lived by routine, compelled him to unroll it. The paper was yellowed, the ink faded to a bruised purple. It was a map, but not of any chart he knew. The coastlines were distorted, exaggerated, as if drawn by someone who had seen the sea not as a boundary, but as a living, breathing entity. A red circle marked a spot near the reef, labeled in a shaky hand: *Here, the tide forgets.*\n\nElias looked out the window. The storm had shifted, the waves now crashing against the base of the tower with rhythmic"
+    },
+    "runtime": "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide",
+    "stream_after_first_tps": 50.21597670037759
+  },
+  {
+    "wall_s": 7.273561665999999,
+    "ttft_s": 2.13648375,
+    "usage": {
+      "prompt_tokens": 1851,
+      "completion_tokens": 256,
+      "total_tokens": 2107,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1851
+      }
+    },
+    "finish": "length",
+    "content_sha256": "8d2907619ce6b93531b253726d34a5cfba3a85ae74aed9f6f6c52f4822209bd9",
+    "quant": "iq2",
+    "mtp": false,
+    "context_target": 2048,
+    "task": "structured",
+    "message": {
+      "role": "assistant",
+      "content": "[{\"id\": 1, \"name\": \"Quantum Widget\", \"category\": \"Electronics\", \"price\": 199.99, \"in_stock\": true}, {\"id\": 2, \"name\": \"Neural Interface\", \"category\": \"Electronics\", \"price\": 450.00, \"in_stock\": false}, {\"id\": 3, \"name\": \"Holo Projector\", \"category\": \"Electronics\", \"price\": 1200.50, \"in_stock\": true}, {\"id\": 4, \"name\": \"Bio-Suit Alpha\", \"category\": \"Apparel\", \"price\": 89.99, \"in_stock\": true}, {\"id\": 5, \"name\": \"Thermal Cloak\", \"category\": \"Apparel\", \"price\": 150.00, \"in_stock\": false}, {\"id\": 6, \"name\": \"Gravity Boots\", \"category\": \"Apparel\", \"price\": 220.75, \"in_stock\": true}, {\"id\": 7, \"name\": \"Star Chart\", \"category\": \"Accessories\", \"price\": 2"
+    },
+    "runtime": "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide",
+    "stream_after_first_tps": 49.63911472040831
+  },
+  {
+    "wall_s": 7.4416603330000015,
+    "ttft_s": 2.378033500000001,
+    "usage": {
+      "prompt_tokens": 1851,
+      "completion_tokens": 256,
+      "total_tokens": 2107,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1851
+      }
+    },
+    "finish": "length",
+    "content_sha256": "621284db9d8b835edce5622cd9d7f12e66d5fef8e052a77a305882cd059986ff",
+    "quant": "iq2",
+    "mtp": false,
+    "context_target": 2048,
+    "task": "reasoning",
+    "message": {
+      "role": "assistant",
+      "content": "To find the least positive integer divisible by all integers from 1 through 12, we need to calculate the **Least Common Multiple (LCM)** of the set $\\{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12\\}$.\n\nHere is the step-by-step logical deduction:\n\n### Step 1: Prime Factorization of Each Number\nFirst, we break down each integer from 1 to 12 into its prime factors. The LCM is determined by taking the highest power of each prime number that appears in these factorizations.\n\n1.  $1 = 1$ (No prime factors)\n2.  $2 = 2^1$\n3.  $3 = 3^1$\n4.  $4 = 2^2$\n5.  $5 = 5^1$\n6.  $6 = 2^1 \\times 3^1$\n7.  $7 = 7^1$\n8.  $8 = 2^3$\n9.  $9 = 3^2$"
+    },
+    "runtime": "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide",
+    "stream_after_first_tps": 50.359161211909935
+  },
+  {
+    "wall_s": 13.752015,
+    "ttft_s": 8.473116415999996,
+    "usage": {
+      "prompt_tokens": 7988,
+      "completion_tokens": 256,
+      "total_tokens": 8244,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 7988
+      }
+    },
+    "finish": "length",
+    "content_sha256": "92b08724d8d5bd23330c4e3c3a9be450ab8da872d7ad4b25fbd62902284fea49",
+    "quant": "iq2",
+    "mtp": false,
+    "context_target": 8192,
+    "task": "coding",
+    "message": {
+      "role": "assistant",
+      "content": "```python\nfrom collections import OrderedDict\n\n\nclass LRUCache:\n    def __init__(self, capacity: int):\n        if capacity <= 0:\n            raise ValueError(\"Capacity must be a positive integer\")\n        self.capacity = capacity\n        self.cache = OrderedDict()\n\n    def get(self, key: int) -> int:\n        if key not in self.cache:\n            return -1\n        # Move accessed item to end (most recently used)\n        self.cache.move_to_end(key)\n        return self.cache[key]\n\n    def put(self, key: int, value: int) -> None:\n        if key in self.cache:\n            # Update value and move to end\n            self.cache.move_to_end(key)\n        elif len(self.cache) >= self.capacity:\n            # Remove least recently used (first item)\n            self.cache.popitem(last=False)\n        self.cache[key] = value\n\n\n# Usage examples\nif __name__ == \"__main__\":\n    # Example 1: Basic get and put\n    cache = LRUCache(2)\n    cache.put(1, 1)\n    cache.put(2, 2)\n    print(cache.get"
+    },
+    "runtime": "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide",
+    "stream_after_first_tps": 48.30553115244311
+  },
+  {
+    "wall_s": 14.110135458000002,
+    "ttft_s": 8.657766125000002,
+    "usage": {
+      "prompt_tokens": 7987,
+      "completion_tokens": 256,
+      "total_tokens": 8243,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 7987
+      }
+    },
+    "finish": "length",
+    "content_sha256": "2e195bd299f13a7d35de84e8a9c85c62e9ff6f11b02ba1fcdd485cd5c37451a8",
+    "quant": "iq2",
+    "mtp": false,
+    "context_target": 8192,
+    "task": "story",
+    "message": {
+      "role": "assistant",
+      "content": "The wind screamed against the reinforced glass, a relentless, shrieking chorus that vibrated through the soles of Elias\u2019s boots. Inside the lantern room, the air tasted of ozone and stale coffee. He wiped condensation from the lens, his fingers numb despite the wool gloves. The storm had been raging for three days, turning the sea into a churning gray void that swallowed the horizon whole.\n\nA sudden, sharp knock on the heavy iron door below broke the rhythm of the gale. Elias frowned. No supply boat would dare approach in this weather. He descended the spiral stairs, the metal steps cold and slick under his weight. When he finally threw the bolt, the door burst inward, not from force, but from the sheer pressure of the wind. A leather satchel, soaked and swollen, lay on the threshold.\n\nHe picked it up, the leather heavy with rainwater. Inside, wrapped in oilskin that had somehow survived the deluge, was a folded sheet of parchment. The edges were frayed, stained with salt and something darker, perhaps rust or dried blood. Elias unfolded it with trembling hands. It was a map, drawn in shaky, hurried ink. The coastline was familiar, yet wrong\u2014new shoals marked in red,"
+    },
+    "runtime": "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide",
+    "stream_after_first_tps": 46.76865861904003
+  },
+  {
+    "wall_s": 14.979693540999996,
+    "ttft_s": 9.345877250000008,
+    "usage": {
+      "prompt_tokens": 7988,
+      "completion_tokens": 256,
+      "total_tokens": 8244,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 7988
+      }
+    },
+    "finish": "length",
+    "content_sha256": "a51bbf8ca106853aa2b059bf0f06f349d6d3aa898dd87b38fb2a23f8f7a1af9c",
+    "quant": "iq2",
+    "mtp": false,
+    "context_target": 8192,
+    "task": "structured",
+    "message": {
+      "role": "assistant",
+      "content": "[\n  {\n    \"id\": 101,\n    \"name\": \"Quantum Core\",\n    \"category\": \"Hardware\",\n    \"price\": 4500.00,\n    \"in_stock\": true\n  },\n  {\n    \"id\": 102,\n    \"name\": \"Neural Link\",\n    \"category\": \"Hardware\",\n    \"price\": 1200.50,\n    \"in_stock\": false\n  },\n  {\n    \"id\": 103,\n    \"name\": \"Holo Projector\",\n    \"category\": \"Hardware\",\n    \"price\": 890.00,\n    \"in_stock\": true\n  },\n  {\n    \"id\": 104,\n    \"name\": \"Data Vault\",\n    \"category\": \"Software\",\n    \"price\": 250.00,\n    \"in_stock\": true\n  },\n  {\n    \"id\": 105,\n    \"name\": \"AI Assistant\",\n    \"category\": \"Software\",\n    \"price\": 1"
+    },
+    "runtime": "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide",
+    "stream_after_first_tps": 45.262391748087715
+  },
+  {
+    "wall_s": 15.918087458999992,
+    "ttft_s": 9.827885834,
+    "usage": {
+      "prompt_tokens": 7988,
+      "completion_tokens": 256,
+      "total_tokens": 8244,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 7988
+      }
+    },
+    "finish": "length",
+    "content_sha256": "e2aa016328d29118d7306aeb3f4f9b8ccae8d72e90181a270ed3e53f9ae5c71e",
+    "quant": "iq2",
+    "mtp": false,
+    "context_target": 8192,
+    "task": "reasoning",
+    "message": {
+      "role": "assistant",
+      "content": "To find the least positive integer divisible by all integers from 1 through 12, we need to calculate the **Least Common Multiple (LCM)** of the set $\\{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12\\}$.\n\n### Step-by-Step Method\n\nThe most efficient way to find the LCM of a set of numbers is to use **prime factorization**. The LCM is the product of the highest power of each prime number that appears in the factorization of any number in the set.\n\n**Step 1: List the prime numbers up to 12.**\nThe prime numbers less than or equal to 12 are:\n$$2, 3, 5, 7, 11$$\n\n**Step 2: Determine the highest power of each prime required.**\nWe examine the numbers from 1 to 12 to find the highest exponent for each prime factor.\n\n*   **Prime 2:**\n    *   Multiples of 2 in the set: 2, 4, 6, 8, 10, 1"
+    },
+    "runtime": "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide",
+    "stream_after_first_tps": 41.870534951295696
+  },
+  {
+    "wall_s": 49.12263337500001,
+    "ttft_s": 44.01768724999998,
+    "usage": {
+      "prompt_tokens": 33488,
+      "completion_tokens": 204,
+      "total_tokens": 33692,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 33488
+      }
+    },
+    "finish": "stop",
+    "content_sha256": "b2f72e3d644c4fd18a9959c1cee894f6cd9f4c6d8dad4ffb38a223e1cc1c411c",
+    "quant": "iq2",
+    "mtp": false,
+    "context_target": 32768,
+    "task": "coding",
+    "message": {
+      "role": "assistant",
+      "content": "```python\nfrom collections import OrderedDict\n\n\nclass LRUCache:\n    def __init__(self, capacity: int):\n        if capacity <= 0:\n            raise ValueError(\"Capacity must be a positive integer\")\n        self.capacity = capacity\n        self.cache = OrderedDict()\n\n    def get(self, key: int) -> int:\n        if key not in self.cache:\n            return -1\n        # Move accessed item to the end (most recently used)\n        self.cache.move_to_end(key)\n        return self.cache[key]\n\n    def put(self, key: int, value: int) -> None:\n        if key in self.cache:\n            # Update existing key and move to end\n            self.cache.move_to_end(key)\n        elif len(self.cache) >= self.capacity:\n            # Remove the least recently used item (first item in OrderedDict)\n            self.cache.popitem(last=False)\n        self.cache[key] = value\n```"
+    },
+    "runtime": "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide",
+    "stream_after_first_tps": 39.76535599579887
+  },
+  {
+    "wall_s": 47.58599379099999,
+    "ttft_s": 41.415144707999985,
+    "usage": {
+      "prompt_tokens": 33487,
+      "completion_tokens": 256,
+      "total_tokens": 33743,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 33487
+      }
+    },
+    "finish": "length",
+    "content_sha256": "0291aa4adfa8ba731dfa09633533cbfa3ff2943d07f3a043dffb888390de25a5",
+    "quant": "iq2",
+    "mtp": false,
+    "context_target": 32768,
+    "task": "story",
+    "message": {
+      "role": "assistant",
+      "content": "The wind screamed against the reinforced glass, a high-pitched shriek that vibrated through the soles of Elias\u2019s boots. Inside the lantern room, the air smelled of ozone, kerosene, and the damp rot of old wood. He wiped condensation from the lens, his fingers numb, watching the black sea churn into white foam below. The storm had lasted three days, swallowing the horizon and erasing the world beyond the tower\u2019s beam.\n\nWhen the power flickered, plunging the room into darkness, Elias struck a match. The flame trembled, casting long, dancing shadows against the curved walls. In the sudden silence between thunderclaps, he heard a faint scratching sound. It came from the floorboards near the base of the pedestal. He knelt, prying up a loose plank with his pocketknife. Beneath it lay a leather satchel, cracked and stiff with age.\n\nInside was a map, drawn on parchment that felt like dried skin. The ink was faded brown, but the coastlines were sharp. A red circle marked a cove Elias had never seen, hidden behind the jagged rocks to the north. The handwriting in the margin was jagged, hurried. *Wait for the tide*, it read."
+    },
+    "runtime": "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide",
+    "stream_after_first_tps": 41.323324646278614
+  },
+  {
+    "wall_s": 47.006620708000014,
+    "ttft_s": 40.69882616700002,
+    "usage": {
+      "prompt_tokens": 33488,
+      "completion_tokens": 256,
+      "total_tokens": 33744,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 33488
+      }
+    },
+    "finish": "length",
+    "content_sha256": "6ccf59c4347e6efdac2cfea7607e23ee76ae0311fd2aec81ed73a4b0a391e813",
+    "quant": "iq2",
+    "mtp": false,
+    "context_target": 32768,
+    "task": "structured",
+    "message": {
+      "role": "assistant",
+      "content": "[\n  {\n    \"id\": 1,\n    \"name\": \"Quantum Widget\",\n    \"category\": \"Electronics\",\n    \"price\": 199.99,\n    \"in_stock\": true\n  },\n  {\n    \"id\": 2,\n    \"name\": \"Neural Interface\",\n    \"category\": \"Electronics\",\n    \"price\": 450.00,\n    \"in_stock\": false\n  },\n  {\n    \"id\": 3,\n    \"name\": \"Bio-Synthetic Leaf\",\n    \"category\": \"Nature\",\n    \"price\": 12.50,\n    \"in_stock\": true\n  },\n  {\n    \"id\": 4,\n    \"name\": \"Mossy Stone\",\n    \"category\": \"Nature\",\n    \"price\": 5.00,\n    \"in_stock\": true\n  },\n  {\n    \"id\": 5,\n    \"name\": \"Ancient Scroll\",\n    \"category\": \"Artifacts\",\n    \"price\": 1200.00,\n"
+    },
+    "runtime": "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide",
+    "stream_after_first_tps": 40.42617405220274
+  },
+  {
+    "wall_s": 46.77299962500004,
+    "ttft_s": 40.57168170899999,
+    "usage": {
+      "prompt_tokens": 33488,
+      "completion_tokens": 256,
+      "total_tokens": 33744,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 33488
+      }
+    },
+    "finish": "length",
+    "content_sha256": "9069381ec49ddac2795d613dd05375813f9d5744e98e934a65f36fe7a9048858",
+    "quant": "iq2",
+    "mtp": false,
+    "context_target": 32768,
+    "task": "reasoning",
+    "message": {
+      "role": "assistant",
+      "content": "To find the least positive integer divisible by all integers from 1 through 12, we need to calculate the **Least Common Multiple (LCM)** of the set $\\{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12\\}$.\n\nHere is the step-by-step logical deduction:\n\n### Step 1: Prime Factorization of Each Number\nFirst, we break down each integer from 1 to 12 into its prime factors. The LCM is determined by taking the highest power of each prime number that appears in these factorizations.\n\n*   **1**: $1$ (No prime factors)\n*   **2**: $2^1$\n*   **3**: $3^1$\n*   **4**: $2^2$\n*   **5**: $5^1$\n*   **6**: $2^1 \\times 3^1$\n*   **7**: $7^1$\n*   **8**: $2^3$\n*   **9**: $3^2$\n*   **10**: $2"
+    },
+    "runtime": "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide",
+    "stream_after_first_tps": 41.12029143709489
+  }
+]

@@ -1,0 +1,25 @@
+ds4: PLE sidecar table: /Users/brianfarley/Desktop/ds4/gguf/qwen38-iq2-test/Qwen3.8-Flash-Next-PLE-Q4_1.gguf (ple.weight [160, 320001536], CPU-only)
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Qwen PLE remains CPU-mapped; Metal residency restricted to 1 model spans (46.88 GiB)
+ds4: Metal model views created in 1.072 ms, residency requested in 237.334 ms, warmup 3.370 ms (mapped 48000.42 MiB from offset 10.51 MiB)
+ds4: Metal mapped mmaped model as 1 overlapping shared buffers
+ds4: Metal model views created in 0.050 ms, residency requested in 442.101 ms, warmup 0.955 ms (mapped 862.12 MiB from offset 0.02 MiB)
+ds4: Metal mapped mmaped model as 2 overlapping shared buffers
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 0.26 GiB (raw 0.20 + compressed 0.06) + buffers 7.04 GiB + resident model 46.88 GiB = 54.17 GiB planned
+ds4: memory detail: ctx=8192 prefill_cap=8192 raw_kv_rows=8192 compressed_kv_rows=2049 backend=metal
+ds4: memory: KV 0.26 GiB (raw 0.20 + compressed 0.06) + buffers 7.04 GiB = 7.30 GiB context
+ds4: memory detail: ctx=8192 prefill_cap=8192 raw_kv_rows=8192 compressed_kv_rows=2049 backend=metal
+ds4: image 1200x700, 836 image tokens
+processing 860 input tokens: 860/860 (100.0%)
+ds4: prefill: 753.61 t/s, generation: 71.21 t/s
+processing 25 input tokens: 25/25 (100.0%)
+ds4: prefill: 125.78 t/s, generation: 70.84 t/s
+ds4: image 1000x800, 775 image tokens
+processing 789 input tokens: 789/789 (100.0%)
+ds4: prefill: 682.83 t/s, generation: 63.80 t/s
+processing 26 input tokens: 26/26 (100.0%)
+ds4: prefill: 123.35 t/s, generation: 120.68 t/s
+ds4: prompt-lookup summary: attempts=27 no_match=0 first_miss=1 verify_passes=26 drafted=178 committed=163 accept=91.6% tokens/pass=6.27 scan=0.07 ms total gate_skips=80 gate_partials=3 gate_ambiguous=0 parity_replays=0

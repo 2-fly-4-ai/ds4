@@ -1,0 +1,100 @@
+[
+  {
+    "wall_s": 8.717316333,
+    "ttft_s": null,
+    "usage": {
+      "prompt_tokens": 7963,
+      "completion_tokens": 57,
+      "total_tokens": 8020,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 7963
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "606ce90527f63861985edb1be28308e9af5e4e80d7cd605323207216afd211b1",
+    "mode": "base",
+    "rep": 0,
+    "stream": false,
+    "turn": 0,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "I'll start by reading package.json.",
+      "reasoning_content": "The user wants me to read three files in order, one per response. Start with package.json.",
+      "tool_calls": [
+        {
+          "id": "call_6c58b00c2a67166e367d4b8498f9bb71",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"package.json\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 0.8832320419999995,
+    "ttft_s": null,
+    "usage": {
+      "prompt_tokens": 8050,
+      "completion_tokens": 46,
+      "total_tokens": 8096,
+      "prompt_tokens_details": {
+        "cached_tokens": 8020,
+        "cache_write_tokens": 30
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "8816c113f9b320580d2b63910bec0e823284969d32003cffb4e260196dc9167a",
+    "mode": "base",
+    "rep": 0,
+    "stream": false,
+    "turn": 1,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "Now reading src/main.py.",
+      "reasoning_content": "Now read src/main.py, waiting for result.",
+      "tool_calls": [
+        {
+          "id": "call_ca2d3380a98b3bf798eb636f1cc066e8",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"src/main.py\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 0.3645670419999991,
+    "ttft_s": null,
+    "usage": {
+      "prompt_tokens": 8121,
+      "completion_tokens": 13,
+      "total_tokens": 8134,
+      "prompt_tokens_details": {
+        "cached_tokens": 8096,
+        "cache_write_tokens": 25
+      }
+    },
+    "finish": "stop",
+    "content_sha256": "9e30c999b408ffefb4768255f2ceb49b2bb469215216996edfb0837202bbec94",
+    "mode": "base",
+    "rep": 0,
+    "stream": false,
+    "turn": 2,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "Now reading README.md.",
+      "reasoning_content": "Now read README.md."
+    }
+  }
+]

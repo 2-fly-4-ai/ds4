@@ -1,0 +1,13 @@
+Commands:
+  /help          Show this help.
+  /think         Use normal thinking mode.
+  /think-max     Use Think Max only when context is at least 393216 tokens.
+  /nothink       Disable thinking mode.
+  /ctx N         Set context size for following prompts.
+  /power N       Set GPU duty cycle percentage, 1..100.
+  /steer F       Set FFN steering for subsequent tokens; no value shows it.
+  /read FILE     Submit a text file, PNG, or JPEG.
+  /quit, /exit   Leave the prompt.
+  Ctrl+C         Stop generation and return to the prompt.
+I do not see any image in your message. Please upload the image you would like me to describe.
+I do not see any image in your message. Please upload the image you would like me to describe.

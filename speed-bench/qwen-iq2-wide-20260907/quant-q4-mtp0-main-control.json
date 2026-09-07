@@ -1,0 +1,77 @@
+[
+  {
+    "wall_s": 7.9718015,
+    "ttft_s": 2.323905959,
+    "usage": {
+      "prompt_tokens": 1851,
+      "completion_tokens": 256,
+      "total_tokens": 2107,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1851
+      }
+    },
+    "finish": "length",
+    "content_sha256": "fc266d94b660fe3069bef8e667635084ce2c210e77bf142497168b932a7314eb",
+    "quant": "q4",
+    "mtp": false,
+    "context_target": 2048,
+    "task": "coding",
+    "message": {
+      "role": "assistant",
+      "content": "```python\nfrom collections import OrderedDict\n\n\nclass LRUCache:\n    def __init__(self, capacity: int):\n        if capacity <= 0:\n            raise ValueError(\"Capacity must be a positive integer\")\n        self.capacity = capacity\n        self.cache = OrderedDict()\n\n    def get(self, key: int) -> int:\n        if key not in self.cache:\n            return -1\n        # Move the accessed item to the end (most recently used)\n        self.cache.move_to_end(key)\n        return self.cache[key]\n\n    def put(self, key: int, value: int) -> None:\n        if key in self.cache:\n            # Update the value and move to end\n            self.cache.move_to_end(key)\n        self.cache[key] = value\n        # If capacity exceeded, remove the least recently used item (first item)\n        if len(self.cache) > self.capacity:\n            self.cache.popitem(last=False)\n\n\n# Usage examples\nif __name__ == \"__main__\":\n    # Example 1: Basic get and put\n    cache = LRUCache(2)\n    cache.put(1, 1)\n    cache.put(2"
+    },
+    "runtime": "/Users/brianfarley/Desktop/ds4",
+    "stream_after_first_tps": 45.149560247506
+  },
+  {
+    "wall_s": 14.546295083,
+    "ttft_s": 9.200642833,
+    "usage": {
+      "prompt_tokens": 7988,
+      "completion_tokens": 256,
+      "total_tokens": 8244,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 7988
+      }
+    },
+    "finish": "length",
+    "content_sha256": "a8fc3b0f38e38fdfdae5d7f0f85c0ad8489ddf7b0a286d9372c2f3a2a2e8afd7",
+    "quant": "q4",
+    "mtp": false,
+    "context_target": 8192,
+    "task": "coding",
+    "message": {
+      "role": "assistant",
+      "content": "```python\nfrom collections import OrderedDict\n\n\nclass LRUCache:\n    def __init__(self, capacity: int):\n        if capacity <= 0:\n            raise ValueError(\"Capacity must be positive\")\n        self.capacity = capacity\n        self.cache = OrderedDict()\n\n    def get(self, key: int) -> int:\n        if key not in self.cache:\n            return -1\n        # Move the accessed item to the end (most recently used)\n        self.cache.move_to_end(key)\n        return self.cache[key]\n\n    def put(self, key: int, value: int) -> None:\n        if key in self.cache:\n            # Update the value and move to end\n            self.cache.move_to_end(key)\n        self.cache[key] = value\n        if len(self.cache) > self.capacity:\n            # Remove the least recently used item (first item)\n            self.cache.popitem(last=False)\n\n\n# Usage examples\nif __name__ == \"__main__\":\n    # Example 1: Basic get and put\n    cache = LRUCache(2)\n    cache.put(1, 1)\n    cache.put(2, 2)\n   "
+    },
+    "runtime": "/Users/brianfarley/Desktop/ds4",
+    "stream_after_first_tps": 47.70231733648592
+  },
+  {
+    "wall_s": 38.9574535,
+    "ttft_s": 33.61484299999999,
+    "usage": {
+      "prompt_tokens": 33488,
+      "completion_tokens": 256,
+      "total_tokens": 33744,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 33488
+      }
+    },
+    "finish": "length",
+    "content_sha256": "4ea63c988430e0825fd146efb9a49cdeb681774bed87c5f7b21a0cff5ad1c6f0",
+    "quant": "q4",
+    "mtp": false,
+    "context_target": 32768,
+    "task": "coding",
+    "message": {
+      "role": "assistant",
+      "content": "```python\nfrom collections import OrderedDict\n\n\nclass LRUCache:\n    def __init__(self, capacity: int):\n        if capacity <= 0:\n            raise ValueError(\"Capacity must be a positive integer\")\n        self.capacity = capacity\n        self.cache = OrderedDict()\n\n    def get(self, key: int) -> int:\n        if key not in self.cache:\n            return -1\n        # Move the accessed item to the end to mark it as recently used\n        self.cache.move_to_end(key)\n        return self.cache[key]\n\n    def put(self, key: int, value: int) -> None:\n        if key in self.cache:\n            # Update the value and move to end\n            self.cache.move_to_end(key)\n        self.cache[key] = value\n        if len(self.cache) > self.capacity:\n            # Remove the least recently used item (first item)\n            self.cache.popitem(last=False)\n\n\n# Usage Examples\n\n# Example 1: Basic get and put\ncache = LRUCache(2)\ncache.put(1, 1)\ncache.put(2, 2)\nprint(cache.get(1))       # returns 1\n"
+    },
+    "runtime": "/Users/brianfarley/Desktop/ds4",
+    "stream_after_first_tps": 47.729476067925916
+  }
+]

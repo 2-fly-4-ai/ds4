@@ -1,0 +1,538 @@
+[
+  {
+    "wall_s": 40.564578333,
+    "ttft_s": null,
+    "usage": {
+      "prompt_tokens": 33443,
+      "completion_tokens": 73,
+      "total_tokens": 33516,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 33443
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "606ce90527f63861985edb1be28308e9af5e4e80d7cd605323207216afd211b1",
+    "mode": "base",
+    "rep": 0,
+    "stream": false,
+    "turn": 0,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "I'll start by reading package.json.",
+      "reasoning_content": "The user wants me to read package.json first, then src/main.py, then README.md, one at a time, waiting for each result. Let me start with package.json.",
+      "tool_calls": [
+        {
+          "id": "call_535eff54e787a925b7bbe467a5cbd10e",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"package.json\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 41.68971462499999,
+    "ttft_s": null,
+    "usage": {
+      "prompt_tokens": 33509,
+      "completion_tokens": 42,
+      "total_tokens": 33551,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 33509
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "8816c113f9b320580d2b63910bec0e823284969d32003cffb4e260196dc9167a",
+    "mode": "base",
+    "rep": 0,
+    "stream": false,
+    "turn": 1,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "Now reading src/main.py.",
+      "reasoning_content": "Now read src/main.py.",
+      "tool_calls": [
+        {
+          "id": "call_298708eaa7cab0c6e6b4574fbb93d00f",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"src/main.py\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 40.38003758400001,
+    "ttft_s": null,
+    "usage": {
+      "prompt_tokens": 33569,
+      "completion_tokens": 44,
+      "total_tokens": 33613,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 33569
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "9e30c999b408ffefb4768255f2ceb49b2bb469215216996edfb0837202bbec94",
+    "mode": "base",
+    "rep": 0,
+    "stream": false,
+    "turn": 2,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "Now reading README.md.",
+      "reasoning_content": "Now I'm looking at the README.md file.",
+      "tool_calls": [
+        {
+          "id": "call_98b6d391d5d7afa42176695e4e0ec40f",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"README.md\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 41.649202917,
+    "ttft_s": null,
+    "usage": {
+      "prompt_tokens": 33623,
+      "completion_tokens": 67,
+      "total_tokens": 33690,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 33623
+      }
+    },
+    "finish": "stop",
+    "content_sha256": "ec7a5e0e085e0a9b95d792ed2343a592e067a9f3dcd2e4234a91f2cd29eff5ea",
+    "mode": "base",
+    "rep": 0,
+    "stream": false,
+    "turn": 3,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "Fixture-project is version **2.7.4**, its entry function is `serve()` in `src/main.py` (returning `\"ready\"`), and tests are run with **pytest**.",
+      "reasoning_content": "Summarize: version 2.7.4, entry function serve() in src/main.py, test command pytest."
+    }
+  },
+  {
+    "wall_s": 40.707090333,
+    "ttft_s": 39.578693250000015,
+    "usage": {
+      "prompt_tokens": 33443,
+      "completion_tokens": 64,
+      "total_tokens": 33507,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 33443
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mode": "base",
+    "rep": 0,
+    "stream": true,
+    "turn": 0,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "",
+      "reasoning_content": "The user wants me to read package.json first, then src/main.py, then README.md, one at a time, waiting for each result. Let me start with package.json.\n",
+      "tool_calls": [
+        {
+          "id": "call_66ccc254b99dcacf78058b8c0f43f082",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"package.json\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 40.40684837500001,
+    "ttft_s": 39.695459750000026,
+    "usage": {
+      "prompt_tokens": 33500,
+      "completion_tokens": 44,
+      "total_tokens": 33544,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 33500
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mode": "base",
+    "rep": 0,
+    "stream": true,
+    "turn": 1,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "",
+      "reasoning_content": "Now I need to read src/main.py, waiting for the result first.\n",
+      "tool_calls": [
+        {
+          "id": "call_250e04984d9b60acd589839a1d272fb4",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"src/main.py\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 40.516222792000036,
+    "ttft_s": 39.96631604199999,
+    "usage": {
+      "prompt_tokens": 33553,
+      "completion_tokens": 36,
+      "total_tokens": 33589,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 33553
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mode": "base",
+    "rep": 0,
+    "stream": true,
+    "turn": 2,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "",
+      "reasoning_content": "Now I need to read README.md.\n",
+      "tool_calls": [
+        {
+          "id": "call_8e302ffc4cfbea2e232ec20c3f982c7d",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"README.md\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 41.230040833999965,
+    "ttft_s": 39.97196133399996,
+    "usage": {
+      "prompt_tokens": 33601,
+      "completion_tokens": 74,
+      "total_tokens": 33675,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 33601
+      }
+    },
+    "finish": "stop",
+    "content_sha256": "296bbcbff08d02c3982fff94faffc980b1419d53bf9e7050863061b523f998b1",
+    "mode": "base",
+    "rep": 0,
+    "stream": true,
+    "turn": 3,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "\n\nThe project `fixture-project` is version **2.7.4**, its entry function is **`serve()`** in `src/main.py` (returning `\"ready\"`), and tests are run with **`pytest`** per the README.",
+      "reasoning_content": "Summarize: version 2.7.4, entry function serve(), test command pytest.\n"
+    }
+  },
+  {
+    "wall_s": 40.70857237499996,
+    "ttft_s": null,
+    "usage": {
+      "prompt_tokens": 33443,
+      "completion_tokens": 73,
+      "total_tokens": 33516,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 33443
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "606ce90527f63861985edb1be28308e9af5e4e80d7cd605323207216afd211b1",
+    "mode": "candidate",
+    "rep": 0,
+    "stream": false,
+    "turn": 0,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "I'll start by reading package.json.",
+      "reasoning_content": "The user wants me to read package.json first, then src/main.py, then README.md, one at a time, waiting for each result. Let me start with package.json.",
+      "tool_calls": [
+        {
+          "id": "call_3dd7e5f29dca81ca0403723a19d1a93d",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"package.json\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 1.339543166999988,
+    "ttft_s": null,
+    "usage": {
+      "prompt_tokens": 33546,
+      "completion_tokens": 63,
+      "total_tokens": 33609,
+      "prompt_tokens_details": {
+        "cached_tokens": 33516,
+        "cache_write_tokens": 30
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "9042d22c6e160e9af386536b856a28c9e2d3303409c1977f3f5090d7ba0a4338",
+    "mode": "candidate",
+    "rep": 0,
+    "stream": false,
+    "turn": 1,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "package.json read. Now reading src/main.py.",
+      "reasoning_content": "package.json read: name \"fixture-project\", version \"2.7.4\". Now read src/main.py.",
+      "tool_calls": [
+        {
+          "id": "call_589aca09009a6757452d309d8aa2974e",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"src/main.py\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 1.232120000000009,
+    "ttft_s": null,
+    "usage": {
+      "prompt_tokens": 33634,
+      "completion_tokens": 57,
+      "total_tokens": 33691,
+      "prompt_tokens_details": {
+        "cached_tokens": 33609,
+        "cache_write_tokens": 25
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "caf4d87214dcd529eb65dd8ad77ebbff1594739b018584c17a6ee87aa5dd6203",
+    "mode": "candidate",
+    "rep": 0,
+    "stream": false,
+    "turn": 2,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "src/main.py read. Now reading README.md.",
+      "reasoning_content": "src/main.py contains a function `serve()` returning \"ready\". Now read README.md.",
+      "tool_calls": [
+        {
+          "id": "call_edab15502e7d07746efb1fb620bd1962",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"README.md\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 1.343791667000005,
+    "ttft_s": null,
+    "usage": {
+      "prompt_tokens": 33712,
+      "completion_tokens": 61,
+      "total_tokens": 33773,
+      "prompt_tokens_details": {
+        "cached_tokens": 33691,
+        "cache_write_tokens": 21
+      }
+    },
+    "finish": "stop",
+    "content_sha256": "d54977432e0f4c0a57cf1209360b7a8ae97c9c5283c1f8ea168d1fb67f5903e5",
+    "mode": "candidate",
+    "rep": 0,
+    "stream": false,
+    "turn": 3,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "The project (fixture-project) is version 2.7.4, its entry function is `serve()` in src/main.py, and tests are run with `pytest`.",
+      "reasoning_content": "Now summarize in one short sentence: version 2.7.4, entry function serve(), test command pytest."
+    }
+  },
+  {
+    "wall_s": 41.124190458999976,
+    "ttft_s": 40.034120417,
+    "usage": {
+      "prompt_tokens": 33443,
+      "completion_tokens": 64,
+      "total_tokens": 33507,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 33443
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mode": "candidate",
+    "rep": 0,
+    "stream": true,
+    "turn": 0,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "",
+      "reasoning_content": "The user wants me to read package.json first, then src/main.py, then README.md, one at a time, waiting for each result. Let me start with package.json.\n",
+      "tool_calls": [
+        {
+          "id": "call_6d1fcdb51b0f2905276019a6e13596ee",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"package.json\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 1.1144457080000052,
+    "ttft_s": 0.275189915999988,
+    "usage": {
+      "prompt_tokens": 33537,
+      "completion_tokens": 52,
+      "total_tokens": 33589,
+      "prompt_tokens_details": {
+        "cached_tokens": 33507,
+        "cache_write_tokens": 30
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mode": "candidate",
+    "rep": 0,
+    "stream": true,
+    "turn": 1,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "",
+      "reasoning_content": "package.json read: name \"fixture-project\", version \"2.7.4\". Now read src/main.py.\n",
+      "tool_calls": [
+        {
+          "id": "call_2d859242bb007fd407f9703309cf3e51",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"src/main.py\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 0.7881970000000251,
+    "ttft_s": 0.2761141249999923,
+    "usage": {
+      "prompt_tokens": 33614,
+      "completion_tokens": 33,
+      "total_tokens": 33647,
+      "prompt_tokens_details": {
+        "cached_tokens": 33589,
+        "cache_write_tokens": 25
+      }
+    },
+    "finish": "tool_calls",
+    "content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mode": "candidate",
+    "rep": 0,
+    "stream": true,
+    "turn": 2,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "",
+      "reasoning_content": "Now read README.md.\n",
+      "tool_calls": [
+        {
+          "id": "call_18d064bed48480aa3018b03bb0b77528",
+          "type": "function",
+          "function": {
+            "name": "read_file",
+            "arguments": "{\"path\":\"README.md\"}"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "wall_s": 2.1445728749999944,
+    "ttft_s": 0.3037399159999836,
+    "usage": {
+      "prompt_tokens": 33668,
+      "completion_tokens": 95,
+      "total_tokens": 33763,
+      "prompt_tokens_details": {
+        "cached_tokens": 33647,
+        "cache_write_tokens": 21
+      }
+    },
+    "finish": "stop",
+    "content_sha256": "173d8d5b7ac6d5cb82994dab906e24e7af7183d3ff8e06c2f76374390ee76950",
+    "mode": "candidate",
+    "rep": 0,
+    "stream": true,
+    "turn": 3,
+    "mtp": true,
+    "thinking": true,
+    "message": {
+      "role": "assistant",
+      "content": "\n\nProject version is 2.7.4 (fixture-project), the entry function is `serve()` in src/main.py, and tests are run with `pytest`.",
+      "reasoning_content": "Now summarize in one short sentence: version 2.7.4, entry function serve(), test command pytest.\n\nNote: the reference items repeated \"preserve public interfaces and test changes before release\" \u2014 that's noise, not relevant content. I should not invent file contents. Just summarize.\n"
+    }
+  }
+]

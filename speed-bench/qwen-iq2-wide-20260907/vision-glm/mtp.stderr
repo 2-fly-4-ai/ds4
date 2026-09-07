@@ -1,0 +1,27 @@
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 1.958 ms, residency requested in 453.426 ms, warmup 4.199 ms (mapped 90220.81 MiB from offset 9.07 MiB)
+ds4: Metal mapped mmaped model as 2 overlapping shared buffers
+ds4: Metal model views created in 0.066 ms, residency requested in 727.113 ms, warmup 1.291 ms (mapped 1075.05 MiB from offset 0.03 MiB)
+ds4: Metal mapped mmaped model as 3 overlapping shared buffers
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 0.09 GiB (raw 0.00 + compressed 0.09) + buffers 5.71 GiB + resident model 88.11 GiB = 93.91 GiB planned
+ds4: memory detail: ctx=8192 prefill_cap=4096 raw_kv_rows=0 compressed_kv_rows=8192 backend=metal
+ds4: memory: KV 0.09 GiB (raw 0.00 + compressed 0.09) + buffers 5.71 GiB = 5.80 GiB context
+ds4: memory detail: ctx=8192 prefill_cap=4096 raw_kv_rows=0 compressed_kv_rows=8192 backend=metal
+ds4: GLM session ctx=8192 (model max=1048576); full-attention prefill/work cap=4096; compact indexed decode is used beyond the cap
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=8192 logical_ctx=8192 kv_layers=45 indexer_layers=11 f16 0.09 GiB
+ds4: GLM compact indexed prefill chunk=4096 score_rows=4096 score_scratch=32.00 MiB
+ds4: image 1200x700, 1075 image tokens
+processing 1089 input tokens: 1089/1089 (100.0%)
+ds4: prefill: 437.87 t/s, generation: 35.74 t/s
+processing 17 input tokens: 17/17 (100.0%)
+ds4: prefill: 71.57 t/s, generation: 36.97 t/s
+ds4: image 1000x800, 1044 image tokens
+processing 1049 input tokens: 1049/1049 (100.0%)
+ds4: prefill: 375.92 t/s, generation: 33.62 t/s
+processing 16 input tokens: 16/16 (100.0%)
+ds4: prefill: 53.76 t/s, generation: 44.27 t/s
+ds4: prompt-lookup summary: attempts=13 no_match=0 first_miss=1 verify_passes=12 drafted=72 committed=69 accept=95.8% tokens/pass=5.75 scan=0.04 ms total gate_skips=64 gate_partials=1 gate_ambiguous=0 parity_replays=0

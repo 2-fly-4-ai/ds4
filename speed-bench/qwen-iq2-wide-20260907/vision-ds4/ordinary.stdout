@@ -1,0 +1,28 @@
+Commands:
+  /help          Show this help.
+  /think         Use normal thinking mode.
+  /think-max     Use Think Max only when context is at least 393216 tokens.
+  /nothink       Disable thinking mode.
+  /ctx N         Set context size for following prompts.
+  /power N       Set GPU duty cycle percentage, 1..100.
+  /steer F       Set FFN steering for subsequent tokens; no value shows it.
+  /read FILE     Submit a text file, PNG, or JPEG.
+  /quit, /exit   Leave the prompt.
+  Ctrl+C         Stop generation and return to the prompt.
+Based on the image provided, here is a description of the diagram:
+
+The image displays a flowchart titled **"Document pipeline"** at the top. It illustrates a three-step process using colored boxes connected by arrows.
+
+*   **Step 1:** On the left, there is a blue box labeled **"INPUT"**.
+*   **Step 2:** A black arrow points from the blue box to a green box in the center, which is labeled **"ENCODER"**.
+*   **Step 3:** Another black arrow points from the green box to an orange box on the right, labeled **"SUMMARY"**.
+
+At the bottom of the image, there is a caption that explains the process: **"Blue data becomes a green representation before the orange result."**
+The most recent image is a diagram titled "Document pipeline" at the top. It features three colored boxes connected by black arrows pointing from left to right. The first box is blue and labeled "INPUT". The second box is green and labeled "ENCODER". The third box is orange and labeled "SUMMARY". Below the diagram, there is a caption that reads: "Blue data becomes a green representation before the orange result."
+The image displays a digital ticket or boarding pass for a destination labeled "NORTH HARBOR" at the top. Below the title, there is a list of travel details:
+*   Train: 482
+*   Gate: C7
+*   Departure: 19:45
+*   Seat: 14A
+At the bottom of the card, there is a highlighted yellow box containing the access code: "ACCESS: MINT-731".
+The most recent image is a digital boarding pass or ticket. It features a white rectangular card with a thin black border set against a light gray background. At the top, the text "NORTH HARBOR" is written in black, followed by a horizontal black line. Below this line, there are four lines of text in black: "Train: 482", "Gate: C7", "Departure: 19:45", and "Seat: 14A". At the bottom of the card, there is a yellow rectangular box with a black border containing the text "ACCESS: MINT-731" in black.

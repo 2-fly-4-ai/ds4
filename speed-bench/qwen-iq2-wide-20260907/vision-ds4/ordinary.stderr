@@ -1,0 +1,24 @@
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 2.187 ms, residency requested in 8425.569 ms, warmup 3.744 ms (mapped 82185.67 MiB from offset 5.09 MiB)
+ds4: Metal mapped mmaped model as 1 overlapping shared buffers
+ds4: Metal model views created in 0.060 ms, residency requested in 98.603 ms, warmup 0.965 ms (mapped 889.64 MiB from offset 0.02 MiB)
+ds4: Metal mapped mmaped model as 2 overlapping shared buffers
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 0.42 GiB (raw 0.36 + compressed 0.06) + buffers 0.06 GiB + resident model 80.26 GiB = 80.74 GiB planned
+ds4: memory detail: ctx=8192 prefill_cap=4096 raw_kv_rows=4352 compressed_kv_rows=2050 backend=metal
+ds4: memory: KV 0.42 GiB (raw 0.36 + compressed 0.06) + buffers 0.06 GiB = 0.48 GiB context
+ds4: memory detail: ctx=8192 prefill_cap=4096 raw_kv_rows=4352 compressed_kv_rows=2050 backend=metal
+ds4: image 1200x700, 336 image tokens
+ds4: prefill: 407.18 t/s, generation: 42.54 t/s
+processing 17 input tokens: 0/17 (0.0%)
+processing 17 input tokens: 17/17 (100.0%)
+ds4: prefill: 67.03 t/s, generation: 42.41 t/s
+ds4: image 1000x800, 320 image tokens
+processing 342 input tokens: 0/342 (0.0%)
+processing 342 input tokens: 342/342 (100.0%)
+ds4: prefill: 365.02 t/s, generation: 42.78 t/s
+processing 17 input tokens: 0/17 (0.0%)
+processing 17 input tokens: 17/17 (100.0%)
+ds4: prefill: 70.07 t/s, generation: 41.75 t/s

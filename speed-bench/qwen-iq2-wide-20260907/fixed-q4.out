@@ -1,0 +1,12 @@
+START fixed-q4-0-2048
+{'quant': 'q4', 'rep': 0, 'ctx': 2048, 'data': [{'ctx_tokens': '2048', 'prefill_tokens': '2048', 'prefill_tps': '934.96', 'gen_tokens': '128', 'gen_tps': '48.55', 'gen_first_ms': '28.224', 'gen_steady_tokens': '127', 'gen_steady_tps': '48.69', 'kvcache_bytes': '0', 'gen_first64_tps': '48.38', 'gen_middle64_tps': '48.75', 'gen_final64_tps': '48.72'}]}
+START fixed-q4-0-8192
+{'quant': 'q4', 'rep': 0, 'ctx': 8192, 'data': [{'ctx_tokens': '8192', 'prefill_tokens': '8192', 'prefill_tps': '936.89', 'gen_tokens': '128', 'gen_tps': '45.05', 'gen_first_ms': '27.387', 'gen_steady_tokens': '127', 'gen_steady_tps': '45.13', 'kvcache_bytes': '0', 'gen_first64_tps': '46.82', 'gen_middle64_tps': '46.24', 'gen_final64_tps': '43.41'}]}
+START fixed-q4-0-32768
+{'quant': 'q4', 'rep': 0, 'ctx': 32768, 'data': [{'ctx_tokens': '32768', 'prefill_tokens': '32768', 'prefill_tps': '886.60', 'gen_tokens': '128', 'gen_tps': '42.35', 'gen_first_ms': '28.170', 'gen_steady_tokens': '127', 'gen_steady_tps': '42.41', 'kvcache_bytes': '0', 'gen_first64_tps': '42.12', 'gen_middle64_tps': '42.71', 'gen_final64_tps': '42.58'}]}
+START fixed-q4-1-2048
+{'quant': 'q4', 'rep': 1, 'ctx': 2048, 'data': [{'ctx_tokens': '2048', 'prefill_tokens': '2048', 'prefill_tps': '848.93', 'gen_tokens': '128', 'gen_tps': '42.53', 'gen_first_ms': '25.222', 'gen_steady_tokens': '127', 'gen_steady_tps': '42.56', 'kvcache_bytes': '0', 'gen_first64_tps': '43.00', 'gen_middle64_tps': '42.80', 'gen_final64_tps': '42.07'}]}
+START fixed-q4-1-8192
+{'quant': 'q4', 'rep': 1, 'ctx': 8192, 'data': [{'ctx_tokens': '8192', 'prefill_tokens': '8192', 'prefill_tps': '871.89', 'gen_tokens': '128', 'gen_tps': '43.82', 'gen_first_ms': '27.098', 'gen_steady_tokens': '127', 'gen_steady_tps': '43.88', 'kvcache_bytes': '0', 'gen_first64_tps': '44.97', 'gen_middle64_tps': '44.20', 'gen_final64_tps': '42.72'}]}
+START fixed-q4-1-32768
+{'quant': 'q4', 'rep': 1, 'ctx': 32768, 'data': [{'ctx_tokens': '32768', 'prefill_tokens': '32768', 'prefill_tps': '867.73', 'gen_tokens': '128', 'gen_tps': '42.08', 'gen_first_ms': '27.662', 'gen_steady_tokens': '127', 'gen_steady_tps': '42.13', 'kvcache_bytes': '0', 'gen_first64_tps': '42.16', 'gen_middle64_tps': '42.81', 'gen_final64_tps': '41.99'}]}

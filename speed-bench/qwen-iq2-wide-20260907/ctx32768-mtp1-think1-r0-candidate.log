@@ -1,0 +1,87 @@
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Qwen PLE remains CPU-mapped; Metal residency restricted to 2 model spans (71.29 GiB)
+ds4: Metal model views created in 2.173 ms, residency requested in 321.414 ms, warmup 3.587 ms (mapped 73000.62 MiB from offset 10.52 MiB)
+ds4: Metal mapped mmaped model as 2 disjoint shared buffers across 2 tensor spans
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 1.17 GiB (raw 0.91 + compressed 0.26) + buffers 7.48 GiB + resident model 71.29 GiB = 79.94 GiB planned
+ds4: memory detail: ctx=36864 prefill_cap=8192 raw_kv_rows=36864 compressed_kv_rows=9217 backend=metal
+0907 18:00:23 ds4-server: context buffers 8855.88 MiB (ctx=36864, backend=metal, prefill_chunk=8192, raw_kv_rows=36864, compressed_kv_rows=9217)
+0907 18:00:24 ds4-server: tracing session to /Users/brianfarley/Desktop/ds4-qwen-iq2-wide/speed-bench/qwen-iq2-wide-20260907/ctx32768-mtp1-think1-r0-candidate.trace
+0907 18:00:24 ds4-server: listening on http://127.0.0.1:55662
+0907 18:00:24 ds4-server: chat ctx=0..33443:33443 TOOLS prompt start
+0907 18:00:33 ds4-server: chat ctx=0..33443:33443 TOOLS prefill chunk 8192/33443 (24.5%) chunk=879.43 t/s avg=879.43 t/s 9.315s
+0907 18:00:43 ds4-server: chat ctx=0..33443:33443 TOOLS prefill chunk 16384/33443 (49.0%) chunk=852.02 t/s avg=865.51 t/s 18.930s
+0907 18:00:52 ds4-server: chat ctx=0..33443:33443 TOOLS prefill chunk 24576/33443 (73.5%) chunk=862.45 t/s avg=864.49 t/s 28.428s
+0907 18:01:02 ds4-server: chat ctx=0..33443:33443 TOOLS prefill chunk 32768/33443 (98.0%) chunk=853.97 t/s avg=861.83 t/s 38.021s
+0907 18:01:03 ds4-server: chat ctx=0..33443:33443 TOOLS prefill chunk 33443/33443 (100.0%) chunk=491.93 t/s avg=848.95 t/s 39.393s
+0907 18:01:03 ds4-server: chat ctx=0..33443:33443 TOOLS prompt done 39.393s
+0907 18:01:04 ds4-server: chat ctx=33443..33493:50 gen=50 TOOLS DSML_START decoding chunk=54.82 t/s avg=54.82 t/s 0.912s
+0907 18:01:04 ds4-server: chat ctx=33493..33516:23 gen=73 TOOLS DSML_START DSML_END decoding chunk=59.62 t/s avg=56.25 t/s 1.298s
+0907 18:01:04 ds4-server: tool calls ctx=0..33443:33443 n=1 raw_tool_text=1 ids=[call_3dd7e5f29dca81ca0403723a19d1a93d] names=[read_file]
+0907 18:01:04 ds4-server: qwen tool-turn visible checkpoint remembered ctx=0..33443:33443 live=33516 visible=154606
+0907 18:01:04 ds4-server: chat ctx=0..33443:33443 gen=73 TOOLS DSML_START DSML_END finish=tool_calls 40.692s
+0907 18:01:04 ds4-server: thinking live continuation match=visible-prefix cached=33516 prompt=33546
+0907 18:01:04 ds4-server: chat ctx=33516..33546:30 TOOLS prompt start
+0907 18:01:05 ds4-server: chat ctx=33516..33546:30 TOOLS prefill chunk 30/30 (100.0%) chunk=147.81 t/s avg=147.81 t/s 0.203s
+0907 18:01:05 ds4-server: chat ctx=33516..33546:30 TOOLS prompt done 0.203s
+0907 18:01:05 ds4-server: chat ctx=33546..33596:50 gen=50 TOOLS DSML_START decoding chunk=54.86 t/s avg=54.86 t/s 0.911s
+0907 18:01:06 ds4-server: chat ctx=33596..33609:13 gen=63 TOOLS DSML_START DSML_END decoding chunk=62.90 t/s avg=56.35 t/s 1.118s
+0907 18:01:06 ds4-server: tool calls ctx=33516..33546:30 n=1 raw_tool_text=1 ids=[call_589aca09009a6757452d309d8aa2974e] names=[read_file]
+0907 18:01:06 ds4-server: qwen tool-turn visible checkpoint remembered ctx=33516..33546:30 live=33609 visible=154907
+0907 18:01:06 ds4-server: chat ctx=33516..33546:30 gen=63 TOOLS DSML_START DSML_END finish=tool_calls 1.321s
+0907 18:01:06 ds4-server: thinking live continuation match=visible-prefix cached=33609 prompt=33634
+0907 18:01:06 ds4-server: chat ctx=33609..33634:25 TOOLS prompt start
+0907 18:01:06 ds4-server: chat ctx=33609..33634:25 TOOLS prefill chunk 25/25 (100.0%) chunk=126.23 t/s avg=126.23 t/s 0.198s
+0907 18:01:06 ds4-server: chat ctx=33609..33634:25 TOOLS prompt done 0.198s
+0907 18:01:07 ds4-server: chat ctx=33634..33684:50 gen=50 TOOLS DSML_START decoding chunk=54.73 t/s avg=54.73 t/s 0.913s
+0907 18:01:07 ds4-server: chat ctx=33684..33691:7 gen=57 TOOLS DSML_START DSML_END decoding chunk=68.16 t/s avg=56.09 t/s 1.016s
+0907 18:01:07 ds4-server: tool calls ctx=33609..33634:25 n=1 raw_tool_text=1 ids=[call_edab15502e7d07746efb1fb620bd1962] names=[read_file]
+0907 18:01:07 ds4-server: qwen tool-turn visible checkpoint remembered ctx=33609..33634:25 live=33691 visible=155191
+0907 18:01:07 ds4-server: chat ctx=33609..33634:25 gen=57 TOOLS DSML_START DSML_END finish=tool_calls 1.214s
+0907 18:01:07 ds4-server: thinking live continuation match=visible-prefix cached=33691 prompt=33712
+0907 18:01:07 ds4-server: chat ctx=33691..33712:21 TOOLS prompt start
+0907 18:01:07 ds4-server: chat ctx=33691..33712:21 TOOLS prefill chunk 21/21 (100.0%) chunk=114.23 t/s avg=114.23 t/s 0.184s
+0907 18:01:07 ds4-server: chat ctx=33691..33712:21 TOOLS prompt done 0.184s
+0907 18:01:08 ds4-server: chat ctx=33712..33762:50 gen=50 TOOLS decoding chunk=54.32 t/s avg=54.32 t/s 0.921s
+0907 18:01:08 ds4-server: chat ctx=33762..33773:11 gen=61 TOOLS decoding chunk=49.77 t/s avg=53.44 t/s 1.142s
+0907 18:01:08 ds4-server: chat ctx=33691..33712:21 gen=61 TOOLS finish=stop 1.325s
+0907 18:01:08 ds4-server: live kv cache miss live=33774 prompt=33443 common=33414 vision=match reason=token-mismatch
+0907 18:01:08 ds4-server: chat ctx=0..33443:33443 TOOLS prompt start
+0907 18:01:18 ds4-server: chat ctx=0..33443:33443 TOOLS prefill chunk 8192/33443 (24.5%) chunk=849.93 t/s avg=849.93 t/s 9.638s
+0907 18:01:28 ds4-server: chat ctx=0..33443:33443 TOOLS prefill chunk 16384/33443 (49.0%) chunk=845.10 t/s avg=847.51 t/s 19.332s
+0907 18:01:37 ds4-server: chat ctx=0..33443:33443 TOOLS prefill chunk 24576/33443 (73.5%) chunk=842.68 t/s avg=845.89 t/s 29.053s
+0907 18:01:47 ds4-server: chat ctx=0..33443:33443 TOOLS prefill chunk 32768/33443 (98.0%) chunk=857.93 t/s avg=848.87 t/s 38.602s
+0907 18:01:48 ds4-server: chat ctx=0..33443:33443 TOOLS prefill chunk 33443/33443 (100.0%) chunk=499.73 t/s avg=837.07 t/s 39.953s
+0907 18:01:48 ds4-server: chat ctx=0..33443:33443 TOOLS prompt done 39.953s
+0907 18:01:49 ds4-server: chat ctx=33443..33493:50 gen=50 TOOLS DSML_START decoding chunk=54.21 t/s avg=54.21 t/s 0.922s
+0907 18:01:49 ds4-server: chat ctx=33493..33507:14 gen=64 TOOLS DSML_START DSML_END decoding chunk=60.38 t/s avg=55.45 t/s 1.154s
+0907 18:01:49 ds4-server: tool calls ctx=0..33443:33443 n=1 raw_tool_text=1 ids=[call_6d1fcdb51b0f2905276019a6e13596ee] names=[read_file]
+0907 18:01:49 ds4-server: qwen tool-turn visible checkpoint remembered ctx=0..33443:33443 live=33507 visible=154571
+0907 18:01:49 ds4-server: chat ctx=0..33443:33443 gen=64 TOOLS DSML_START DSML_END finish=tool_calls 41.107s
+0907 18:01:49 ds4-server: thinking live continuation match=visible-prefix cached=33507 prompt=33537
+0907 18:01:49 ds4-server: chat ctx=33507..33537:30 TOOLS prompt start
+0907 18:01:50 ds4-server: chat ctx=33507..33537:30 TOOLS prefill chunk 30/30 (100.0%) chunk=152.13 t/s avg=152.13 t/s 0.197s
+0907 18:01:50 ds4-server: chat ctx=33507..33537:30 TOOLS prompt done 0.197s
+0907 18:01:50 ds4-server: chat ctx=33537..33587:50 gen=50 TOOLS DSML_START decoding chunk=57.79 t/s avg=57.79 t/s 0.865s
+0907 18:01:51 ds4-server: chat ctx=33587..33589:2 gen=52 TOOLS DSML_START DSML_END decoding chunk=59.34 t/s avg=57.85 t/s 0.899s
+0907 18:01:51 ds4-server: tool calls ctx=33507..33537:30 n=1 raw_tool_text=1 ids=[call_2d859242bb007fd407f9703309cf3e51] names=[read_file]
+0907 18:01:51 ds4-server: qwen tool-turn visible checkpoint remembered ctx=33507..33537:30 live=33589 visible=154829
+0907 18:01:51 ds4-server: chat ctx=33507..33537:30 gen=52 TOOLS DSML_START DSML_END finish=tool_calls 1.096s
+0907 18:01:51 ds4-server: thinking live continuation match=visible-prefix cached=33589 prompt=33614
+0907 18:01:51 ds4-server: chat ctx=33589..33614:25 TOOLS prompt start
+0907 18:01:51 ds4-server: chat ctx=33589..33614:25 TOOLS prefill chunk 25/25 (100.0%) chunk=130.86 t/s avg=130.86 t/s 0.191s
+0907 18:01:51 ds4-server: chat ctx=33589..33614:25 TOOLS prompt done 0.191s
+0907 18:01:51 ds4-server: chat ctx=33614..33647:33 gen=33 TOOLS DSML_START DSML_END decoding chunk=56.92 t/s avg=56.92 t/s 0.580s
+0907 18:01:51 ds4-server: tool calls ctx=33589..33614:25 n=1 raw_tool_text=1 ids=[call_18d064bed48480aa3018b03bb0b77528] names=[read_file]
+0907 18:01:51 ds4-server: qwen tool-turn visible checkpoint remembered ctx=33589..33614:25 live=33647 visible=155073
+0907 18:01:51 ds4-server: chat ctx=33589..33614:25 gen=33 TOOLS DSML_START DSML_END finish=tool_calls 0.771s
+0907 18:01:51 ds4-server: thinking live continuation match=visible-prefix cached=33647 prompt=33668
+0907 18:01:51 ds4-server: chat ctx=33647..33668:21 TOOLS prompt start
+0907 18:01:52 ds4-server: chat ctx=33647..33668:21 TOOLS prefill chunk 21/21 (100.0%) chunk=114.64 t/s avg=114.64 t/s 0.183s
+0907 18:01:52 ds4-server: chat ctx=33647..33668:21 TOOLS prompt done 0.183s
+0907 18:01:53 ds4-server: chat ctx=33668..33718:50 gen=50 TOOLS THINKING decoding chunk=47.18 t/s avg=47.18 t/s 1.060s
+0907 18:01:53 ds4-server: chat ctx=33718..33763:45 gen=95 TOOLS decoding chunk=50.91 t/s avg=48.87 t/s 1.944s
+0907 18:01:53 ds4-server: chat ctx=33647..33668:21 gen=95 TOOLS finish=stop 2.127s
+0907 18:01:53 ds4-server: shutdown requested, draining requests

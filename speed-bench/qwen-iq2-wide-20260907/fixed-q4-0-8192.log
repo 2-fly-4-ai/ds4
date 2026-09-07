@@ -1,0 +1,10 @@
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Qwen PLE remains CPU-mapped; Metal residency restricted to 2 model spans (71.29 GiB)
+ds4: Metal model views created in 1.781 ms, residency requested in 390.857 ms, warmup 3.579 ms (mapped 73000.62 MiB from offset 10.52 MiB)
+ds4: Metal mapped mmaped model as 2 disjoint shared buffers across 2 tensor spans
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 0.39 GiB (raw 0.30 + compressed 0.09) + buffers 7.10 GiB + resident model 71.29 GiB = 78.78 GiB planned
+ds4: memory detail: ctx=12288 prefill_cap=8192 raw_kv_rows=12288 compressed_kv_rows=3073 backend=metal
+ds4-bench: context buffers 7672.00 MiB (ctx=12288, backend=metal, prefill_chunk=8192, raw_kv_rows=12288, compressed_kv_rows=3073)

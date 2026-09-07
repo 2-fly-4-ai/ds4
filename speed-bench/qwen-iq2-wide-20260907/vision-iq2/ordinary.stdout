@@ -1,0 +1,59 @@
+Commands:
+  /help          Show this help.
+  /think         Use normal thinking mode.
+  /think-max     Use Think Max only when context is at least 393216 tokens.
+  /nothink       Disable thinking mode.
+  /ctx N         Set context size for following prompts.
+  /power N       Set GPU duty cycle percentage, 1..100.
+  /steer F       Set FFN steering for subsequent tokens; no value shows it.
+  /read FILE     Submit a text file, PNG, or JPEG.
+  /quit, /exit   Leave the prompt.
+  Ctrl+C         Stop generation and return to the prompt.
+Based on the image provided, here is a description of its content:
+
+The image displays a simple flowchart titled **"Document pipeline"**.
+
+It illustrates a three-step process using colored boxes connected by arrows:
+
+1.  **INPUT:** A blue box on the left.
+2.  **ENCODER:** A green box in the middle.
+3.  **SUMMARY:** An orange box on the right.
+
+Arrows point from left to right, indicating the flow of data:
+*   From **INPUT** to **ENCODER**
+*   From **ENCODER** to **SUMMARY**
+
+Below the diagram, there is a caption that explains the color coding:
+> "Blue data becomes a green representation before the orange result."
+The image displays a simple flowchart titled **"Document pipeline"** against a light gray background.
+
+The diagram consists of three rectangular boxes arranged horizontally, connected by black arrows pointing from left to right:
+
+1.  **Left Box:** A blue rectangle containing the word **"INPUT"** in white, uppercase letters.
+2.  **Middle Box:** A green rectangle containing the word **"ENCODER"** in white, uppercase letters.
+3.  **Right Box:** An orange-red rectangle containing the word **"SUMMARY"** in white, uppercase letters.
+
+Below the diagram, there is a sentence in dark gray text that reads:
+"Blue data becomes a green representation before the orange result."
+The image displays a digital ticket or pass for **"NORTH HARBOR"**, presented in a white rectangular card with rounded corners and a thin gray border, set against a light gray background.
+
+The text is black and arranged as follows:
+
+*   **Header:** "NORTH HARBOR" is centered at the top in uppercase letters, underlined by a horizontal black line.
+*   **Details:** Below the line, the following information is listed vertically:
+    *   Train: 482
+    *   Gate: C7
+    *   Departure: 19:45
+    *   Seat: 14A
+*   **Access Code:** At the bottom, there is a distinct yellow rectangular box with a darker yellow border. Inside this box, the text reads **"ACCESS: MINT-731"** in black
+The image displays a digital ticket or pass for **"NORTH HARBOR"**, presented in a white rectangular card with rounded corners and a thin gray border, set against a light gray background.
+
+The text is black and arranged as follows:
+
+*   **Header:** "NORTH HARBOR" is centered at the top in uppercase letters, underlined by a horizontal black line.
+*   **Details:** Below the line, the following information is listed vertically:
+    *   Train: 482
+    *   Gate: C7
+    *   Departure: 19:45
+    *   Seat: 14A
+*   **Access Code:** At the bottom, there is a distinct yellow rectangular box with a darker yellow border. Inside this box, the text reads **"ACCESS: MINT-731"** in black

@@ -1,0 +1,22 @@
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Qwen PLE remains CPU-mapped; Metal residency restricted to 2 model spans (71.29 GiB)
+ds4: Metal model views created in 1.762 ms, residency requested in 321.869 ms, warmup 4.254 ms (mapped 73000.62 MiB from offset 10.52 MiB)
+ds4: Metal mapped mmaped model as 2 disjoint shared buffers across 2 tensor spans
+ds4: Metal model views created in 0.052 ms, residency requested in 654.594 ms, warmup 1.260 ms (mapped 862.12 MiB from offset 0.02 MiB)
+ds4: Metal mapped mmaped model as 3 overlapping shared buffers
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 0.26 GiB (raw 0.20 + compressed 0.06) + buffers 7.04 GiB + resident model 71.29 GiB = 78.59 GiB planned
+ds4: memory detail: ctx=8192 prefill_cap=8192 raw_kv_rows=8192 compressed_kv_rows=2049 backend=metal
+ds4: memory: KV 0.26 GiB (raw 0.20 + compressed 0.06) + buffers 7.04 GiB = 7.30 GiB context
+ds4: memory detail: ctx=8192 prefill_cap=8192 raw_kv_rows=8192 compressed_kv_rows=2049 backend=metal
+ds4: image 1200x700, 836 image tokens
+ds4: prompt processing failed: token id -1 at position 10 is outside the vocabulary
+processing 35 input tokens: 35/35 (100.0%)
+ds4: prefill: 132.87 t/s, generation: 45.95 t/s
+ds4: image 1000x800, 775 image tokens
+ds4: prompt processing failed: token id -1 at position 57 is outside the vocabulary
+processing 26 input tokens: 26/26 (100.0%)
+ds4: prefill: 134.78 t/s, generation: 108.41 t/s
+ds4: prompt-lookup summary: attempts=3 no_match=0 first_miss=0 verify_passes=3 drafted=19 committed=19 accept=100.0% tokens/pass=6.33 scan=0.00 ms total gate_skips=0 gate_partials=0 gate_ambiguous=0 parity_replays=0

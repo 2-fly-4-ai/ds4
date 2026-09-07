@@ -1,0 +1,5 @@
+PLE SHA-256: 17f951f9445c98b7daacdf5205a2ad895ba4443aa78ba3eede40deccbbea2789
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/speed-bench/qwen-iq2-wide-20260907/materialize_ple.py", line 27, in <module>
+    assert actual == expected, 'Not the published sidecar; do not use this candidate'
+AssertionError: Not the published sidecar; do not use this candidate

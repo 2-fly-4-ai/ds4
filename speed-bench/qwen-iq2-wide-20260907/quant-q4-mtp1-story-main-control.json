@@ -1,0 +1,27 @@
+[
+  {
+    "wall_s": 12.838869791999999,
+    "ttft_s": 7.694020957999999,
+    "usage": {
+      "prompt_tokens": 7987,
+      "completion_tokens": 256,
+      "total_tokens": 8243,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 7987
+      }
+    },
+    "finish": "length",
+    "content_sha256": "8a404bb033b28e3d6b05290a8032cc80522e81a781ea6bccfdc909ad67901a24",
+    "quant": "q4",
+    "mtp": true,
+    "context_target": 8192,
+    "task": "story",
+    "message": {
+      "role": "assistant",
+      "content": "The wind screamed against the reinforced glass, a relentless, high-pitched wail that vibrated through the soles of Elias\u2019s boots. Inside the lantern room, the air tasted of ozone and old brass. The great Fresnel lens rotated with a hypnotic, rhythmic *thrum*, casting sweeping beams of white light into the churning blackness of the Atlantic. Elias wiped condensation from the cold pane, his breath fogging the surface in short, ragged bursts. He was checking the oil reservoir when his boot caught on a loose floorboard. It gave way with a dry snap, revealing a hollow space beneath the heavy iron plating.\n\nCuriosity, sharp and sudden, overrode his fatigue. He pried the board fully open. Inside lay a leather satchel, cracked and stiff with age, smelling faintly of mildew and dried kelp. He pulled it out, the leather creaking under his gloved hands. Inside, wrapped in oilcloth, was a map. It wasn\u2019t printed; it was drawn in faded sepia ink, the lines trembling with the hand of someone who had been afraid. The coastline was wrong, jagged and unfamiliar, marked with symbols he didn\u2019t recognize\u2014spirals and crossed anchors"
+    },
+    "runtime": "/Users/brianfarley/Desktop/ds4",
+    "stream_after_first_tps": 49.564138466969005
+  }
+]

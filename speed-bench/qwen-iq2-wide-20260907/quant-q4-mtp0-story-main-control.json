@@ -1,0 +1,27 @@
+[
+  {
+    "wall_s": 14.583190916,
+    "ttft_s": 8.581231374999998,
+    "usage": {
+      "prompt_tokens": 7987,
+      "completion_tokens": 256,
+      "total_tokens": 8243,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 7987
+      }
+    },
+    "finish": "length",
+    "content_sha256": "0fa3577e4540eedc3c8f63186515004e4137943f6e1d72212f215aa81f3764ac",
+    "quant": "q4",
+    "mtp": false,
+    "context_target": 8192,
+    "task": "story",
+    "message": {
+      "role": "assistant",
+      "content": "The wind screamed against the reinforced glass, a relentless, high-pitched wail that vibrated through the soles of Elias\u2019s boots. Inside the lantern room, the air tasted of ozone and old brass. The great Fresnel lens rotated with a hypnotic, rhythmic *thrum*, casting sweeping beams of white light into the churning blackness of the Atlantic. Elias wiped condensation from the cold pane, his breath fogging the surface in short, ragged bursts. He was alone, as he had been for three years, the isolation a heavy, familiar cloak.\n\nA sudden gust slammed the service door, rattling the iron hinges. Elias turned, expecting the usual intrusion of rain, but found instead a small, oilskin-wrapped parcel wedged beneath the threshold. It was dry, impossibly so, despite the deluge outside. He picked it up, the leather casing slick and cold in his calloused hands. There was no return address, only a faint scent of pine resin and damp earth.\n\nWith trembling fingers, he unrolled the contents. It was not a chart of the local shoals, but a hand-drawn map on parchment that felt brittle as dried leaves. The ink was faded, brownish-red, depicting a coastline"
+    },
+    "runtime": "/Users/brianfarley/Desktop/ds4",
+    "stream_after_first_tps": 42.486124449535
+  }
+]

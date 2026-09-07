@@ -1,0 +1,2 @@
+First 12 embedded questions: GPQA / SuperGPQA / AIME; identical bounded thinking and answer budgets; no MTP.
+eval exit 1 (wrong benchmark answers are quality outcomes, not necessarily engine failures)

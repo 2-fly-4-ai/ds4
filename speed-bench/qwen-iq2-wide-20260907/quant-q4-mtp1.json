@@ -1,0 +1,290 @@
+[
+  {
+    "wall_s": 6.9975200840000005,
+    "ttft_s": 2.537792459,
+    "usage": {
+      "prompt_tokens": 1851,
+      "completion_tokens": 256,
+      "total_tokens": 2107,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1851
+      }
+    },
+    "finish": "length",
+    "content_sha256": "fc266d94b660fe3069bef8e667635084ce2c210e77bf142497168b932a7314eb",
+    "quant": "q4",
+    "mtp": true,
+    "context_target": 2048,
+    "task": "coding",
+    "message": {
+      "role": "assistant",
+      "content": "```python\nfrom collections import OrderedDict\n\n\nclass LRUCache:\n    def __init__(self, capacity: int):\n        if capacity <= 0:\n            raise ValueError(\"Capacity must be a positive integer\")\n        self.capacity = capacity\n        self.cache = OrderedDict()\n\n    def get(self, key: int) -> int:\n        if key not in self.cache:\n            return -1\n        # Move the accessed item to the end (most recently used)\n        self.cache.move_to_end(key)\n        return self.cache[key]\n\n    def put(self, key: int, value: int) -> None:\n        if key in self.cache:\n            # Update the value and move to end\n            self.cache.move_to_end(key)\n        self.cache[key] = value\n        # If capacity exceeded, remove the least recently used item (first item)\n        if len(self.cache) > self.capacity:\n            self.cache.popitem(last=False)\n\n\n# Usage examples\nif __name__ == \"__main__\":\n    # Example 1: Basic get and put\n    cache = LRUCache(2)\n    cache.put(1, 1)\n    cache.put(2"
+    },
+    "stream_after_first_tps": 57.17837981192852
+  },
+  {
+    "wall_s": 8.310160333999999,
+    "ttft_s": 2.9545690419999993,
+    "usage": {
+      "prompt_tokens": 1850,
+      "completion_tokens": 256,
+      "total_tokens": 2106,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1850
+      }
+    },
+    "finish": "length",
+    "content_sha256": "9ef87f1f60647f98c8663c1b1e29dc6c094c95a9290d285d1cc4e318638e441d",
+    "quant": "q4",
+    "mtp": true,
+    "context_target": 2048,
+    "task": "story",
+    "message": {
+      "role": "assistant",
+      "content": "The wind screamed against the reinforced glass, a relentless, high-pitched wail that vibrated through the soles of Elias\u2019s boots. Inside the lantern room, the air tasted of ozone and old brass. The great Fresnel lens rotated with a hypnotic, rhythmic hum, casting sweeping beams of white light into the churning blackness of the Atlantic. Elias wiped condensation from the pane, his breath fogging the cold surface. He had lived here for thirty years, long enough to know the difference between a squall and a gale, but tonight felt different. The storm wasn\u2019t just weather; it was a presence, pressing against the stone walls with malicious intent.\n\nA sudden crack echoed from below, followed by the heavy thud of something striking the gallery deck. Elias descended the spiral staircase, his hand trailing along the damp, iron railing. The smell of salt spray was stronger here, mixed with the metallic tang of rust. He opened the heavy oak door, the hinges groaning in protest. Rain lashed his face, stinging his eyes. On the wet stone, half-submerged in a puddle, lay a leather satchel, its straps frayed and swollen with water.\n\nHe picked it up, the leather slick and"
+    },
+    "stream_after_first_tps": 47.613790167466725
+  },
+  {
+    "wall_s": 7.493062957999999,
+    "ttft_s": 2.839213000000001,
+    "usage": {
+      "prompt_tokens": 1851,
+      "completion_tokens": 256,
+      "total_tokens": 2107,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1851
+      }
+    },
+    "finish": "length",
+    "content_sha256": "7a6e49ece1b976a7a44c8f3eb1cc5a0cf1bbde20a1081e2e6d9933553e85e148",
+    "quant": "q4",
+    "mtp": true,
+    "context_target": 2048,
+    "task": "structured",
+    "message": {
+      "role": "assistant",
+      "content": "[{\"id\":1,\"name\":\"Quantum Widget\",\"category\":\"Electronics\",\"price\":199.99,\"in_stock\":true},{\"id\":2,\"name\":\"Neural Link Cable\",\"category\":\"Electronics\",\"price\":49.99,\"in_stock\":false},{\"id\":3,\"name\":\"Holo-Projector Mini\",\"category\":\"Electronics\",\"price\":299.00,\"in_stock\":true},{\"id\":4,\"name\":\"Starlight Coffee\",\"category\":\"Beverages\",\"price\":12.50,\"in_stock\":true},{\"id\":5,\"name\":\"Nebula Tea\",\"category\":\"Beverages\",\"price\":8.75,\"in_stock\":false},{\"id\":6,\"name\":\"Comet Juice\",\"category\":\"Beverages\",\"price\":15.00,\"in_stock\":true},{\"id\":7,\"name\":\"Gravity Boots\",\"category\":\"Apparel\",\"price\":150.00,\"in_stock\":false},{\"id\":8,\"name\":\"Invisibility Cloak\",\"category\":\"Apparel\",\"price\":500.00,\"in_stock\":true},{\"id\":9,\"name\":\"Thermal Suit\",\"category\":\"Apparel\",\"price\":22"
+    },
+    "stream_after_first_tps": 54.793343640495614
+  },
+  {
+    "wall_s": 7.404690165999998,
+    "ttft_s": 2.850503749999998,
+    "usage": {
+      "prompt_tokens": 1851,
+      "completion_tokens": 256,
+      "total_tokens": 2107,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 1851
+      }
+    },
+    "finish": "length",
+    "content_sha256": "1f8b012e24044b04f4e015de7d9cb3f1185c1c9c0809101479a3a5d4b08b5eac",
+    "quant": "q4",
+    "mtp": true,
+    "context_target": 2048,
+    "task": "reasoning",
+    "message": {
+      "role": "assistant",
+      "content": "To find the least positive integer divisible by all integers from 1 through 12, we need to calculate the **Least Common Multiple (LCM)** of the set $\\{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12\\}$.\n\n### Step-by-Step Explanation\n\nThe standard method to find the LCM of a set of numbers is to use **prime factorization**. The LCM is constructed by taking the highest power of each prime number that appears in the factorization of any number in the set.\n\n**Step 1: List the prime numbers up to 12.**\nThe prime numbers less than or equal to 12 are:\n$$2, 3, 5, 7, 11$$\n\n**Step 2: Determine the highest power of each prime required.**\nWe examine the numbers from 1 to 12 to find the maximum exponent for each prime.\n\n*   **Prime 2:**\n    *   Multiples of 2 in the range: 2, 4, 6, 8, 10, 12."
+    },
+    "stream_after_first_tps": 55.99243788179618
+  },
+  {
+    "wall_s": 15.454339290999997,
+    "ttft_s": 10.904322082999997,
+    "usage": {
+      "prompt_tokens": 7988,
+      "completion_tokens": 256,
+      "total_tokens": 8244,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 7988
+      }
+    },
+    "finish": "length",
+    "content_sha256": "a8fc3b0f38e38fdfdae5d7f0f85c0ad8489ddf7b0a286d9372c2f3a2a2e8afd7",
+    "quant": "q4",
+    "mtp": true,
+    "context_target": 8192,
+    "task": "coding",
+    "message": {
+      "role": "assistant",
+      "content": "```python\nfrom collections import OrderedDict\n\n\nclass LRUCache:\n    def __init__(self, capacity: int):\n        if capacity <= 0:\n            raise ValueError(\"Capacity must be positive\")\n        self.capacity = capacity\n        self.cache = OrderedDict()\n\n    def get(self, key: int) -> int:\n        if key not in self.cache:\n            return -1\n        # Move the accessed item to the end (most recently used)\n        self.cache.move_to_end(key)\n        return self.cache[key]\n\n    def put(self, key: int, value: int) -> None:\n        if key in self.cache:\n            # Update the value and move to end\n            self.cache.move_to_end(key)\n        self.cache[key] = value\n        if len(self.cache) > self.capacity:\n            # Remove the least recently used item (first item)\n            self.cache.popitem(last=False)\n\n\n# Usage examples\nif __name__ == \"__main__\":\n    # Example 1: Basic get and put\n    cache = LRUCache(2)\n    cache.put(1, 1)\n    cache.put(2, 2)\n   "
+    },
+    "stream_after_first_tps": 56.04374408774763
+  },
+  {
+    "wall_s": 16.402409875000004,
+    "ttft_s": 10.7441465,
+    "usage": {
+      "prompt_tokens": 7987,
+      "completion_tokens": 256,
+      "total_tokens": 8243,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 7987
+      }
+    },
+    "finish": "length",
+    "content_sha256": "8a404bb033b28e3d6b05290a8032cc80522e81a781ea6bccfdc909ad67901a24",
+    "quant": "q4",
+    "mtp": true,
+    "context_target": 8192,
+    "task": "story",
+    "message": {
+      "role": "assistant",
+      "content": "The wind screamed against the reinforced glass, a relentless, high-pitched wail that vibrated through the soles of Elias\u2019s boots. Inside the lantern room, the air tasted of ozone and old brass. The great Fresnel lens rotated with a hypnotic, rhythmic *thrum*, casting sweeping beams of white light into the churning blackness of the Atlantic. Elias wiped condensation from the cold pane, his breath fogging the surface in short, ragged bursts. He was checking the oil reservoir when his boot caught on a loose floorboard. It gave way with a dry snap, revealing a hollow space beneath the heavy iron plating.\n\nCuriosity, sharp and sudden, overrode his fatigue. He pried the board fully open. Inside lay a leather satchel, cracked and stiff with age, smelling faintly of mildew and dried kelp. He pulled it out, the leather creaking under his gloved hands. Inside, wrapped in oilcloth, was a map. It wasn\u2019t printed; it was drawn in faded sepia ink, the lines trembling with the hand of someone who had been afraid. The coastline was wrong, jagged and unfamiliar, marked with symbols he didn\u2019t recognize\u2014spirals and crossed anchors"
+    },
+    "stream_after_first_tps": 45.06683112819926
+  },
+  {
+    "wall_s": 15.512562500000001,
+    "ttft_s": 10.907331374999998,
+    "usage": {
+      "prompt_tokens": 7988,
+      "completion_tokens": 256,
+      "total_tokens": 8244,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 7988
+      }
+    },
+    "finish": "length",
+    "content_sha256": "804c99ca7149b687e655e916eeb50f313e439e83a7ecd2d94311d098a64f2bc7",
+    "quant": "q4",
+    "mtp": true,
+    "context_target": 8192,
+    "task": "structured",
+    "message": {
+      "role": "assistant",
+      "content": "[{\"id\":1,\"name\":\"Quantum Flux Capacitor\",\"category\":\"Electronics\",\"price\":199.99,\"in_stock\":true},{\"id\":2,\"name\":\"Dragon Scale Shield\",\"category\":\"Armor\",\"price\":450.00,\"in_stock\":false},{\"id\":3,\"name\":\"Elixir of Clarity\",\"category\":\"Potions\",\"price\":25.50,\"in_stock\":true},{\"id\":4,\"name\":\"Starlight Dagger\",\"category\":\"Weapons\",\"price\":320.00,\"in_stock\":true},{\"id\":5,\"name\":\"Mithril Chainmail\",\"category\":\"Armor\",\"price\":800.00,\"in_stock\":false},{\"id\":6,\"name\":\"Healing Salve\",\"category\":\"Potions\",\"price\":15.00,\"in_stock\":true},{\"id\":7,\"name\":\"Holographic Projector\",\"category\":\"Electronics\",\"price\":1200.00,\"in_stock\":true},{\"id\":8,\"name\":\"Obsidian Greatsword\",\"category\":\"Weapons\",\"price\":550.00,\"in_stock\":false},{\"id\":9,\"name\":\"Mana Potion\",\"category\":\"Potions\",\"price\":3"
+    },
+    "stream_after_first_tps": 55.371813721944264
+  },
+  {
+    "wall_s": 15.26933145800001,
+    "ttft_s": 10.659201041000003,
+    "usage": {
+      "prompt_tokens": 7988,
+      "completion_tokens": 256,
+      "total_tokens": 8244,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 7988
+      }
+    },
+    "finish": "length",
+    "content_sha256": "bdf4628f951e54845aea09b0e1d48da45d716a9b4ccc145ff90bde5cc0b7966a",
+    "quant": "q4",
+    "mtp": true,
+    "context_target": 8192,
+    "task": "reasoning",
+    "message": {
+      "role": "assistant",
+      "content": "To find the least positive integer divisible by all integers from 1 through 12, we need to calculate the **Least Common Multiple (LCM)** of the set $\\{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12\\}$.\n\n### Step-by-Step Explanation\n\nThe standard method to find the LCM of a set of numbers is to use **prime factorization**. The LCM is constructed by taking the highest power of every prime number that appears in the factorization of any number in the set.\n\n**Step 1: List the prime numbers involved.**\nThe prime numbers less than or equal to 12 are:\n$$2, 3, 5, 7, 11$$\n\n**Step 2: Determine the highest power of each prime required.**\nWe examine the numbers from 1 to 12 to find the maximum exponent for each prime.\n\n*   **Prime 2:**\n    *   Multiples of 2 in the range: 2, 4, 6, 8, 10, 12.\n    *  "
+    },
+    "stream_after_first_tps": 55.31296881747187
+  },
+  {
+    "wall_s": 45.62396374999999,
+    "ttft_s": 40.951935250000005,
+    "usage": {
+      "prompt_tokens": 33488,
+      "completion_tokens": 256,
+      "total_tokens": 33744,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 33488
+      }
+    },
+    "finish": "length",
+    "content_sha256": "4ea63c988430e0825fd146efb9a49cdeb681774bed87c5f7b21a0cff5ad1c6f0",
+    "quant": "q4",
+    "mtp": true,
+    "context_target": 32768,
+    "task": "coding",
+    "message": {
+      "role": "assistant",
+      "content": "```python\nfrom collections import OrderedDict\n\n\nclass LRUCache:\n    def __init__(self, capacity: int):\n        if capacity <= 0:\n            raise ValueError(\"Capacity must be a positive integer\")\n        self.capacity = capacity\n        self.cache = OrderedDict()\n\n    def get(self, key: int) -> int:\n        if key not in self.cache:\n            return -1\n        # Move the accessed item to the end to mark it as recently used\n        self.cache.move_to_end(key)\n        return self.cache[key]\n\n    def put(self, key: int, value: int) -> None:\n        if key in self.cache:\n            # Update the value and move to end\n            self.cache.move_to_end(key)\n        self.cache[key] = value\n        if len(self.cache) > self.capacity:\n            # Remove the least recently used item (first item)\n            self.cache.popitem(last=False)\n\n\n# Usage Examples\n\n# Example 1: Basic get and put\ncache = LRUCache(2)\ncache.put(1, 1)\ncache.put(2, 2)\nprint(cache.get(1))       # returns 1\n"
+    },
+    "stream_after_first_tps": 54.58014650381541
+  },
+  {
+    "wall_s": 46.287319666,
+    "ttft_s": 40.92093937500002,
+    "usage": {
+      "prompt_tokens": 33487,
+      "completion_tokens": 256,
+      "total_tokens": 33743,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 33487
+      }
+    },
+    "finish": "length",
+    "content_sha256": "1fde487d2cbd31bd4cb01432cb3011b326ae840639c7f76728dc980bf9ddb247",
+    "quant": "q4",
+    "mtp": true,
+    "context_target": 32768,
+    "task": "story",
+    "message": {
+      "role": "assistant",
+      "content": "The wind screamed against the glass, a relentless, high-pitched wail that vibrated through the soles of Elias\u2019s boots. Inside the lantern room, the air tasted of salt and old brass. He wiped condensation from the lens, his movements mechanical, born of thirty years of solitude. The storm had been raging for three days, turning the sea into a churning cauldron of black ink and white foam.\n\nA sudden gust slammed the heavy iron door shut, the sound echoing like a gunshot in the confined space. Elias turned, expecting the usual draft, but found something else. Wedged beneath the door\u2019s threshold, soaked and shivering, was a leather satchel. It hadn\u2019t been there moments before.\n\nHe approached it cautiously, the floorboards groaning under his weight. The leather was slick with rain, smelling of brine and decay. With trembling fingers, he unbuckled the strap. Inside, wrapped in oilcloth, lay a single sheet of parchment. It was not a chart of the local waters, but a map of the coastline as it had been a century ago, marked with red ink that seemed to pulse in the dim light.\n\nElias traced the jagged lines with a calloused thumb. The map"
+    },
+    "stream_after_first_tps": 47.5180636056791
+  },
+  {
+    "wall_s": 45.738819207999995,
+    "ttft_s": 41.05280329199999,
+    "usage": {
+      "prompt_tokens": 33488,
+      "completion_tokens": 256,
+      "total_tokens": 33744,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 33488
+      }
+    },
+    "finish": "length",
+    "content_sha256": "fc54ce0666df091c2443fce6bad87516d36994fec5268c8ca9ac7e8ef8535e6a",
+    "quant": "q4",
+    "mtp": true,
+    "context_target": 32768,
+    "task": "structured",
+    "message": {
+      "role": "assistant",
+      "content": "[{\"id\":1,\"name\":\"Quantum Flux Capacitor\",\"category\":\"Electronics\",\"price\":199.99,\"in_stock\":true},{\"id\":2,\"name\":\"Dragon Scale Shield\",\"category\":\"Armor\",\"price\":450.00,\"in_stock\":false},{\"id\":3,\"name\":\"Elixir of Clarity\",\"category\":\"Potions\",\"price\":25.50,\"in_stock\":true},{\"id\":4,\"name\":\"Starlight Dagger\",\"category\":\"Weapons\",\"price\":120.00,\"in_stock\":true},{\"id\":5,\"name\":\"Mithril Chainmail\",\"category\":\"Armor\",\"price\":800.00,\"in_stock\":false},{\"id\":6,\"name\":\"Mana Battery\",\"category\":\"Electronics\",\"price\":75.25,\"in_stock\":true},{\"id\":7,\"name\":\"Healing Salve\",\"category\":\"Potions\",\"price\":15.00,\"in_stock\":true},{\"id\":8,\"name\":\"Obsidian Hammer\",\"category\":\"Weapons\",\"price\":300.00,\"in_stock\":false},{\"id\":9,\"name\":\"Leather Greaves\",\"category\":\"Armor\",\"price\":60.00,\""
+    },
+    "stream_after_first_tps": 54.41722874421408
+  },
+  {
+    "wall_s": 45.70406537499997,
+    "ttft_s": 41.19080541699998,
+    "usage": {
+      "prompt_tokens": 33488,
+      "completion_tokens": 256,
+      "total_tokens": 33744,
+      "prompt_tokens_details": {
+        "cached_tokens": 0,
+        "cache_write_tokens": 33488
+      }
+    },
+    "finish": "length",
+    "content_sha256": "a761b4eb30fe3e2dcf98891682a216e45f2c39417093f72b4f3ccf123dcc1cb6",
+    "quant": "q4",
+    "mtp": true,
+    "context_target": 32768,
+    "task": "reasoning",
+    "message": {
+      "role": "assistant",
+      "content": "To find the least positive integer divisible by all integers from 1 through 12, we need to calculate the **Least Common Multiple (LCM)** of the set $\\{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12\\}$.\n\n### Step-by-Step Explanation\n\nThe standard method to find the LCM of a set of numbers is to use prime factorization. The LCM is found by taking the highest power of every prime number that appears in the factorization of any number in the set.\n\n**Step 1: List the prime numbers involved.**\nThe prime numbers less than or equal to 12 are:\n$$2, 3, 5, 7, 11$$\n\n**Step 2: Determine the highest power of each prime required.**\nWe examine the numbers from 1 to 12 to find the maximum exponent for each prime.\n\n*   **Prime 2:**\n    *   Multiples of 2 in the range: 2, 4, 6, 8, 10, 12.\n    *   Factor"
+    },
+    "stream_after_first_tps": 56.50017999694412
+  }
+]

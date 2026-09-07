@@ -1,0 +1,43 @@
+Commands:
+  /help          Show this help.
+  /think         Use normal thinking mode.
+  /think-max     Use Think Max only when context is at least 393216 tokens.
+  /nothink       Disable thinking mode.
+  /ctx N         Set context size for following prompts.
+  /power N       Set GPU duty cycle percentage, 1..100.
+  /steer F       Set FFN steering for subsequent tokens; no value shows it.
+  /read FILE     Submit a text file, PNG, or JPEG.
+  /quit, /exit   Leave the prompt.
+  Ctrl+C         Stop generation and return to the prompt.
+The image shows a diagram titled **"Document pipeline"** depicting a three-stage flow:
+
+1. **INPUT** (blue box) →
+2. **ENCODER** (green box) →
+3. **SUMMARY** (orange/red box)
+
+The caption explains: *"Blue data becomes a green representation before the orange result."*
+
+In other words, raw input data is first transformed by an encoder into an intermediate representation, which is then used to produce the final summary output.
+The most recent image shows a diagram titled **"Document pipeline"** with three colored boxes connected by black arrows:
+
+- **INPUT** — a blue box on the left
+- **ENCODER** — a green box in the middle
+- **SUMMARY** — an orange/red box on the right
+
+Below the diagram is the caption: *"Blue data becomes a green representation before the orange result."*
+The most recent image shows a white ticket-style card on a light gray background, titled **"NORTH HARBOR"** with a horizontal line beneath it. The card contains the following details in dark text:
+
+- **Train:** 482
+- **Gate:** C7
+- **Departure:** 19:45
+- **Seat:** 14A
+
+At the bottom is a yellow highlighted box with a gold border reading: **"ACCESS: MINT-731"**
+The most recent image shows a white ticket-style card on a light gray background, titled **"NORTH HARBOR"** with a horizontal line beneath it. The card contains the following details in dark text:
+
+- **Train:** 482
+- **Gate:** C7
+- **Departure:** 19:45
+- **Seat:** 14A
+
+At the bottom is a yellow highlighted box with a gold border reading: **"ACCESS: MINT-731"**

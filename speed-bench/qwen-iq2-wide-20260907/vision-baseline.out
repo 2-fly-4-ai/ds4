@@ -1,0 +1,2 @@
+Logs: speed-bench/qwen-iq2-wide-20260907/vision-baseline
+FAIL ordinary: exit=0, encoded=2/2, completed=2/4, errors=['ds4: prompt processing failed: token id -1 at position 10 is outside the vocabulary', 'ds4: prompt processing failed: token id -1 at position 57 is outside the vocabulary']; see speed-bench/qwen-iq2-wide-20260907/vision-baseline

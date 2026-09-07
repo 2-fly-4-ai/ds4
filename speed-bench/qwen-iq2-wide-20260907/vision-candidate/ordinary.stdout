@@ -1,0 +1,65 @@
+Commands:
+  /help          Show this help.
+  /think         Use normal thinking mode.
+  /think-max     Use Think Max only when context is at least 393216 tokens.
+  /nothink       Disable thinking mode.
+  /ctx N         Set context size for following prompts.
+  /power N       Set GPU duty cycle percentage, 1..100.
+  /steer F       Set FFN steering for subsequent tokens; no value shows it.
+  /read FILE     Submit a text file, PNG, or JPEG.
+  /quit, /exit   Leave the prompt.
+  Ctrl+C         Stop generation and return to the prompt.
+This image illustrates a **Document pipeline**, showing a three-stage process:
+
+1. **INPUT** (blue box) — The raw document or data enters the system.
+2. **ENCODER** (green box) — The input is processed and transformed into a structured or compressed representation (e.g., via an AI model like a transformer).
+3. **SUMMARY** (orange box) — The encoded representation is used to generate a final output, such as a concise summary.
+
+The caption below reinforces this flow:  
+> *“Blue data becomes a green representation before the orange result.”*
+
+This is a common architecture in NLP systems — for example, in abstractive summarization models where an encoder processes the input text and a decoder generates the summary. The color coding helps visualize the transformation stages clearly.
+
+✅ Simple, clean, and effective for explaining data flow in
+The image displays a diagram titled **“Document pipeline”** in black text at the top.
+
+Below the title is a horizontal flowchart with three rectangular boxes connected by black right-pointing arrows:
+
+1. **Left box**: Blue background, white uppercase text reading **“INPUT”**.
+2. **Middle box**: Green background, white uppercase text reading **“ENCODER”**.
+3. **Right box**: Orange-red background, white uppercase text reading **“SUMMARY”**.
+
+Beneath the diagram, centered gray text reads:  
+**“Blue data becomes a green representation before the orange result.”**
+
+The overall background of the image is light off-white or very pale beige. The design is clean and minimalist, using bold colors to distinguish each stage of the pipeline.
+The image shows a digital ticket or boarding pass for **NORTH HARBOR**, displayed in bold black uppercase letters at the top, underlined by a thin black line.
+
+Below the title, on a white card with rounded corners and a subtle gray border, are four lines of information in dark gray monospace-style font:
+
+- **Train: 482**
+- **Gate: C7**
+- **Departure: 19:45**
+- **Seat: 14A**
+
+At the bottom of the card is a prominent rectangular button with a pale yellow background and a golden-yellow border. Inside it, in bold black uppercase text, is:  
+**ACCESS: MINT-731**
+
+The entire card is centered on a light gray background. The layout is clean, modern, and functional — typical of a transit or travel
+The image displays a digital ticket or boarding pass centered on a light gray background.
+
+The ticket itself is a white rectangle with rounded corners and a thin gray border. At the top, in bold black uppercase letters, is the title:  
+**NORTH HARBOR**  
+— underlined by a thin black horizontal line.
+
+Below the title, four lines of information appear in dark gray, monospace-style font:
+
+- **Train: 482**  
+- **Gate: C7**  
+- **Departure: 19:45**  
+- **Seat: 14A**
+
+At the bottom of the ticket is a rectangular button with a pale yellow fill and a golden-yellow border. Inside the button, in bold black uppercase text, is:  
+**ACCESS: MINT-731**
+
+All text is clearly legible, and

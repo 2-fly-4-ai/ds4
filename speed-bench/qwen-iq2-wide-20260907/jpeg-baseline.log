@@ -1,0 +1,904 @@
+F.
+======================================================================
+FAIL: test_earth_regression (test_jpeg_decode.JpegDecodeTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 56, in test_earth_regression
+    self.check_decode((Path(__file__).parent / "vision-fixtures/glm53/earth.jpg").read_bytes())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 442533 / 778752 (56.8%)
+Max absolute difference among violations: 26
+Max relative difference among violations: 0.38297872
+ ACTUAL: array([[[70, 63, 61],
+        [71, 64, 62],
+        [73, 66, 64],...
+ DESIRED: array([[[71, 63, 61],
+        [72, 64, 62],
+        [74, 66, 64],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(3, 5), progressive=False, sampling=0)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 17 / 45 (37.8%)
+Max absolute difference among violations: 1
+Max relative difference among violations: 0.25
+ ACTUAL: array([[[  1,   0,   0],
+        [ 19,   9,   3],
+        [ 36,  15,   4]],...
+ DESIRED: array([[[  1,   0,   0],
+        [ 19,   8,   4],
+        [ 37,  15,   4]],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(3, 5), progressive=False, sampling=1)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 18 / 45 (40%)
+Max absolute difference among violations: 1
+Max relative difference among violations: 0.25
+ ACTUAL: array([[[  5,   0,   0],
+        [ 16,  10,   3],
+        [ 35,  15,   7]],...
+ DESIRED: array([[[  6,   0,   0],
+        [ 17,  10,   4],
+        [ 35,  15,   8]],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(3, 5), progressive=False, sampling=2)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 26 / 45 (57.8%)
+Max absolute difference among violations: 1
+Max relative difference among violations: 0.5
+ ACTUAL: array([[[  0,   6,   0],
+        [  6,  17,   0],
+        [ 25,  22,   0]],...
+ DESIRED: array([[[  0,   5,   0],
+        [  7,  16,   0],
+        [ 26,  21,   0]],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(3, 5), progressive=True, sampling=0)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 31 / 45 (68.9%)
+Max absolute difference among violations: 5
+Max relative difference among violations: 1.
+ ACTUAL: array([[[  2,   0,   0],
+        [ 19,   7,   2],
+        [ 37,  13,   3]],...
+ DESIRED: array([[[  1,   0,   0],
+        [ 19,   8,   4],
+        [ 37,  15,   4]],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(3, 5), progressive=True, sampling=1)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 30 / 45 (66.7%)
+Max absolute difference among violations: 6
+Max relative difference among violations: 0.5
+ ACTUAL: array([[[  7,   0,   0],
+        [ 17,   8,   2],
+        [ 35,  13,   6]],...
+ DESIRED: array([[[  6,   0,   0],
+        [ 17,  10,   4],
+        [ 35,  15,   8]],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(3, 5), progressive=True, sampling=2)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 33 / 45 (73.3%)
+Max absolute difference among violations: 4
+Max relative difference among violations: 0.66666667
+ ACTUAL: array([[[  0,   6,   0],
+        [  5,  16,   0],
+        [ 24,  21,   0]],...
+ DESIRED: array([[[  0,   5,   0],
+        [  7,  16,   0],
+        [ 26,  21,   0]],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(7, 9), progressive=False, sampling=0)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 88 / 189 (46.6%)
+Max absolute difference among violations: 1
+Max relative difference among violations: 1.
+ ACTUAL: array([[[  0,   3,   0],
+        [ 22,  12,  16],
+        [ 29,  15,   0],...
+ DESIRED: array([[[  0,   2,   0],
+        [ 22,  11,  17],
+        [ 30,  15,   0],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(7, 9), progressive=False, sampling=1)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 172 / 189 (91%)
+Max absolute difference among violations: 91
+Max relative difference among violations: 3.16666667
+ ACTUAL: array([[[  5,   0,   0],
+        [ 20,  14,   9],
+        [ 33,   0, 100],...
+ DESIRED: array([[[  6,   0,   0],
+        [ 23,   7,  33],
+        [ 31,   0,  77],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(7, 9), progressive=False, sampling=2)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 182 / 189 (96.3%)
+Max absolute difference among violations: 128
+Max relative difference among violations: 1.63157895
+ ACTUAL: array([[[  0,   7,   0],
+        [  9,  22,   0],
+        [ 18,   1, 100],...
+ DESIRED: array([[[  0,   6,   0],
+        [ 11,  16,  22],
+        [ 17,   6,  75],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(7, 9), progressive=True, sampling=0)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 88 / 189 (46.6%)
+Max absolute difference among violations: 1
+Max relative difference among violations: 1.
+ ACTUAL: array([[[  0,   3,   0],
+        [ 22,  12,  16],
+        [ 29,  15,   0],...
+ DESIRED: array([[[  0,   2,   0],
+        [ 22,  11,  17],
+        [ 30,  15,   0],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(7, 9), progressive=True, sampling=1)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 172 / 189 (91%)
+Max absolute difference among violations: 91
+Max relative difference among violations: 3.16666667
+ ACTUAL: array([[[  5,   0,   0],
+        [ 20,  14,   9],
+        [ 33,   0, 100],...
+ DESIRED: array([[[  6,   0,   0],
+        [ 23,   7,  33],
+        [ 31,   0,  77],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(7, 9), progressive=True, sampling=2)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 183 / 189 (96.8%)
+Max absolute difference among violations: 128
+Max relative difference among violations: 1.63157895
+ ACTUAL: array([[[  0,   8,   0],
+        [  7,  23,   0],
+        [ 21,   0, 100],...
+ DESIRED: array([[[  0,   6,   0],
+        [ 11,  16,  22],
+        [ 17,   6,  75],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(16, 16), progressive=False, sampling=0)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 318 / 768 (41.4%)
+Max absolute difference among violations: 1
+Max relative difference among violations: 1.
+ ACTUAL: array([[[  0,   5,   0],
+        [ 23,  11,   8],
+        [ 29,  17,   0],...
+ DESIRED: array([[[  0,   4,   0],
+        [ 24,  10,   9],
+        [ 29,  17,   0],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(16, 16), progressive=False, sampling=1)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 701 / 768 (91.3%)
+Max absolute difference among violations: 105
+Max relative difference among violations: 2.4
+ ACTUAL: array([[[  5,   0,   0],
+        [ 19,  14,   1],
+        [ 29,   0, 115],...
+ DESIRED: array([[[  6,   0,   0],
+        [ 21,   7,  30],
+        [ 28,   0,  87],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(16, 16), progressive=False, sampling=2)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 736 / 768 (95.8%)
+Max absolute difference among violations: 121
+Max relative difference among violations: 19.
+ ACTUAL: array([[[  0,   8,   0],
+        [  4,  22,   0],
+        [ 29,   0,  92],...
+ DESIRED: array([[[  0,   8,   0],
+        [ 10,  15,  21],
+        [ 24,   5,  71],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(16, 16), progressive=True, sampling=0)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 369 / 768 (48%)
+Max absolute difference among violations: 5
+Max relative difference among violations: 1.5
+ ACTUAL: array([[[  0,   5,   0],
+        [ 23,  11,   8],
+        [ 29,  17,   0],...
+ DESIRED: array([[[  0,   4,   0],
+        [ 24,  10,   9],
+        [ 29,  17,   0],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(16, 16), progressive=True, sampling=1)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 703 / 768 (91.5%)
+Max absolute difference among violations: 108
+Max relative difference among violations: 2.4
+ ACTUAL: array([[[  5,   0,   0],
+        [ 19,  14,   1],
+        [ 29,   0, 115],...
+ DESIRED: array([[[  6,   0,   0],
+        [ 21,   7,  30],
+        [ 28,   0,  87],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(16, 16), progressive=True, sampling=2)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 736 / 768 (95.8%)
+Max absolute difference among violations: 121
+Max relative difference among violations: 19.
+ ACTUAL: array([[[  0,   8,   0],
+        [  4,  22,   0],
+        [ 29,   0,  92],...
+ DESIRED: array([[[  0,   8,   0],
+        [ 10,  15,  21],
+        [ 24,   5,  71],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(31, 27), progressive=False, sampling=0)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 1022 / 2511 (40.7%)
+Max absolute difference among violations: 1
+Max relative difference among violations: 1.
+ ACTUAL: array([[[  0,   5,   0],
+        [ 23,  11,   8],
+        [ 29,  17,   0],...
+ DESIRED: array([[[  0,   4,   0],
+        [ 24,  10,   9],
+        [ 29,  17,   0],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(31, 27), progressive=False, sampling=1)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 2389 / 2511 (95.1%)
+Max absolute difference among violations: 105
+Max relative difference among violations: 11.
+ ACTUAL: array([[[  5,   0,   0],
+        [ 19,  14,   1],
+        [ 29,   0, 115],...
+ DESIRED: array([[[  6,   0,   0],
+        [ 21,   7,  30],
+        [ 28,   0,  87],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(31, 27), progressive=False, sampling=2)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 2440 / 2511 (97.2%)
+Max absolute difference among violations: 125
+Max relative difference among violations: 2.375
+ ACTUAL: array([[[  0,   8,   0],
+        [  4,  22,   0],
+        [ 29,   0,  92],...
+ DESIRED: array([[[  0,   8,   0],
+        [ 10,  15,  21],
+        [ 24,   5,  71],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(31, 27), progressive=True, sampling=0)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 1022 / 2511 (40.7%)
+Max absolute difference among violations: 1
+Max relative difference among violations: 1.
+ ACTUAL: array([[[  0,   5,   0],
+        [ 23,  11,   8],
+        [ 29,  17,   0],...
+ DESIRED: array([[[  0,   4,   0],
+        [ 24,  10,   9],
+        [ 29,  17,   0],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(31, 27), progressive=True, sampling=1)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 2389 / 2511 (95.1%)
+Max absolute difference among violations: 105
+Max relative difference among violations: 11.
+ ACTUAL: array([[[  5,   0,   0],
+        [ 19,  14,   1],
+        [ 29,   0, 115],...
+ DESIRED: array([[[  6,   0,   0],
+        [ 21,   7,  30],
+        [ 28,   0,  87],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(31, 27), progressive=True, sampling=2)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 2440 / 2511 (97.2%)
+Max absolute difference among violations: 125
+Max relative difference among violations: 2.375
+ ACTUAL: array([[[  0,   8,   0],
+        [  4,  22,   0],
+        [ 29,   0,  92],...
+ DESIRED: array([[[  0,   8,   0],
+        [ 10,  15,  21],
+        [ 24,   5,  71],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(64, 49), progressive=False, sampling=0)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 3893 / 9408 (41.4%)
+Max absolute difference among violations: 1
+Max relative difference among violations: 1.
+ ACTUAL: array([[[  0,   5,   0],
+        [ 23,  11,   8],
+        [ 29,  17,   0],...
+ DESIRED: array([[[  0,   4,   0],
+        [ 24,  10,   9],
+        [ 29,  17,   0],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(64, 49), progressive=False, sampling=1)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 8962 / 9408 (95.3%)
+Max absolute difference among violations: 105
+Max relative difference among violations: 11.
+ ACTUAL: array([[[  5,   0,   0],
+        [ 19,  14,   1],
+        [ 29,   0, 115],...
+ DESIRED: array([[[  6,   0,   0],
+        [ 21,   7,  30],
+        [ 28,   0,  87],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(64, 49), progressive=False, sampling=2)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 9141 / 9408 (97.2%)
+Max absolute difference among violations: 125
+Max relative difference among violations: 18.5
+ ACTUAL: array([[[  0,   8,   0],
+        [  4,  22,   0],
+        [ 29,   0,  92],...
+ DESIRED: array([[[  0,   8,   0],
+        [ 10,  15,  21],
+        [ 24,   5,  71],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(64, 49), progressive=True, sampling=0)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 3893 / 9408 (41.4%)
+Max absolute difference among violations: 1
+Max relative difference among violations: 1.
+ ACTUAL: array([[[  0,   5,   0],
+        [ 23,  11,   8],
+        [ 29,  17,   0],...
+ DESIRED: array([[[  0,   4,   0],
+        [ 24,  10,   9],
+        [ 29,  17,   0],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(64, 49), progressive=True, sampling=1)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 8962 / 9408 (95.3%)
+Max absolute difference among violations: 105
+Max relative difference among violations: 11.
+ ACTUAL: array([[[  5,   0,   0],
+        [ 19,  14,   1],
+        [ 29,   0, 115],...
+ DESIRED: array([[[  6,   0,   0],
+        [ 21,   7,  30],
+        [ 28,   0,  87],...
+
+======================================================================
+FAIL: test_sampling_progression_and_edges (test_jpeg_decode.JpegDecodeTests) (size=(64, 49), progressive=True, sampling=2)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 69, in test_sampling_progression_and_edges
+    self.check_decode(buf.getvalue())
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/tests/test_jpeg_decode.py", line 51, in check_decode
+    np.testing.assert_array_equal(actual, expected)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/_utils/__init__.py", line 85, in wrapper
+    return fun(*args, **kwargs)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 1021, in assert_array_equal
+    assert_array_compare(operator.__eq__, actual, desired, err_msg=err_msg,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 79, in inner
+    return func(*args, **kwds)
+  File "/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/lib/python3.9/site-packages/numpy/testing/_private/utils.py", line 885, in assert_array_compare
+    raise AssertionError(msg)
+AssertionError: 
+Arrays are not equal
+
+Mismatched elements: 9141 / 9408 (97.2%)
+Max absolute difference among violations: 125
+Max relative difference among violations: 18.5
+ ACTUAL: array([[[  0,   8,   0],
+        [  4,  22,   0],
+        [ 29,   0,  92],...
+ DESIRED: array([[[  0,   8,   0],
+        [ 10,  15,  21],
+        [ 24,   5,  71],...
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.978s
+
+FAILED (failures=31)

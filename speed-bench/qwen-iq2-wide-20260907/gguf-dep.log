@@ -1,0 +1,17 @@
+Collecting gguf
+  Downloading gguf-0.18.0-py3-none-any.whl (114 kB)
+Requirement already satisfied: pyyaml>=5.1 in ./.venv/lib/python3.9/site-packages (from gguf) (6.0.3)
+Requirement already satisfied: numpy>=1.17 in ./.venv/lib/python3.9/site-packages (from gguf) (2.0.2)
+Requirement already satisfied: tqdm>=4.27 in ./.venv/lib/python3.9/site-packages (from gguf) (4.70.0)
+Collecting requests>=2.25
+  Downloading requests-2.32.5-py3-none-any.whl (64 kB)
+Collecting urllib3<3,>=1.21.1
+  Downloading urllib3-2.6.3-py3-none-any.whl (131 kB)
+Requirement already satisfied: idna<4,>=2.5 in ./.venv/lib/python3.9/site-packages (from requests>=2.25->gguf) (3.19)
+Collecting charset_normalizer<4,>=2
+  Downloading charset_normalizer-3.5.1-cp39-cp39-macosx_10_9_universal2.whl (368 kB)
+Requirement already satisfied: certifi>=2017.4.17 in ./.venv/lib/python3.9/site-packages (from requests>=2.25->gguf) (2026.7.22)
+Installing collected packages: urllib3, charset-normalizer, requests, gguf
+Successfully installed charset-normalizer-3.5.1 gguf-0.18.0 requests-2.32.5 urllib3-2.6.3
+WARNING: You are using pip version 21.2.4; however, version 26.0.1 is available.
+You should consider upgrading via the '/Users/brianfarley/Desktop/ds4-qwen-iq2-wide/.venv/bin/python -m pip install --upgrade pip' command.
