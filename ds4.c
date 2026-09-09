@@ -76104,6 +76104,17 @@ static int ds4_session_sync_internal(ds4_session *s, const ds4_tokens *prompt, c
             if (mtp_prefill) qwen_mtp_bind(&mtp_prefill_w, &e->model);
             if (mtp_prefill && !qwen_mtp_is_valid(&mtp_prefill_w))
                 mtp_prefill = false;
+            uint32_t prefill_batch_cap = g_qwen_pool.batch_cap;
+            const char *batch_cap_override = getenv("DS4_QWEN_PREFILL_BATCH_CAP");
+            /* Q4_K changes its reduction order above 16 rows and can cross a
+               greedy decision boundary at long prompts.  Keep the validated
+               exact cap unless an explicit profiling override is requested. */
+            if ((!batch_cap_override || !batch_cap_override[0]) &&
+                e->weights.layer[0].ffn_gate &&
+                e->weights.layer[0].ffn_gate->type != DS4_TENSOR_Q8_0 &&
+                prefill_batch_cap > 16u) {
+                prefill_batch_cap = 16u;
+            }
             for (int i = start; i < prompt->len;) {
                 if (ds4_session_cancelled(s)) {
                     snprintf(err, errlen, "interrupted");
@@ -76112,7 +76123,7 @@ static int ds4_session_sync_internal(ds4_session *s, const ds4_tokens *prompt, c
                     return DS4_SESSION_SYNC_INTERRUPTED;
                 }
                 uint32_t rows = (uint32_t)(prompt->len - i);
-                if (rows > g_qwen_pool.batch_cap) rows = g_qwen_pool.batch_cap;
+                if (rows > prefill_batch_cap) rows = prefill_batch_cap;
                 for (uint32_t r = 0; r < rows; r++) {
                     const int tok = prompt->v[i + (int)r];
                     if (tok < 0 || tok >= (int)DS4_N_VOCAB) {

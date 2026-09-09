@@ -13,8 +13,8 @@ Runtime escape hatches:
 - `DS4_QWEN_NEXTN_DRAFT=0` disables the bundled NextN drafter.
 - `DS4_QWEN_PREFILL_BATCH=0` restores one-token dense-Qwen prefill.
 - `DS4_QWEN_PREFILL_BATCH_CAP=8` restores the original eight-row batched
-  prefill.  The validated default is 256 rows; 16, 32, 64, 128, and 512 are
-  retained for controlled profiling.
+  prefill.  The validated automatic caps are 256 rows for Q8_0 and 16 rows for
+  Q4_K; 32, 64, 128, 256, and 512 remain explicit profiling choices.
 - `DS4_MTP_SPEC_DISABLE=1` disables neural speculation while retaining
   batched prefill.
 - `DS4_QWEN_MTP_PREFILL=1` opt-in teacher-forces the bundled NextN attention
@@ -77,6 +77,14 @@ tokens.  At 2,048 tokens, ten repeated runs measured 359.9--372.1 t/s and all
 snapshots plus 16-token continuations remained exact.  A 512-row probe was
 slightly faster at 349 tokens but slightly slower at 1,005 tokens and requires
 larger temporary tensors, so 256 rows is the conservative default.
+
+The same experiment on `Qwen3.8-27B-Q4_K_M.gguf` exposed a quantization-specific
+boundary.  Moving from 8 to 16 rows preserved the 1,005-token continuation and
+reduced TTFT from 19.753 s to 14.090 s (1.40x).  Caps of 32 and 256 were much
+faster but changed that continuation hash because the wider Q4_K matrix route
+uses a different reduction order.  Automatic Q4_K prefill is therefore capped
+at the validated exact 16 rows; wider values require an explicit environment
+override and are not production defaults.
 
 | Prompt/output tokens | Scalar A/B wall | Batch A/B wall | Batch+NextN wall | Batch+NextN vs scalar mean |
 | ---: | ---: | ---: | ---: | ---: |
