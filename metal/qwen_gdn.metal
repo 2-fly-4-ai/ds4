@@ -10,12 +10,14 @@ struct ds4_qwen_gdn_conv_args {
     uint32_t n_channels;
     uint32_t layer;
     uint32_t n_tok;
+    uint32_t save_steps;
 };
 
 
 struct ds4_qwen_gdn_core_args {
     uint32_t layer;
     uint32_t n_tok;
+    uint32_t save_steps;
 };
 
 
@@ -41,7 +43,7 @@ kernel void kernel_qwen_gdn_conv(
         h[3] = x;
         float acc = w[0]*h[0] + w[1]*h[1] + w[2]*h[2] + w[3]*h[3];
         mixed[t * args.n_channels + gid] = acc / (1.0f + exp(-acc));
-        if (ntok > 1u) {
+        if (args.save_steps != 0u && ntok > 1u) {
             device float *hs = conv_steps + t * step_stride + layer_off;
             hs[0] = h[0]; hs[1] = h[1]; hs[2] = h[2]; hs[3] = h[3];
         }
@@ -166,7 +168,7 @@ kernel void kernel_qwen_gdn_core(
         const float nscale = 1.0f / sqrt(ss + 1e-6f);
         const float zj = z_t[vh * QWEN_GDN_HEAD_DIM + j];
         core_t[vh * QWEN_GDN_HEAD_DIM + j] = oh * nscale * snorm[j] * (zj / (1.0f + exp(-zj)));
-        if (ntok > 1u) {
+        if (args.save_steps != 0u && ntok > 1u) {
             const uint state_off = ((uint)args.layer * QWEN_GDN_V_HEADS + vh) *
                                    QWEN_GDN_HEAD_DIM * QWEN_GDN_HEAD_DIM + j * QWEN_GDN_HEAD_DIM;
             const uint step_stride = 64u * QWEN_GDN_V_HEADS * QWEN_GDN_HEAD_DIM * QWEN_GDN_HEAD_DIM;
@@ -530,4 +532,3 @@ kernel void kernel_affine2_g64_matvec(
         out[row] = total;
     }
 }
-

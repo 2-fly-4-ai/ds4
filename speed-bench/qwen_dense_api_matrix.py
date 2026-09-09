@@ -23,6 +23,8 @@ if len(sys.argv) != 4:
 
 build, model, output = map(Path, sys.argv[1:])
 output.mkdir(parents=True, exist_ok=True)
+server_binary = Path(os.environ.get("QWEN_MATRIX_SERVER", build / "ds4-server"))
+batch_cap = os.environ.get("QWEN_MATRIX_BATCH_CAP", "")
 
 
 def free_port():
@@ -116,13 +118,15 @@ for config, batched, mtp, mtp_prefill in configs:
     base = f"http://127.0.0.1:{port}"
     env = clean_env()
     env["DS4_QWEN_PREFILL_BATCH"] = "1" if batched else "0"
+    if batch_cap:
+        env["DS4_QWEN_PREFILL_BATCH_CAP"] = batch_cap
     if mtp:
         env["DS4_QWEN_MTP_K"] = "4"
         env["DS4_QWEN_MTP_PROFILE"] = "1"
     else:
         env["DS4_MTP_SPEC_DISABLE"] = "1"
     env["DS4_QWEN_MTP_PREFILL"] = "1" if mtp_prefill else "0"
-    args = [str(build / "ds4-server"), "-m", str(model), "--metal",
+    args = [str(server_binary), "-m", str(model), "--metal",
             "--ctx", "4096", "--tokens", "64", "--host", "127.0.0.1",
             "--port", str(port)]
     log_path = output / f"{config}.log"

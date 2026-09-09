@@ -153,7 +153,8 @@ int ds4_gpu_qwen_gdn_core_rows_tensor(
         uint64_t              dt_off,
         uint64_t              snorm_off,
         uint32_t              layer,
-        uint32_t              n_tok);
+        uint32_t              n_tok,
+        bool                  save_steps);
 void ds4_gpu_qwen_set_gdn_steps(ds4_gpu_tensor *conv_steps, ds4_gpu_tensor *state_steps);
 
 

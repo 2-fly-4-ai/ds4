@@ -20335,7 +20335,8 @@ int ds4_gpu_qwen_gdn_core_tensor(
         int owned = 0;
         id<MTLCommandBuffer> cb = ds4_gpu_command_buffer(&owned);
         if (!cb) return 0;
-        struct { uint32_t n_channels; uint32_t layer; uint32_t n_tok; } cargs = { 10240u, layer, 1u };
+        struct { uint32_t n_channels; uint32_t layer; uint32_t n_tok; uint32_t save_steps; }
+            cargs = { 10240u, layer, 1u, 0u };
 
         id<MTLComputeCommandEncoder> enc = ds4_gpu_compute_encoder(cb);
         [enc setComputePipelineState:conv_p];
@@ -20351,7 +20352,8 @@ int ds4_gpu_qwen_gdn_core_tensor(
 
 
 
-        struct { uint32_t layer; uint32_t n_tok; } gargs = { layer, 1u };
+        struct { uint32_t layer; uint32_t n_tok; uint32_t save_steps; }
+            gargs = { layer, 1u, 0u };
 
         enc = ds4_gpu_compute_encoder(cb);
         [enc setComputePipelineState:core_p];
@@ -20466,7 +20468,8 @@ int ds4_gpu_qwen_gdn_core_rows_tensor(
         uint64_t              dt_off,
         uint64_t              snorm_off,
         uint32_t              layer,
-        uint32_t              n_tok) {
+        uint32_t              n_tok,
+        bool                  save_steps) {
     if (!g_initialized && !ds4_gpu_init()) return 0;
     if (!core || !conv || !state || !qkv || !z || !alpha || !beta || n_tok == 0) return 0;
 
@@ -20489,7 +20492,8 @@ int ds4_gpu_qwen_gdn_core_rows_tensor(
         int owned = 0;
         id<MTLCommandBuffer> cb = ds4_gpu_command_buffer(&owned);
         if (!cb) return 0;
-        struct { uint32_t n_channels; uint32_t layer; uint32_t n_tok; } cargs = { 10240u, layer, n_tok };
+        struct { uint32_t n_channels; uint32_t layer; uint32_t n_tok; uint32_t save_steps; }
+            cargs = { 10240u, layer, n_tok, save_steps ? 1u : 0u };
         id<MTLComputeCommandEncoder> enc = ds4_gpu_compute_encoder(cb);
         [enc setComputePipelineState:conv_p];
         [enc setBytes:&cargs length:sizeof(cargs) atIndex:0];
@@ -20502,7 +20506,8 @@ int ds4_gpu_qwen_gdn_core_rows_tensor(
         [enc dispatchThreads:MTLSizeMake(10240, 1, 1) threadsPerThreadgroup:MTLSizeMake(128, 1, 1)];
         ds4_gpu_end_compute_encoder(cb, enc);
 
-        struct { uint32_t layer; uint32_t n_tok; } gargs = { layer, n_tok };
+        struct { uint32_t layer; uint32_t n_tok; uint32_t save_steps; }
+            gargs = { layer, n_tok, save_steps ? 1u : 0u };
         enc = ds4_gpu_compute_encoder(cb);
         [enc setComputePipelineState:core_p];
         [enc setBytes:&gargs length:sizeof(gargs) atIndex:0];

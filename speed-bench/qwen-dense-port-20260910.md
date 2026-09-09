@@ -12,6 +12,9 @@ Runtime escape hatches:
 
 - `DS4_QWEN_NEXTN_DRAFT=0` disables the bundled NextN drafter.
 - `DS4_QWEN_PREFILL_BATCH=0` restores one-token dense-Qwen prefill.
+- `DS4_QWEN_PREFILL_BATCH_CAP=8` restores the original eight-row batched
+  prefill.  The validated default is 256 rows; 16, 32, 64, 128, and 512 are
+  retained for controlled profiling.
 - `DS4_MTP_SPEC_DISABLE=1` disables neural speculation while retaining
   batched prefill.
 - `DS4_QWEN_MTP_PREFILL=1` opt-in teacher-forces the bundled NextN attention
@@ -47,6 +50,34 @@ so the averages include the observed thermal drift.
 The earlier independent 896-token control measured 57.508 s at 15.58 t/s
 versus 12.547 s at 71.41 t/s: 4.58x faster, byte-identical.
 
+### Wide-row prefill follow-up
+
+The original eight-row implementation still wrote verifier rollback snapshots
+during ordinary prefill, limiting safe row width and sending each chunk through
+short-row matrix kernels.  Ordinary prefill now suppresses those disposable
+snapshots, keeps the verifier's exact eight-row rollback path unchanged, and
+uses 256-row chunks.  Only the final row runs the vocabulary output head.
+
+Matched A/B measurements on the same Q8 model remained byte-identical:
+
+| Prompt tokens | 8-row TTFT A/B | 256-row TTFT A/B | Mean speedup |
+| ---: | ---: | ---: | ---: |
+| 349 | 4.594 / 6.285 s | 1.119 / 1.115 s | 4.87x |
+| 1,005 | 14.236 / 18.610 s | 2.484 / 2.493 s | 6.60x |
+
+The full 48-cell scalar/batch/NextN/sampled matrix also passed with identical
+SHA-256 output in every cell.  Its thermally drifted scalar controls averaged
+23.154 s versus 1.573 s at 349 tokens (14.72x TTFT reduction), and 75.005 s
+versus 3.437 s at 1,005 tokens (21.82x).  Those scalar ratios describe the
+complete one-row-to-256-row change; the stricter table above isolates the new
+wide-row improvement over the already-shipped eight-row path.
+
+Ten repeated exact-state runs measured 420.7--494.2 prefill t/s at 1,024
+tokens.  At 2,048 tokens, ten repeated runs measured 359.9--372.1 t/s and all
+snapshots plus 16-token continuations remained exact.  A 512-row probe was
+slightly faster at 349 tokens but slightly slower at 1,005 tokens and requires
+larger temporary tensors, so 256 rows is the conservative default.
+
 | Prompt/output tokens | Scalar A/B wall | Batch A/B wall | Batch+NextN wall | Batch+NextN vs scalar mean |
 | ---: | ---: | ---: | ---: | ---: |
 | 22 / 48 | 4.330 / 5.437 s | 3.328 / 3.460 s | 1.805 s | 2.71x |
@@ -62,6 +93,8 @@ from 1.478 s to 0.443–0.446 s without changing output.
 `speed-bench/qwen_dense_api_matrix.py BUILD MODEL OUTPUT_DIR` writes raw server
 logs, response text, and `results.json`.  `QWEN_MATRIX_CASES` and
 `QWEN_MATRIX_CONFIGS` accept comma-separated filters for quick focused reruns.
+`QWEN_MATRIX_BATCH_CAP` selects a row cap and `QWEN_MATRIX_SERVER` selects a
+preserved comparison binary without mutating the source tree.
 
 ## Remaining limitations
 
