@@ -13617,6 +13617,8 @@ hybrid_chain_again:
                 break;
             }
         } else if (route == DS4_DECODE_ROUTE_NEURAL_SPECULATION) {
+            const bool qwen_serial = ds4_engine_is_qwen(s->engine);
+            if (qwen_serial) pthread_mutex_lock(&s->inference_mu);
             if (j->req.ignore_eos) {
                 ntok = ds4_session_eval_speculative_argmax_ignoring_eos(
                     slot->session, token, max_tokens - completion,
@@ -13630,6 +13632,7 @@ hybrid_chain_again:
                     toks, (int)(sizeof(toks) / sizeof(toks[0])),
                     err, sizeof(err));
             }
+            if (qwen_serial) pthread_mutex_unlock(&s->inference_mu);
             if (ntok < 0) {
                 finish = "error";
                 break;

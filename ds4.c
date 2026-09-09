@@ -17631,6 +17631,7 @@ static struct {
 
     uint32_t batch_cap;
     uint32_t max_ctx;
+    const void *owner;
     pthread_mutex_t mu;
     int inited;
 } g_qwen_pool = {0};
@@ -17744,7 +17745,7 @@ static int qwen_metal_ensure_pool(void) {
  * recurrent GDN scratch in the Qwen Metal pool.  A fresh session sync must
  * explicitly clear that state; merely starting again at position zero would
  * otherwise reuse the preceding request's recurrent history. */
-static int qwen_hybrid_reset_recurrent(void) {
+static int qwen_hybrid_reset_recurrent(const void *owner) {
     if (!qwen_metal_ensure_pool()) return 0;
     pthread_mutex_lock(&g_qwen_pool.mu);
     const uint64_t conv_count =
@@ -17754,6 +17755,7 @@ static int qwen_hybrid_reset_recurrent(void) {
     const int ok =
         ds4_gpu_tensor_fill_f32(g_qwen_pool.gdn_conv, 0.0f, conv_count) &&
         ds4_gpu_tensor_fill_f32(g_qwen_pool.gdn_state, 0.0f, state_count);
+    if (ok) g_qwen_pool.owner = owner;
     pthread_mutex_unlock(&g_qwen_pool.mu);
     return ok;
 }
@@ -73962,8 +73964,22 @@ void ds4_session_free(ds4_session *s) {
             glm_graph_free(&s->glm_graph);
         } else if (ds4_session_is_qwen(s)) {
             // Qwen Metal session has no graph allocation
+            const char *mtp_profile = getenv("DS4_QWEN_MTP_PROFILE");
+            if (mtp_profile && mtp_profile[0] != '0' && s->mtp_probe_total) {
+                fprintf(stderr,
+                        "ds4: Qwen NextN session drafted=%llu accepted=%llu (%.1f%%)\n",
+                        (unsigned long long)s->mtp_probe_total,
+                        (unsigned long long)s->mtp_probe_hit,
+                        100.0 * (double)s->mtp_probe_hit /
+                            (double)s->mtp_probe_total);
+            }
             free(s->qwen_layers);
             free(s->qwen_hidden);
+            if (g_qwen_pool.inited) {
+                pthread_mutex_lock(&g_qwen_pool.mu);
+                if (g_qwen_pool.owner == s) g_qwen_pool.owner = NULL;
+                pthread_mutex_unlock(&g_qwen_pool.mu);
+            }
         } else {
             metal_graph_free(&s->graph);
         }
@@ -76016,7 +76032,7 @@ static int ds4_session_sync_internal(ds4_session *s, const ds4_tokens *prompt, c
         ds4_engine *e = s->engine;
         const bool is_cpu = e->backend == DS4_BACKEND_CPU;
         int start = 0;
-        if (s->checkpoint_valid &&
+        if (s->checkpoint_valid && (is_cpu || g_qwen_pool.owner == s) &&
             prompt->len >= s->checkpoint.len &&
             ds4_tokens_starts_with(prompt, &s->checkpoint)) {
             start = s->checkpoint.len;
@@ -76024,7 +76040,7 @@ static int ds4_session_sync_internal(ds4_session *s, const ds4_tokens *prompt, c
             s->checkpoint.len = 0;
             s->checkpoint_valid = false;
             if (!is_cpu && qwen_engine_is_hybrid(e) &&
-                !qwen_hybrid_reset_recurrent()) {
+                !qwen_hybrid_reset_recurrent(s)) {
                 snprintf(err, errlen, "failed to reset Qwen recurrent state");
                 return 1;
             }
@@ -76036,6 +76052,71 @@ static int ds4_session_sync_internal(ds4_session *s, const ds4_tokens *prompt, c
                      "Qwen prompt length %d exceeds dense Metal cache %u",
                      prompt->len, g_qwen_pool.max_ctx);
             return 1;
+        }
+
+        const char *batch_env = getenv("DS4_QWEN_PREFILL_BATCH");
+        const bool batch_prefill = !is_cpu && qwen_engine_is_hybrid(e) &&
+            (!batch_env || !batch_env[0] || strcmp(batch_env, "0") != 0);
+        if (batch_prefill) {
+            if (!qwen_metal_ensure_pool()) {
+                snprintf(err, errlen, "failed to initialize Qwen batched prefill");
+                return 1;
+            }
+            for (int i = start; i < prompt->len;) {
+                if (ds4_session_cancelled(s)) {
+                    snprintf(err, errlen, "interrupted");
+                    s->checkpoint_valid = s->checkpoint.len > 0;
+                    s->mtp_draft_valid = false;
+                    return DS4_SESSION_SYNC_INTERRUPTED;
+                }
+                uint32_t rows = (uint32_t)(prompt->len - i);
+                if (rows > g_qwen_pool.batch_cap) rows = g_qwen_pool.batch_cap;
+                for (uint32_t r = 0; r < rows; r++) {
+                    const int tok = prompt->v[i + (int)r];
+                    if (tok < 0 || tok >= (int)DS4_N_VOCAB) {
+                        snprintf(err, errlen,
+                                 "token id %d at position %d is outside the vocabulary",
+                                 tok, i + (int)r);
+                        s->checkpoint_valid = false;
+                        return 1;
+                    }
+                }
+                const bool final = i + (int)rows == prompt->len;
+                float *row_logits = final ?
+                    xmalloc((size_t)rows * DS4_N_VOCAB * sizeof(float)) : NULL;
+                float *row_hidden = final && s->qwen_hidden ?
+                    xmalloc((size_t)rows * 5120u * sizeof(float)) : NULL;
+                const int ok = qwen_hybrid_metal_forward_tokens(
+                    row_logits, NULL, row_hidden, NULL, NULL, 0,
+                    &e->model, &e->weights, prompt->v + i, rows, (uint32_t)i);
+                if (!ok) {
+                    free(row_hidden);
+                    free(row_logits);
+                    s->checkpoint_valid = false;
+                    snprintf(err, errlen, "Qwen batched prefill failed at token %d", i);
+                    return 1;
+                }
+                if (final) {
+                    memcpy(s->logits,
+                           row_logits + (size_t)(rows - 1u) * DS4_N_VOCAB,
+                           (size_t)DS4_N_VOCAB * sizeof(float));
+                    if (row_hidden) {
+                        memcpy(s->qwen_hidden,
+                               row_hidden + (size_t)(rows - 1u) * 5120u,
+                               5120u * sizeof(float));
+                    }
+                }
+                free(row_hidden);
+                free(row_logits);
+                for (uint32_t r = 0; r < rows; r++)
+                    token_vec_push(&s->checkpoint, prompt->v[i + (int)r]);
+                i += (int)rows;
+                if (s->progress)
+                    s->progress(s->progress_ud, "prefill_chunk", i, prompt->len);
+            }
+            s->checkpoint_valid = true;
+            s->mtp_draft_valid = false;
+            return 0;
         }
         for (int i = start; i < prompt->len; i++) {
             if (ds4_session_cancelled(s)) {
@@ -77884,6 +77965,38 @@ static void ds4_session_prepare_support_draft(ds4_session *s,
 }
 #endif
 
+#ifndef DS4_NO_GPU
+/* Dense Qwen currently shares one large Metal scratch/KV pool.  When the
+ * server alternates between logical sessions, reconstruct the selected
+ * session's exact frontier before its next decode cycle.  This is slower than
+ * future per-session recurrent tensors, but it is deterministic and prevents
+ * cross-request state contamination. */
+static int ds4_session_qwen_activate(ds4_session *s, char *err, size_t errlen) {
+    if (!s || !ds4_session_is_qwen(s) ||
+        s->engine->backend == DS4_BACKEND_CPU || g_qwen_pool.owner == s) {
+        return 1;
+    }
+    if (!qwen_hybrid_reset_recurrent(s)) {
+        if (errlen) snprintf(err, errlen, "failed to activate Qwen recurrent state");
+        return 0;
+    }
+    qwen_mtp_metal_reset_kv();
+    ds4_engine *e = s->engine;
+    for (int i = 0; i < s->checkpoint.len; i++) {
+        float *logits = i == s->checkpoint.len - 1 ? s->logits : NULL;
+        float *hidden = i == s->checkpoint.len - 1 ? s->qwen_hidden : NULL;
+        if (!qwen_hybrid_metal_forward_token_ex(
+                logits, NULL, hidden, NULL, NULL, 0,
+                &e->model, &e->weights, s->checkpoint.v[i], (uint32_t)i)) {
+            s->checkpoint_valid = false;
+            if (errlen) snprintf(err, errlen, "failed to replay Qwen session frontier");
+            return 0;
+        }
+    }
+    return 1;
+}
+#endif
+
 static int ds4_session_eval_internal(ds4_session *s, int token, bool probe_mtp,
                                      char *err, size_t errlen) {
     if (!s) return 1;
@@ -77906,6 +78019,7 @@ static int ds4_session_eval_internal(ds4_session *s, int token, bool probe_mtp,
         uint32_t pos = (uint32_t)s->checkpoint.len;
         bool is_cpu = (e->backend == DS4_BACKEND_CPU);
 #ifndef DS4_NO_GPU
+        if (!is_cpu && !ds4_session_qwen_activate(s, err, errlen)) return 1;
         if (e->dflash_ready && s->qwen_layers && s->qwen_hidden) {
             qwen_target_forward_layers(e, s->logits, s->qwen_hidden, s->qwen_layers, token, pos);
         } else if (!is_cpu) {
@@ -83926,6 +84040,7 @@ static int ds4_session_eval_qwen_nextn_argmax(
     if (!s || !s->engine || !accepted || max_tokens <= 0 || accepted_cap <= 0)
         return 0;
     ds4_engine *e = s->engine;
+    if (!ds4_session_qwen_activate(s, err, errlen)) return -1;
     qwen_mtp_weights_t mtp_w;
     qwen_mtp_bind(&mtp_w, &e->model);
     if (!qwen_mtp_is_valid(&mtp_w) || !s->qwen_hidden) {
@@ -83988,6 +84103,8 @@ static int ds4_session_eval_qwen_nextn_argmax(
     int matched = 0;
     while (matched < drafted && verify_argmax[matched] == drafts[matched])
         matched++;
+    s->mtp_probe_total += (uint64_t)drafted;
+    s->mtp_probe_hit += (uint64_t)matched;
     if (matched < drafted && !qwen_hybrid_restore_gdn_prefix((uint32_t)matched)) {
         s->checkpoint_valid = false;
         snprintf(err, errlen, "Qwen NextN recurrent rollback failed");
