@@ -23,6 +23,13 @@
 #include "ds4_gpu.h"
 #include "ds4_image.h"
 
+/* Standalone Metal-kernel tests do not link the GGUF registry in ds4.c.
+ * The full runtime's strong definition overrides this neutral fallback. */
+__attribute__((weak)) float ds4_nvfp4_global_scale(uint64_t weight_offset) {
+    (void)weight_offset;
+    return 1.0f;
+}
+
 /*
  * Objective-C Metal glue for the C engine.
  *

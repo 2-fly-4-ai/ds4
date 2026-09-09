@@ -63,6 +63,10 @@ static int dflash2_matvec_gpu(float *out, const ds4_model *m, const ds4_tensor *
 
 static int dflash2_matvecs_gpu(float *out, const ds4_model *m, const ds4_tensor *w,
                                const float *x, uint32_t n_tok) {
+#ifdef DS4_NO_GPU
+    (void)out; (void)m; (void)w; (void)x; (void)n_tok;
+    return 0;
+#else
     static int nfail;
     if (!g_qwen_pool.inited || !w || !m || !m->map || n_tok == 0) {
         if (nfail++ < 3) fprintf(stderr, "ds4: dflash gpu skip pool/w map n=%u inited=%d\n",
@@ -109,7 +113,7 @@ static int dflash2_matvecs_gpu(float *out, const ds4_model *m, const ds4_tensor 
                 w->type, (unsigned long long)in_dim, (unsigned long long)out_dim, n_tok);
     }
     return ok;
-
+#endif
 }
 
 static void dflash2_matvecs(float *out, const ds4_model *m, const ds4_tensor *w,
@@ -117,6 +121,10 @@ static void dflash2_matvecs(float *out, const ds4_model *m, const ds4_tensor *w,
 
 static int dflash2_matvecs_n_gpu(float **outs, const ds4_model *m, const ds4_tensor **ws,
                                  const float *x, uint32_t n_tok, int n_w) {
+#ifdef DS4_NO_GPU
+    (void)outs; (void)m; (void)ws; (void)x; (void)n_tok; (void)n_w;
+    return 0;
+#else
     static int nfail;
     static ds4_gpu_tensor *gx;
     static ds4_gpu_tensor *gy[4];
@@ -169,6 +177,7 @@ static int dflash2_matvecs_n_gpu(float **outs, const ds4_model *m, const ds4_ten
     }
     if (!ok && nfail++ < 4) fprintf(stderr, "ds4: dflash gpu n-gemm fail n_w=%d n=%u\n", n_w, n_tok);
     return ok;
+#endif
 }
 
 static void dflash2_matvecs_n(float **outs, const ds4_model *m, const ds4_tensor **ws,
@@ -876,5 +885,4 @@ static void qwen_forward_token_cpu_layers(
     free(next);
     free(cur);
 }
-
 
