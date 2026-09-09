@@ -76062,6 +76062,15 @@ static int ds4_session_sync_internal(ds4_session *s, const ds4_tokens *prompt, c
                 snprintf(err, errlen, "failed to initialize Qwen batched prefill");
                 return 1;
             }
+            const char *mtp_prefill_env = getenv("DS4_QWEN_MTP_PREFILL");
+            bool mtp_prefill = mtp_prefill_env && mtp_prefill_env[0] != '0' &&
+                getenv("DS4_MTP_SPEC_DISABLE") == NULL &&
+                qwen_has_mtp(&e->model) && qwen_mtp_metal_ensure_pool();
+            qwen_mtp_weights_t mtp_prefill_w;
+            memset(&mtp_prefill_w, 0, sizeof(mtp_prefill_w));
+            if (mtp_prefill) qwen_mtp_bind(&mtp_prefill_w, &e->model);
+            if (mtp_prefill && !qwen_mtp_is_valid(&mtp_prefill_w))
+                mtp_prefill = false;
             for (int i = start; i < prompt->len;) {
                 if (ds4_session_cancelled(s)) {
                     snprintf(err, errlen, "interrupted");
@@ -76084,7 +76093,7 @@ static int ds4_session_sync_internal(ds4_session *s, const ds4_tokens *prompt, c
                 const bool final = i + (int)rows == prompt->len;
                 float *row_logits = final ?
                     xmalloc((size_t)rows * DS4_N_VOCAB * sizeof(float)) : NULL;
-                float *row_hidden = final && s->qwen_hidden ?
+                float *row_hidden = (final || mtp_prefill) && s->qwen_hidden ?
                     xmalloc((size_t)rows * 5120u * sizeof(float)) : NULL;
                 const int ok = qwen_hybrid_metal_forward_tokens(
                     row_logits, NULL, row_hidden, NULL, NULL, 0,
@@ -76104,6 +76113,20 @@ static int ds4_session_sync_internal(ds4_session *s, const ds4_tokens *prompt, c
                         memcpy(s->qwen_hidden,
                                row_hidden + (size_t)(rows - 1u) * 5120u,
                                5120u * sizeof(float));
+                    }
+                }
+                if (mtp_prefill && row_hidden) {
+                    for (uint32_t r = 0; r < rows; r++) {
+                        const int at = i + (int)r;
+                        if (at + 1 >= prompt->len) break;
+                        if (!qwen_mtp_draft_one_metal(
+                                NULL, NULL, NULL, &e->model, &e->weights,
+                                &mtp_prefill_w, row_hidden + (size_t)r * 5120u,
+                                prompt->v[at + 1], (uint32_t)at, 0, 1)) {
+                            qwen_mtp_metal_reset_kv();
+                            mtp_prefill = false;
+                            break;
+                        }
                     }
                 }
                 free(row_hidden);

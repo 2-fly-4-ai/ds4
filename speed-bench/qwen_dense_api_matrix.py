@@ -86,16 +86,21 @@ seed = (
 )
 cases = [
     ("code-short", "Write a Python function that merges overlapping intervals and explain its complexity.", 48, 0.0, 1),
+    ("code-longgen", "Write a complete Python implementation of an LRU cache with type hints, tests, and a complexity discussion.", 256, 0.0, 1),
     ("creative-sampled", "Write a vivid opening paragraph about a city whose clocks begin running backward.", 64, 0.7, 987654321),
     ("systems-medium", (seed * 8) + "\nSummarize the design and identify two failure modes.", 48, 0.0, 1),
+    ("systems-medium-longgen", (seed * 8) + "\nWrite a detailed design review with concrete repairs.", 256, 0.0, 1),
     ("systems-long", (seed * 24) + "\nSummarize the design and identify two failure modes.", 32, 0.0, 1),
 ]
 configs = [
-    ("scalar-a", False, False),
-    ("batch-a", True, False),
-    ("batch-mtp", True, True),
-    ("batch-b", True, False),
-    ("scalar-b", False, False),
+    ("scalar-a", False, False, False),
+    ("batch-a", True, False, False),
+    ("batch-mtp", True, True, False),
+    ("batch-mtp-warm", True, True, True),
+    ("batch-mtp-warm-b", True, True, True),
+    ("batch-mtp-b", True, True, False),
+    ("batch-b", True, False, False),
+    ("scalar-b", False, False, False),
 ]
 case_filter = {x for x in os.environ.get("QWEN_MATRIX_CASES", "").split(",") if x}
 config_filter = {x for x in os.environ.get("QWEN_MATRIX_CONFIGS", "").split(",") if x}
@@ -106,7 +111,7 @@ if config_filter:
 if not cases or not configs:
     raise RuntimeError("benchmark filters selected no cases or configurations")
 rows = []
-for config, batched, mtp in configs:
+for config, batched, mtp, mtp_prefill in configs:
     port = free_port()
     base = f"http://127.0.0.1:{port}"
     env = clean_env()
@@ -116,6 +121,7 @@ for config, batched, mtp in configs:
         env["DS4_QWEN_MTP_PROFILE"] = "1"
     else:
         env["DS4_MTP_SPEC_DISABLE"] = "1"
+    env["DS4_QWEN_MTP_PREFILL"] = "1" if mtp_prefill else "0"
     args = [str(build / "ds4-server"), "-m", str(model), "--metal",
             "--ctx", "4096", "--tokens", "64", "--host", "127.0.0.1",
             "--port", str(port)]

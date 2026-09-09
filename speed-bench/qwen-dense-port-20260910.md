@@ -14,6 +14,8 @@ Runtime escape hatches:
 - `DS4_QWEN_PREFILL_BATCH=0` restores one-token dense-Qwen prefill.
 - `DS4_MTP_SPEC_DISABLE=1` disables neural speculation while retaining
   batched prefill.
+- `DS4_QWEN_MTP_PREFILL=1` opt-in teacher-forces the bundled NextN attention
+  cache from prompt hidden states.  It is intentionally not a default.
 - `DS4_QWEN_MTP_PROFILE=1` prints aggregate draft acceptance at shutdown.
 
 ## Correctness
@@ -69,6 +71,12 @@ logs, response text, and `results.json`.  `QWEN_MATRIX_CASES` and
   makes interleaved sessions deterministic, but switching sessions has a
   performance cost; fully per-session target state remains future work.
 - The NextN attention cache is reset for a fresh API prompt rather than being
-  prefilled from every prompt hidden state.  A batched NextN-prefill path is the
-  clearest follow-up for improving acceptance without sacrificing the new
-  target-prefill speed.
+  prefilled from every prompt hidden state by default.  The opt-in teacher-forced
+  experiment raised acceptance from 48.4% to 64.8% in the 48-output-token pair,
+  and from 48.8% to 57.1% in the 256-output-token matrix.  It improved ABBA mean
+  wall time by 7% for 30-in/256-out coding and 14% for 347-in/256-out systems
+  prose, but made the 349-in/48-out case about 5% slower.  Requested output caps
+  do not predict when a real response will stop, so automatically enabling this
+  would create a production regression risk.  A batched NextN-prefill kernel or
+  a reliable per-request profitability signal is the remaining route to making
+  it a safe default.
