@@ -1317,7 +1317,7 @@ struct ds4_metal_args_qwen4_attn_decode {
     float    scale;
     uint32_t n_splits;    /* key ranges per (token, kv head); > 1 writes partials */
     uint32_t keys_per_split;
-    uint32_t pad0;
+    uint32_t exact_rows;  /* use each row's one-token split plan */
     uint32_t pad1;
 };
 
@@ -1356,8 +1356,16 @@ kernel void kernel_qwen4_attn_decode(
     if (g0 >= group) return;
     const uint ng = min(hps, group - g0);
     const uint n = args.use_sel ? n_sel[tok] : args.pos0 + tok + 1;
-    const uint k0 = split * args.keys_per_split;
-    const uint k1 = min(n, k0 + args.keys_per_split);
+    const uint split_basis = args.use_sel ? args.sel_stride : n;
+    const uint row_splits = args.exact_rows
+        ? min((split_basis + 31u) / 32u, args.n_splits)
+        : args.n_splits;
+    if (split >= row_splits) return;
+    const uint row_keys_per_split = args.exact_rows
+        ? (split_basis + row_splits - 1u) / row_splits
+        : args.keys_per_split;
+    const uint k0 = split * row_keys_per_split;
+    const uint k1 = min(n, k0 + row_keys_per_split);
     device const int32_t *sel = sel_tokens + (uint64_t)tok * args.sel_stride;
 
     float qv[QWEN4_ATTN_HPS][NPT];
@@ -1401,7 +1409,7 @@ kernel void kernel_qwen4_attn_decode(
     for (uint g = 0; g < QWEN4_ATTN_HPS; g++) {
         if (g >= ng) break;
         const uint h = kvh * group + g0 + g;
-        if (args.n_splits == 1) {
+        if (row_splits == 1) {
             device float *dst = out + ((uint64_t)tok * H + h) * D + tiisg * NPT;
             device const float *gt = gate + ((uint64_t)tok * H + h) * D + tiisg * NPT;
             const float inv = l[g] > 0.0f ? 1.0f / l[g] : 0.0f;
@@ -1432,15 +1440,20 @@ kernel void kernel_qwen4_attn_merge(
     constexpr uint D = NPT * 32;
     const uint group = H / Hkv;
     const uint kvh = h / group, g = h % group;
+    const uint split_basis = args.use_sel ? args.sel_stride : args.pos0 + tok + 1;
+    const uint row_splits = args.exact_rows
+        ? min((split_basis + 31u) / 32u, args.n_splits)
+        : args.n_splits;
+    if (row_splits == 1) return;
     const uint64_t stride = (uint64_t)group * (2u + D);
     device const float *base = part + (((uint64_t)tok * Hkv + kvh) * args.n_splits * group + g) * (2u + D);
     float mm = -3.0e38f;
-    for (uint s = 0; s < args.n_splits; s++) mm = max(mm, base[s * stride]);
+    for (uint s = 0; s < row_splits; s++) mm = max(mm, base[s * stride]);
     float ll = 0.0f;
     float o[NPT];
 #pragma unroll
     for (uint i = 0; i < NPT; i++) o[i] = 0.0f;
-    for (uint s = 0; s < args.n_splits; s++) {
+    for (uint s = 0; s < row_splits; s++) {
         device const float *p = base + s * stride;
         const float c = p[1] > 0.0f ? exp(p[0] - mm) : 0.0f;
         ll += p[1] * c;

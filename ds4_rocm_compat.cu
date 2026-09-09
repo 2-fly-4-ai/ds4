@@ -233,6 +233,24 @@ extern "C" int ds4_gpu_matmul_q8_0_pair_decode_rows_exact_tensor(
             in_dim, out0_dim, out1_dim, x, n_rows);
 }
 
+extern "C" int ds4_gpu_matmul_f16_decode_rows_exact_tensor(
+        ds4_gpu_tensor *out, const void *model_map, uint64_t model_size,
+        uint64_t weight_offset, uint64_t in_dim, uint64_t out_dim,
+        const ds4_gpu_tensor *x, uint32_t n_rows) {
+    return ds4_gpu_matmul_f16_tensor(
+        out, model_map, model_size, weight_offset,
+        in_dim, out_dim, x, n_rows);
+}
+
+extern "C" int ds4_gpu_matmul_f32_decode_rows_exact_tensor(
+        ds4_gpu_tensor *out, const void *model_map, uint64_t model_size,
+        uint64_t weight_offset, uint64_t in_dim, uint64_t out_dim,
+        const ds4_gpu_tensor *x, uint32_t n_rows) {
+    return ds4_gpu_matmul_f32_tensor(
+        out, model_map, model_size, weight_offset,
+        in_dim, out_dim, x, n_rows);
+}
+
 extern "C" int ds4_gpu_matmul_f16_router_rows_exact_tensor(
         ds4_gpu_tensor *out, const void *model_map, uint64_t model_size,
         uint64_t weight_offset, const ds4_gpu_tensor *x, uint32_t n_rows) {

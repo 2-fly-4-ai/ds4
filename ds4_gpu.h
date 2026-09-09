@@ -861,6 +861,17 @@ int ds4_gpu_matmul_f16_tensor(
         const ds4_gpu_tensor *x,
         uint64_t                n_tok);
 
+/* Multi-row F16 projection using the exact one-row Metal reduction order. */
+int ds4_gpu_matmul_f16_decode_rows_exact_tensor(
+        ds4_gpu_tensor       *out,
+        const void           *model_map,
+        uint64_t              model_size,
+        uint64_t              weight_offset,
+        uint64_t              in_dim,
+        uint64_t              out_dim,
+        const ds4_gpu_tensor *x,
+        uint32_t              n_rows);
+
 /* CUDA batch path: fold an input RMS normalization into the FP16 activation
  * conversion used by the following projection. Returns 0 without touching
  * out when the optimized path is unavailable. */
@@ -1054,6 +1065,17 @@ int ds4_gpu_matmul_f32_tensor(
         uint64_t                out_dim,
         const ds4_gpu_tensor *x,
         uint64_t                n_tok);
+
+/* Multi-row F32 projection using the exact one-row Metal reduction order. */
+int ds4_gpu_matmul_f32_decode_rows_exact_tensor(
+        ds4_gpu_tensor       *out,
+        const void           *model_map,
+        uint64_t              model_size,
+        uint64_t              weight_offset,
+        uint64_t              in_dim,
+        uint64_t              out_dim,
+        const ds4_gpu_tensor *x,
+        uint32_t              n_rows);
 
 int ds4_gpu_repeat_hc_tensor(
         ds4_gpu_tensor       *out,
@@ -3456,6 +3478,12 @@ int ds4_gpu_qwen4_idx_score_tensor(
         ds4_gpu_tensor *score, const ds4_gpu_tensor *iq, const ds4_gpu_tensor *block_key,
         uint32_t n_tokens, uint32_t n_blocks, uint32_t n_idx_head, uint32_t idx_dim,
         uint32_t pos0, uint32_t ratio);
+/* Short verifier batch using the one-token FP32 index-score arithmetic. */
+int ds4_gpu_qwen4_idx_score_rows_exact_tensor(
+        ds4_gpu_tensor *score, const ds4_gpu_tensor *iq,
+        const ds4_gpu_tensor *block_key, uint32_t n_tokens,
+        uint32_t n_blocks, uint32_t n_idx_head, uint32_t idx_dim,
+        uint32_t pos0, uint32_t ratio);
 int ds4_gpu_qwen4_idx_select_tensor(
         ds4_gpu_tensor *sel, const ds4_gpu_tensor *score, uint32_t n_blocks, uint32_t n_tokens, uint32_t top_k);
 int ds4_gpu_qwen4_idx_expand_tensor(
@@ -3470,6 +3498,14 @@ int ds4_gpu_qwen4_attn_decode_tensor(
         const ds4_gpu_tensor *sel_tokens, const ds4_gpu_tensor *n_sel, ds4_gpu_tensor *part,
         uint32_t n_tokens, uint32_t n_head, uint32_t n_head_kv, uint32_t head_dim,
         uint32_t pos0, bool use_sel, uint32_t sel_stride, float scale);
+/* Short verifier batch using each row's exact one-token attention split plan. */
+int ds4_gpu_qwen4_attn_decode_rows_exact_tensor(
+        ds4_gpu_tensor *out, const ds4_gpu_tensor *q, const ds4_gpu_tensor *gate,
+        const ds4_gpu_tensor *k_cache, const ds4_gpu_tensor *v_cache,
+        const ds4_gpu_tensor *sel_tokens, const ds4_gpu_tensor *n_sel,
+        ds4_gpu_tensor *part, uint32_t n_tokens, uint32_t n_head,
+        uint32_t n_head_kv, uint32_t head_dim, uint32_t pos0, bool use_sel,
+        uint32_t sel_stride, float scale);
 /* Routed experts; shared_type == UINT32_MAX disables the shared-expert slot,
  * otherwise mid/part carry n_slots+1 entries and the reduce weights the last
  * one by sigmoid(shared_gate). */
