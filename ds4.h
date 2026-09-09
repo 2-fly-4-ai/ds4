@@ -129,6 +129,7 @@ typedef struct {
 typedef struct {
     const char *model_path;
     const char *mtp_path;
+    const char *dflash_path;
     const char *vision_path;
     const char *ple_path; /* Optional CPU-mapped Qwen PLE GGUF sidecar. */
     ds4_backend backend;
@@ -136,6 +137,7 @@ typedef struct {
     int context_size;
     uint32_t prefill_chunk;
     int mtp_draft_tokens;
+    int dflash_draft_tokens;
     float mtp_margin;
     float dspark_confidence_threshold;
     const char *directional_steering_file;
@@ -308,6 +310,7 @@ int ds4_engine_model_id(ds4_engine *e);
 bool ds4_engine_is_glm_dsa(ds4_engine *e);
 bool ds4_engine_is_glm53(ds4_engine *e);
 bool ds4_engine_is_qwen4(ds4_engine *e);
+bool ds4_engine_is_qwen(ds4_engine *e);
 /* Qwen3.8 reasoning-effort system instruction for a think mode (NULL when none) */
 const char *ds4_qwen4_reasoning_effort_text(ds4_think_mode mode);
 const char *ds4_backend_name(ds4_backend backend);
@@ -354,6 +357,7 @@ int ds4_dump_chat_tokenization(const char *model_path,
                                FILE *fp);
 int ds4_engine_head_test(ds4_engine *e, const ds4_tokens *prompt);
 bool ds4_engine_is_glm_dsa(ds4_engine *e);
+bool ds4_engine_dflash_ready(const ds4_engine *e);
 int ds4_engine_first_token_test(ds4_engine *e, const ds4_tokens *prompt);
 int ds4_engine_metal_graph_test(ds4_engine *e, const ds4_tokens *prompt);
 int ds4_engine_metal_graph_full_test(ds4_engine *e, const ds4_tokens *prompt);

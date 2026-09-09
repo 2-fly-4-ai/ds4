@@ -197,6 +197,12 @@ Then the default commands work:
 After downloading DSpark support, enable it explicitly:
   ./ds4 --dspark --mtp-model <download directory>/$DS4F_DSPARK_FILE
 
+After downloading Qwen with DFlash2 draft support, run speculative decoding:
+  ./ds4 -m ./ds4flash.gguf --dflash <download directory>/$QWEN38_DFLASH_Q4_FILE -p "Hello"
+
+Or run Qwen server with DFlash2:
+  ./ds4-server -m ./ds4flash.gguf --dflash <download directory>/$QWEN38_DFLASH_Q4_FILE --ctx 32768
+
 PRO and GLM files are downloaded with the official Hugging Face downloader
 because they are too large, sharded, or nested for the curl path used by the
 smaller DeepSeek Flash GGUF files.
@@ -211,10 +217,10 @@ fi
 MODEL=$1
 shift
 MODEL_FILES=
+DOWNLOAD_ITEMS=
 LINK_MODEL=1
 FORCE_HF_DOWNLOAD=0
 FLATTEN_DOWNLOADS=0
-
 case "$MODEL" in
     ds4f-q2) MODEL_FILE=$DS4F_Q2_FILE ;;
     ds4f-q2-q4) MODEL_FILE=$DS4F_Q2_Q4_FILE ;;
@@ -376,7 +382,8 @@ local_download_name() {
 }
 
 download_one_hf() {
-    file=$1
+    repo=$1
+    file=$2
     local_file=$(local_download_name "$file")
     out="$OUT_DIR/$local_file"
     hf_out="$OUT_DIR/$file"
@@ -405,14 +412,14 @@ download_one_hf() {
     fi
 
     echo "Downloading $file"
-    echo "from https://huggingface.co/$REPO"
+    echo "from https://huggingface.co/$repo"
     echo "using $HF_CMD download"
     echo "If the download stops, run the same command again to resume it."
 
     if [ -n "$TOKEN" ]; then
-        "$HF_CMD" download "$REPO" "$file" --repo-type model --local-dir "$OUT_DIR" --token "$TOKEN"
+        "$HF_CMD" download "$repo" "$file" --repo-type model --local-dir "$OUT_DIR" --token "$TOKEN"
     else
-        "$HF_CMD" download "$REPO" "$file" --repo-type model --local-dir "$OUT_DIR"
+        "$HF_CMD" download "$repo" "$file" --repo-type model --local-dir "$OUT_DIR"
     fi
 
     if [ "$hf_out" != "$out" ] && [ -s "$hf_out" ]; then
@@ -427,15 +434,16 @@ download_one_hf() {
 }
 
 download_one() {
-    file=$1
+    repo=$1
+    file=$2
     local_file=$(local_download_name "$file")
     out="$OUT_DIR/$local_file"
     part="$out.part"
     aria2_part="$out.aria2"
-    url="https://huggingface.co/$REPO/resolve/main/$file"
+    url="https://huggingface.co/$repo/resolve/main/$file"
 
     if needs_hf_download "$file"; then
-        download_one_hf "$file"
+        download_one_hf "$repo" "$file"
         return
     fi
 
@@ -453,7 +461,7 @@ download_one() {
     fi
 
     echo "Downloading $file"
-    echo "from https://huggingface.co/$REPO"
+    echo "from https://huggingface.co/$repo"
     echo "If the download stops, run the same command again to resume it."
 
     if [ -n "$TOKEN" ]; then
@@ -465,12 +473,18 @@ download_one() {
     mv "$part" "$out"
 }
 
-if [ -n "$MODEL_FILES" ]; then
+if [ -n "$DOWNLOAD_ITEMS" ]; then
+    for item in $DOWNLOAD_ITEMS; do
+        item_repo=${item%%:*}
+        item_file=${item#*:}
+        download_one "$item_repo" "$item_file"
+    done
+elif [ -n "$MODEL_FILES" ]; then
     for file in $MODEL_FILES; do
-        download_one "$file"
+        download_one "$REPO" "$file"
     done
 else
-    download_one "$MODEL_FILE"
+    download_one "$REPO" "$MODEL_FILE"
 fi
 
 if [ "$MODEL" = "ds4f-dspark" ]; then
@@ -489,6 +503,12 @@ elif [ "$LINK_MODEL" -eq 1 ]; then
     cd "$ROOT"
     ln -sfn "$OUT_DIR/$MODEL_FILE" ds4flash.gguf
     echo "Linked ./ds4flash.gguf -> $OUT_DIR/$MODEL_FILE"
+    case "$MODEL" in
+        qwen*)
+            ln -sfn "$OUT_DIR/$MODEL_FILE" qwen38.gguf
+            echo "Linked ./qwen38.gguf -> $OUT_DIR/$MODEL_FILE"
+            ;;
+    esac
 fi
 
 echo
