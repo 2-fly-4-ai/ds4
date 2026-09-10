@@ -3498,6 +3498,7 @@ int ds4_gpu_deepseek4_vision_encode(
         const float                        *patches,
         uint32_t                            grid_h,
         uint32_t                            grid_w,
+        uint32_t                            output_dim,
         const void                         *model_map,
         uint64_t                            model_size,
         const ds4_deepseek4_vision_weights *weights);

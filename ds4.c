@@ -8219,7 +8219,7 @@ static void deepseek41_vision_weights_bind(
     config_expect_u32("DeepSeek V4.1 vision head_count",
                       required_u32(m, "deepseek41-vision.attention.head_count"), 16u);
     config_expect_u32("DeepSeek V4.1 vision projection_length",
-                      required_u32(m, "deepseek41-vision.projection_length"), 4096u);
+                      required_u32(m, "deepseek41-vision.projection_length"), 5120u);
     config_expect_u32("DeepSeek V4.1 vision patch_size",
                       required_u32(m, "deepseek41-vision.patch_size"), 14u);
     config_expect_u32("DeepSeek V4.1 vision downsample_ratio",
@@ -8242,9 +8242,9 @@ static void deepseek41_vision_weights_bind(
     static const uint64_t d1024_3072[] = {1024u, 3072u};
     static const uint64_t d1024_5632[] = {1024u, 5632u};
     static const uint64_t d3072[] = {3072u};
-    static const uint64_t d4096[] = {4096u};
-    static const uint64_t d4096_4096[] = {4096u, 4096u};
-    static const uint64_t d9216_4096[] = {9216u, 4096u};
+    static const uint64_t d5120[] = {5120u};
+    static const uint64_t d5120_5120[] = {5120u, 5120u};
+    static const uint64_t d9216_5120[] = {9216u, 5120u};
 
     memset(w, 0, sizeof(*w));
 #define DEEPSEEK41_VISION_OFFSET(field_, name_, type_, rank_, dims_) \
@@ -8257,19 +8257,19 @@ static void deepseek41_vision_weights_bind(
     DEEPSEEK41_VISION_OFFSET(post_norm, "vision.norm.weight",
                              DS4_TENSOR_BF16, 1, d1024);
     DEEPSEEK41_VISION_OFFSET(aligner_w1, "aligner.w1.weight",
-                             DS4_TENSOR_BF16, 2, d9216_4096);
+                             DS4_TENSOR_BF16, 2, d9216_5120);
     DEEPSEEK41_VISION_OFFSET(aligner_w1_bias, "aligner.w1.bias",
-                             DS4_TENSOR_BF16, 1, d4096);
+                             DS4_TENSOR_BF16, 1, d5120);
     DEEPSEEK41_VISION_OFFSET(aligner_w2, "aligner.w2.weight",
-                             DS4_TENSOR_BF16, 2, d4096_4096);
+                             DS4_TENSOR_BF16, 2, d5120_5120);
     DEEPSEEK41_VISION_OFFSET(aligner_w2_bias, "aligner.w2.bias",
-                             DS4_TENSOR_BF16, 1, d4096);
+                             DS4_TENSOR_BF16, 1, d5120);
     DEEPSEEK41_VISION_OFFSET(image_start, "image_start",
-                             DS4_TENSOR_BF16, 1, d4096);
+                             DS4_TENSOR_BF16, 1, d5120);
     DEEPSEEK41_VISION_OFFSET(image_newline, "image_newline",
-                             DS4_TENSOR_BF16, 1, d4096);
+                             DS4_TENSOR_BF16, 1, d5120);
     DEEPSEEK41_VISION_OFFSET(image_end, "image_end",
-                             DS4_TENSOR_BF16, 1, d4096);
+                             DS4_TENSOR_BF16, 1, d5120);
 #undef DEEPSEEK41_VISION_OFFSET
 
     for (uint32_t il = 0; il < DS4_DEEPSEEK4_VISION_LAYERS; il++) {
@@ -75419,8 +75419,9 @@ static float ds4_vision_bf16_to_f32(uint16_t value) {
 
 static const uint16_t *ds4_deepseek4_vision_vector(
         const ds4_engine *e,
-        uint64_t offset) {
-    const uint64_t bytes = 4096u * sizeof(uint16_t);
+        uint64_t offset,
+        uint32_t width) {
+    const uint64_t bytes = (uint64_t)width * sizeof(uint16_t);
     if (!e || !e->vision_model.map || offset > e->vision_model.size ||
         bytes > e->vision_model.size - offset) return NULL;
     return (const uint16_t *)((const uint8_t *)e->vision_model.map + offset);
@@ -75468,11 +75469,11 @@ static int ds4_prompt_append_deepseek4_vision(
     }
     const ds4_deepseek4_vision_weights *w = &e->deepseek4_vision_weights;
     const uint16_t *sentinel[5] = {
-        ds4_deepseek4_vision_vector(e, w->image_start),
-        ds4_deepseek4_vision_vector(e, w->image_pad),
+        ds4_deepseek4_vision_vector(e, w->image_start, 4096u),
+        ds4_deepseek4_vision_vector(e, w->image_pad, 4096u),
         NULL,
-        ds4_deepseek4_vision_vector(e, w->image_newline),
-        ds4_deepseek4_vision_vector(e, w->image_end),
+        ds4_deepseek4_vision_vector(e, w->image_newline, 4096u),
+        ds4_deepseek4_vision_vector(e, w->image_end, 4096u),
     };
     if (!sentinel[DS4_DEEPSEEK4_IMAGE_START] ||
         !sentinel[DS4_DEEPSEEK4_IMAGE_PAD] ||
@@ -75554,13 +75555,13 @@ static int ds4_prompt_append_deepseek41_vision(
         (uint64_t)embedding->grid_height *
         (embedding->grid_width + 1u) + 2u;
     if (rows64 > UINT32_MAX || rows64 > (uint64_t)(INT_MAX - tokens->len) ||
-        rows64 > SIZE_MAX / (4096u * sizeof(float))) {
+        rows64 > SIZE_MAX / ((uint64_t)DS4_N_EMBD * sizeof(float))) {
         if (error && error_cap)
             snprintf(error, error_cap, "DeepSeek V4.1 vision prompt is too large");
         return 0;
     }
     const uint32_t rows = (uint32_t)rows64;
-    float *block = malloc((size_t)rows * 4096u * sizeof(float));
+    float *block = malloc((size_t)rows * DS4_N_EMBD * sizeof(float));
     if (!block) {
         if (error && error_cap)
             snprintf(error, error_cap,
@@ -75568,9 +75569,13 @@ static int ds4_prompt_append_deepseek41_vision(
         return 0;
     }
     const ds4_deepseek4_vision_weights *w = &e->deepseek4_vision_weights;
-    const uint16_t *start = ds4_deepseek4_vision_vector(e, w->image_start);
-    const uint16_t *newline = ds4_deepseek4_vision_vector(e, w->image_newline);
-    const uint16_t *end = ds4_deepseek4_vision_vector(e, w->image_end);
+    const uint32_t output_dim = (uint32_t)DS4_N_EMBD;
+    const uint16_t *start = ds4_deepseek4_vision_vector(
+        e, w->image_start, output_dim);
+    const uint16_t *newline = ds4_deepseek4_vision_vector(
+        e, w->image_newline, output_dim);
+    const uint16_t *end = ds4_deepseek4_vision_vector(
+        e, w->image_end, output_dim);
     if (!start || !newline || !end) {
         free(block);
         if (error && error_cap)
@@ -75580,21 +75585,21 @@ static int ds4_prompt_append_deepseek41_vision(
     }
 
     uint32_t dst_row = 0, image_row = 0;
-    for (uint32_t d = 0; d < 4096u; d++)
+    for (uint32_t d = 0; d < output_dim; d++)
         block[d] = ds4_vision_bf16_to_f32(start[d]);
     dst_row++;
     for (uint32_t y = 0; y < embedding->grid_height; y++) {
         for (uint32_t x = 0; x < embedding->grid_width; x++) {
-            memcpy(block + (uint64_t)dst_row++ * 4096u,
-                   embedding->data + (uint64_t)image_row++ * 4096u,
-                   4096u * sizeof(float));
+            memcpy(block + (uint64_t)dst_row++ * output_dim,
+                   embedding->data + (uint64_t)image_row++ * output_dim,
+                   (uint64_t)output_dim * sizeof(float));
         }
-        float *dst = block + (uint64_t)dst_row++ * 4096u;
-        for (uint32_t d = 0; d < 4096u; d++)
+        float *dst = block + (uint64_t)dst_row++ * output_dim;
+        for (uint32_t d = 0; d < output_dim; d++)
             dst[d] = ds4_vision_bf16_to_f32(newline[d]);
     }
-    float *last = block + (uint64_t)dst_row++ * 4096u;
-    for (uint32_t d = 0; d < 4096u; d++)
+    float *last = block + (uint64_t)dst_row++ * output_dim;
+    for (uint32_t d = 0; d < output_dim; d++)
         last[d] = ds4_vision_bf16_to_f32(end[d]);
     if (dst_row != rows || image_row != embedding->token_count) {
         free(block);
@@ -75832,6 +75837,9 @@ static int ds4_engine_vision_encode_image(
     int ok = 0;
     if (e->vision_kind == DS4_VISION_DEEPSEEK4 ||
         e->vision_kind == DS4_VISION_DEEPSEEK41) {
+        const uint32_t output_dim =
+            e->vision_kind == DS4_VISION_DEEPSEEK41 ?
+            (uint32_t)DS4_N_EMBD : 4096u;
         ds4_deepseek4_image_patches patches = {0};
         const int preprocessed =
             e->vision_kind == DS4_VISION_DEEPSEEK41 ?
@@ -75841,12 +75849,13 @@ static int ds4_engine_vision_encode_image(
                 &patches, image, error, error_cap);
         if (!preprocessed) return 0;
         token_count = patches.llm_grid_height * patches.llm_grid_width;
-        embedding = malloc((size_t)token_count * 4096u * sizeof(float));
+        embedding = malloc((size_t)token_count * output_dim * sizeof(float));
         if (embedding) {
 #ifndef DS4_NO_GPU
             ok = ds4_gpu_deepseek4_vision_encode(
                     embedding, patches.patches,
                     patches.grid_height, patches.grid_width,
+                    output_dim,
                     e->vision_model.map, e->vision_model.size,
                     &e->deepseek4_vision_weights);
 #endif
@@ -89214,6 +89223,15 @@ void ds4_session_rewind(ds4_session *s, int pos) {
     if (ds4_session_is_qwen(s) && pos < s->checkpoint.len) {
         /* Dense Qwen's pooled recurrent state has no rewind snapshot yet.
          * Force the following sync to rebuild the retained prefix exactly. */
+        s->checkpoint_valid = false;
+    }
+    if (s->engine && ds4_engine_is_deepseek41(s->engine) &&
+        pos < s->checkpoint.len) {
+        /* DeepSeek V4.1's attention compressor/indexer frontier is recurrent.
+         * Trimming the token vector alone leaves those Metal tensors at the
+         * generated tail and makes a repeated greedy request numerically
+         * different from a cold replay.  Until V4.1 owns a complete hot
+         * snapshot, make every backward rewind rebuild the prompt. */
         s->checkpoint_valid = false;
     }
     bool glm53_state_ok = true;
