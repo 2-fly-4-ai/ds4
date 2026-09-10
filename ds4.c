@@ -88934,7 +88934,7 @@ static bool session_ds4_hot_rewind_supported(const ds4_session *s) {
     /* Legacy MTP owns a separate history not captured by this frontier. */
     return s && s->engine && s->engine->backend == DS4_BACKEND_METAL &&
         !ds4_session_is_glm(s) && !ds4_session_is_qwen4(s) &&
-        !ds4_session_is_qwen(s) &&
+        !ds4_session_is_qwen(s) && !ds4_model_is_deepseek41() &&
         s->engine->support_kind != DS4_SUPPORT_MTP_LEGACY &&
         !s->distributed && !s->engine->tp.active && !s->graph.placement &&
         s->graph.raw_cap > 0;
