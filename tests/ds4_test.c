@@ -913,6 +913,114 @@ static void test_metal_pack_slot_rows_f32(void) {
     ds4_gpu_tensor_free(out);
 }
 
+static float test_v41_round_bf16(float value) {
+    uint32_t bits;
+    memcpy(&bits, &value, sizeof(bits));
+    if ((bits & 0x7f800000u) != 0x7f800000u) {
+        bits += 0x7fffu + ((bits >> 16u) & 1u);
+    }
+    bits &= 0xffff0000u;
+    memcpy(&value, &bits, sizeof(value));
+    return value;
+}
+
+static float test_v41_e4m3_value(int code) {
+    const int exp = (code >> 3) & 15;
+    const int mant = code & 7;
+    return exp == 0 ? (float)mant * 0.001953125f :
+        (1.0f + (float)mant * 0.125f) * ldexpf(1.0f, exp - 7);
+}
+
+static float test_v41_e4m3_round(float value) {
+    const float sign = value < 0.0f ? -1.0f : 1.0f;
+    const float a = fminf(fabsf(value), 448.0f);
+    int best = 0;
+    float diff = fabsf(a - test_v41_e4m3_value(0));
+    for (int i = 1; i <= 126; i++) {
+        const float d = fabsf(a - test_v41_e4m3_value(i));
+        if (d < diff || (d == diff && (i & 1) == 0 && (best & 1) != 0)) {
+            best = i;
+            diff = d;
+        }
+    }
+    return sign * test_v41_e4m3_value(best);
+}
+
+static float test_v41_e2m1_round(float value) {
+    static const float table[8] = {0, .5f, 1, 1.5f, 2, 3, 4, 6};
+    const float sign = value < 0.0f ? -1.0f : 1.0f;
+    const float a = fminf(fabsf(value), 6.0f);
+    int best = 0;
+    float diff = fabsf(a);
+    for (int i = 1; i < 8; i++) {
+        const float d = fabsf(a - table[i]);
+        if (d < diff || (d == diff && (i & 1) == 0 && (best & 1) != 0)) {
+            best = i;
+            diff = d;
+        }
+    }
+    return sign * table[best];
+}
+
+static void test_v41_cache_ref(float *x, uint32_t rows, uint32_t width,
+                               uint32_t mode) {
+    const uint32_t group = mode == 1u ? 16u : 32u;
+    for (uint32_t row = 0; row < rows; row++) {
+        float *xr = x + (uint64_t)row * width;
+        if (mode == 2u) {
+            for (uint32_t i = 0; i < width; i++) xr[i] = test_v41_round_bf16(xr[i]);
+            continue;
+        }
+        for (uint32_t off = 0; off < width; off += group) {
+            float amax = 0.0f;
+            for (uint32_t i = 0; i < group; i++) {
+                xr[off + i] = test_v41_round_bf16(xr[off + i]);
+                amax = fmaxf(amax, fabsf(xr[off + i]));
+            }
+            float scale;
+            if (mode == 1u) scale = test_v41_e4m3_round(fmaxf(amax, .01171875f) / 6.0f);
+            else scale = exp2f(ceilf(log2f(fmaxf(amax,
+                mode == 0u ? 1.0e-4f : 7.052966104933725e-38f) /
+                (mode == 0u ? 448.0f : 6.0f))));
+            for (uint32_t i = 0; i < group; i++) {
+                const float q = mode == 0u
+                    ? test_v41_e4m3_round(xr[off + i] / scale)
+                    : test_v41_e2m1_round(xr[off + i] / scale);
+                xr[off + i] = test_v41_round_bf16(q * scale);
+            }
+        }
+    }
+}
+
+static void test_metal_v41_cache_quantization(void) {
+    enum { ROWS = 3, WIDTH = 512, COUNT = ROWS * WIDTH };
+    float input[COUNT], ref[COUNT], got[COUNT];
+    for (uint32_t i = 0; i < COUNT; i++) {
+        const int32_t v = (int32_t)((i * 7919u + (i >> 3u) * 104729u) % 200003u) - 100001;
+        input[i] = (float)v / 19991.0f;
+    }
+    ds4_gpu_tensor *tensor = ds4_gpu_tensor_alloc(sizeof(input));
+    TEST_ASSERT(tensor != NULL);
+    if (!tensor) return;
+    for (uint32_t mode = 0; mode < 4; mode++) {
+        memcpy(ref, input, sizeof(ref));
+        test_v41_cache_ref(ref, ROWS, WIDTH, mode);
+        TEST_ASSERT(ds4_gpu_tensor_write(tensor, 0, input, sizeof(input)) != 0);
+        const int ok = mode == 0u ? ds4_gpu_v41_window_kv_quantize_tensor(tensor, ROWS, WIDTH) :
+                       mode == 1u ? ds4_gpu_v41_compressed_kv_quantize_tensor(tensor, ROWS, WIDTH) :
+                       mode == 2u ? ds4_gpu_v41_round_bf16_tensor(tensor, ROWS, WIDTH) :
+                                    ds4_gpu_v41_indexer_qat_tensor(tensor, ROWS, WIDTH);
+        TEST_ASSERT(ok != 0);
+        TEST_ASSERT(ds4_gpu_tensor_read(tensor, 0, got, sizeof(got)) != 0);
+        const test_float_compare_stats stats =
+            test_compare_float_bits(ref, got, COUNT);
+        fprintf(stderr, "ds4-test: V4.1 cache mode=%u exact=%zu/%u max_ulp=%u\n",
+                mode, stats.mismatch_count, COUNT, stats.max_ulp);
+        TEST_ASSERT(stats.mismatch_count == 0u);
+    }
+    ds4_gpu_tensor_free(tensor);
+}
+
 static void test_metal_store_raw_kv_batch_wrap(void) {
     const uint32_t raw_cap = 5;
     const uint32_t head_dim = 3;
@@ -6369,6 +6477,7 @@ static void test_metal_kernel_group(void) {
     test_metal_f16_prefill_matmul_case(128);
     test_metal_q8_0_prefill_matmul();
     test_metal_pack_slot_rows_f32();
+    test_metal_v41_cache_quantization();
     test_metal_store_raw_kv_batch_wrap();
     test_dspark_cache_window_crop();
     test_metal_q8_0_decode_pair_exact();

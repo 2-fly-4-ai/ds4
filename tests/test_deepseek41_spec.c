@@ -115,6 +115,43 @@ static void test_ratio2_per_dimension_softmax_pool(void) {
     for (int i = 0; i < 3; i++) assert(fabsf(out[i] - want[i]) < 1e-6f);
 }
 
+static void test_cache_quantization_contracts(void) {
+    float window[32];
+    float compressed[16];
+    float indexer[32];
+    for (uint32_t i = 0; i < 32; i++) {
+        window[i] = ((int)i - 15) * 0.0713f;
+        indexer[i] = ((int)i - 11) * 0.1337f;
+        if (i < 16) compressed[i] = ((int)i - 7) * 0.219f;
+    }
+    ds4_test_deepseek41_window_kv_quantize(window, 32);
+    ds4_test_deepseek41_compressed_kv_quantize(compressed, 16);
+    ds4_test_deepseek41_indexer_qat(indexer, 32);
+
+    /* All three official in-place kernels return BF16 values. */
+    for (uint32_t i = 0; i < 32; i++) {
+        uint32_t bits;
+        memcpy(&bits, &window[i], sizeof(bits));
+        assert((bits & 0xffffu) == 0u);
+        memcpy(&bits, &indexer[i], sizeof(bits));
+        assert((bits & 0xffffu) == 0u);
+        if (i < 16) {
+            memcpy(&bits, &compressed[i], sizeof(bits));
+            assert((bits & 0xffffu) == 0u);
+        }
+    }
+    /* The compressed E2M1 path has at most eight magnitudes per group. */
+    float magnitudes[16];
+    uint32_t distinct = 0;
+    for (uint32_t i = 0; i < 16; i++) {
+        const float a = fabsf(compressed[i]);
+        bool seen = false;
+        for (uint32_t j = 0; j < distinct; j++) seen |= magnitudes[j] == a;
+        if (!seen) magnitudes[distinct++] = a;
+    }
+    assert(distinct <= 8u);
+}
+
 static void test_candidate_block_selection(void) {
     enum { N = 2049 * 8 + 3 };
     float scores[N];
@@ -218,6 +255,7 @@ int main(void) {
     test_reasoning_effort();
     test_previous_pre_mix_hc_transition();
     test_ratio2_per_dimension_softmax_pool();
+    test_cache_quantization_contracts();
     test_candidate_block_selection();
     test_engram_hash();
     test_engram_gate();

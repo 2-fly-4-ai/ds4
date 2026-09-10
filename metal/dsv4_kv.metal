@@ -37,6 +37,12 @@ struct ds4_metal_args_dsv4_indexer_qat {
     uint64_t row_stride;
 };
 
+struct ds4_metal_args_v41_cache_quantize {
+    uint32_t n_rows;
+    uint32_t head_dim;
+    uint32_t mode;
+};
+
 struct ds4_metal_args_dsv4_ratio4_shift {
     uint32_t width;
 };
@@ -103,6 +109,71 @@ static inline float dsv4_e2m1fn_dequant(float x) {
         }
     }
     return sign * dsv4_e2m1fn_values[best];
+}
+
+static inline float v41_round_bf16(float value) {
+    uint bits = as_type<uint>(value);
+    if ((bits & 0x7f800000u) == 0x7f800000u) return value;
+    bits += 0x00007fffu + ((bits >> 16u) & 1u);
+    return as_type<float>(bits & 0xffff0000u);
+}
+
+/* Exact activation-cache simulation from DeepSeek-V4.1's official graph.
+ * mode 0: sliding-window KV, E4M3 values + E8M0 scale, groups of 32.
+ * mode 1: shared compressed KV, E2M1 values + E4M3 scale, groups of 16.
+ * The source graph consumes and returns BF16, represented here in the float
+ * cache after an explicit BF16 round trip. */
+kernel void kernel_v41_cache_quantize_f32(
+        constant ds4_metal_args_v41_cache_quantize & args,
+        device float *x,
+        threadgroup float *scratch [[threadgroup(0)]],
+        uint row [[threadgroup_position_in_grid]],
+        uint tid [[thread_position_in_threadgroup]]) {
+    if (row >= args.n_rows || tid >= 32u) return;
+    device float *xr = x + (ulong)row * args.head_dim;
+    if (args.mode == 2u) {
+        for (uint i = tid; i < args.head_dim; i += 32u) {
+            xr[i] = v41_round_bf16(xr[i]);
+        }
+        return;
+    }
+    const uint group_size = args.mode == 1u ? 16u : 32u;
+
+    for (uint off = 0u; off < args.head_dim; off += group_size) {
+        float v = 0.0f;
+        if (tid < group_size) {
+            v = v41_round_bf16(xr[off + tid]);
+            scratch[tid] = abs(v);
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        for (uint stride = group_size >> 1u; stride != 0u; stride >>= 1u) {
+            if (tid < stride) {
+                scratch[tid] = max(scratch[tid], scratch[tid + stride]);
+            }
+            threadgroup_barrier(mem_flags::mem_threadgroup);
+        }
+        if (tid < group_size) {
+            float out;
+            if (args.mode == 0u) {
+                const float amax = max(scratch[0], 1.0e-4f);
+                const float scale = exp2(ceil(log2(amax / 448.0f)));
+                out = dsv4_e4m3fn_dequant(
+                    clamp(v / scale, -448.0f, 448.0f)) * scale;
+            } else if (args.mode == 1u) {
+                const float amax = max(scratch[0], 0.01171875f);
+                const float scale = dsv4_e4m3fn_dequant(amax / 6.0f);
+                out = dsv4_e2m1fn_dequant(
+                    clamp(v / scale, -6.0f, 6.0f)) * scale;
+            } else {
+                const float amax = max(scratch[0], 7.052966104933725e-38f);
+                const float scale = exp2(ceil(log2(amax / 6.0f)));
+                out = dsv4_e2m1fn_dequant(
+                    clamp(v / scale, -6.0f, 6.0f)) * scale;
+            }
+            xr[off + tid] = v41_round_bf16(out);
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
 }
 
 // Quantizes the non-RoPE part of a KV row through E4M3FN and writes the

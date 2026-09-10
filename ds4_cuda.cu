@@ -7078,6 +7078,56 @@ __global__ static void fp8_kv_quantize_kernel(
             x + (uint64_t)row * head_dim, head_dim, n_rot, scratch);
 }
 
+__device__ static float v41_round_bf16_dev(float value) {
+    uint32_t bits = __float_as_uint(value);
+    if ((bits & 0x7f800000u) != 0x7f800000u) {
+        bits += 0x7fffu + ((bits >> 16u) & 1u);
+    }
+    return __uint_as_float(bits & 0xffff0000u);
+}
+
+__global__ static void v41_cache_quantize_kernel(
+        float *x, uint32_t n_tok, uint32_t head_dim, uint32_t mode) {
+    const uint32_t row = blockIdx.x;
+    const uint32_t group = blockIdx.y;
+    const uint32_t tid = threadIdx.x;
+    if (row >= n_tok || tid >= 32u) return;
+    float *xr = x + (uint64_t)row * head_dim;
+    if (mode == 2u) {
+        const uint32_t i = group * 32u + tid;
+        if (i < head_dim) xr[i] = v41_round_bf16_dev(xr[i]);
+        return;
+    }
+    const uint32_t group_size = mode == 1u ? 16u : 32u;
+    const uint32_t off = group * group_size;
+    if (off >= head_dim) return;
+    __shared__ float scratch[32];
+    float v = 0.0f;
+    if (tid < group_size) v = v41_round_bf16_dev(xr[off + tid]);
+    scratch[tid] = tid < group_size ? fabsf(v) : 0.0f;
+    __syncthreads();
+    for (uint32_t stride = group_size >> 1u; stride != 0u; stride >>= 1u) {
+        if (tid < stride) scratch[tid] = fmaxf(scratch[tid], scratch[tid + stride]);
+        __syncthreads();
+    }
+    if (tid < group_size) {
+        float out;
+        if (mode == 0u) {
+            const float scale = exp2f(ceilf(log2f(fmaxf(scratch[0], 1.0e-4f) / 448.0f)));
+            out = dsv4_e4m3fn_dequant_dev(fminf(448.0f, fmaxf(-448.0f, v / scale))) * scale;
+        } else if (mode == 1u) {
+            const float scale = dsv4_e4m3fn_dequant_dev(fmaxf(scratch[0], 0.01171875f) / 6.0f);
+            out = dsv4_e2m1fn_dequant_dev(fminf(6.0f, fmaxf(-6.0f, v / scale))) * scale;
+        } else {
+            const float scale = exp2f(ceilf(log2f(
+                fmaxf(scratch[0], 7.052966104933725e-38f) / 6.0f)));
+            out = dsv4_e2m1fn_dequant_dev(
+                fminf(6.0f, fmaxf(-6.0f, v / scale))) * scale;
+        }
+        xr[off + tid] = v41_round_bf16_dev(out);
+    }
+}
+
 __global__ static void fp8_kv_quantize_store_rows_kernel(
         float                           *x,
         cuda_attention_decode_row_table  rows,
@@ -16934,6 +16984,32 @@ extern "C" int ds4_gpu_dsv4_fp8_kv_quantize_tensor(ds4_gpu_tensor *x, uint32_t n
     if (!x || n_rot > head_dim || x->bytes < (uint64_t)n_tok * head_dim * sizeof(float)) return 0;
     fp8_kv_quantize_kernel<<<n_tok, 64>>>((float *)x->ptr, n_tok, head_dim, n_rot);
     return cuda_ok(cudaGetLastError(), "fp8_kv_quantize launch");
+}
+static int v41_cache_quantize_launch(ds4_gpu_tensor *x, uint32_t n_tok,
+                                     uint32_t head_dim, uint32_t mode) {
+    const uint32_t group_size = mode == 1u ? 16u : 32u;
+    if (!x || n_tok == 0u || head_dim == 0u || mode > 3u ||
+        (head_dim % group_size) != 0u ||
+        x->bytes < (uint64_t)n_tok * head_dim * sizeof(float)) return 0;
+    v41_cache_quantize_kernel<<<dim3(n_tok, head_dim / group_size), 32>>>(
+        (float *)x->ptr, n_tok, head_dim, mode);
+    return cuda_ok(cudaGetLastError(), "V4.1 cache quantize launch");
+}
+extern "C" int ds4_gpu_v41_window_kv_quantize_tensor(
+        ds4_gpu_tensor *x, uint32_t n_tok, uint32_t head_dim) {
+    return v41_cache_quantize_launch(x, n_tok, head_dim, 0u);
+}
+extern "C" int ds4_gpu_v41_compressed_kv_quantize_tensor(
+        ds4_gpu_tensor *x, uint32_t n_tok, uint32_t head_dim) {
+    return v41_cache_quantize_launch(x, n_tok, head_dim, 1u);
+}
+extern "C" int ds4_gpu_v41_round_bf16_tensor(
+        ds4_gpu_tensor *x, uint32_t n_tok, uint32_t width) {
+    return v41_cache_quantize_launch(x, n_tok, width, 2u);
+}
+extern "C" int ds4_gpu_v41_indexer_qat_tensor(
+        ds4_gpu_tensor *x, uint32_t n_rows, uint32_t head_dim) {
+    return v41_cache_quantize_launch(x, n_rows, head_dim, 3u);
 }
 extern "C" int ds4_gpu_dsv4_indexer_qat_tensor(ds4_gpu_tensor *x, uint32_t n_rows, uint32_t head_dim) {
     if (!x || n_rows == 0 || head_dim != 128u ||

@@ -187,6 +187,7 @@ static id<MTLComputePipelineState> g_rope_tail_inplace_pair_pipeline;
 static id<MTLComputePipelineState> g_rope_tail_inplace_pair_shared4_pipeline;
 static id<MTLComputePipelineState> g_rope_tail_inplace_pair_affine_pipeline;
 static id<MTLComputePipelineState> g_dsv4_fp8_kv_quantize_pipeline;
+static id<MTLComputePipelineState> g_v41_cache_quantize_pipeline;
 static id<MTLComputePipelineState> g_dsv4_indexer_qat_pipeline;
 static id<MTLComputePipelineState> g_dsv4_kv_fp8_store_pipeline;
 static id<MTLComputePipelineState> g_dsv4_kv_rope_fp8_store_pipeline;
@@ -6108,6 +6109,12 @@ typedef struct {
 } ds4_gpu_dsv4_fp8_kv_quantize_args;
 
 typedef struct {
+    uint32_t n_rows;
+    uint32_t head_dim;
+    uint32_t mode;
+} ds4_gpu_v41_cache_quantize_args;
+
+typedef struct {
     int32_t head_dim;
     int32_t n_rot;
     int32_t raw_row;
@@ -7118,6 +7125,23 @@ int ds4_gpu_init(void) {
         g_dsv4_fp8_kv_quantize_pipeline = [g_device newComputePipelineStateWithFunction:fn error:&error];
         if (!g_dsv4_fp8_kv_quantize_pipeline) {
             fprintf(stderr, "ds4: Metal kernel_dsv4_fp8_kv_quantize_f32 pipeline failed: %s\n",
+                    [[error localizedDescription] UTF8String]);
+            g_queue = nil;
+            g_device = nil;
+            return 0;
+        }
+
+        fn = [library newFunctionWithName:@"kernel_v41_cache_quantize_f32"];
+        if (!fn) {
+            fprintf(stderr, "ds4: Metal kernel_v41_cache_quantize_f32 function not found\n");
+            g_queue = nil;
+            g_device = nil;
+            return 0;
+        }
+        g_v41_cache_quantize_pipeline =
+            [g_device newComputePipelineStateWithFunction:fn error:&error];
+        if (!g_v41_cache_quantize_pipeline) {
+            fprintf(stderr, "ds4: Metal kernel_v41_cache_quantize_f32 pipeline failed: %s\n",
                     [[error localizedDescription] UTF8String]);
             g_queue = nil;
             g_device = nil;
@@ -10799,6 +10823,7 @@ void ds4_gpu_cleanup(void) {
         g_rope_tail_inplace_pair_shared4_pipeline = nil;
         g_rope_tail_inplace_pair_affine_pipeline = nil;
         g_dsv4_fp8_kv_quantize_pipeline = nil;
+        g_v41_cache_quantize_pipeline = nil;
         g_dsv4_indexer_qat_pipeline = nil;
         g_dsv4_kv_fp8_store_pipeline = nil;
         g_dsv4_kv_rope_fp8_store_pipeline = nil;
@@ -24485,6 +24510,62 @@ int ds4_gpu_dsv4_fp8_kv_quantize_tensor(
     }
 
     return 1;
+}
+
+static int ds4_gpu_v41_cache_quantize_tensor(
+        ds4_gpu_tensor *x,
+        uint32_t        n_tok,
+        uint32_t        head_dim,
+        uint32_t        mode) {
+    if (!g_initialized && !ds4_gpu_init()) return 0;
+    const uint32_t group_size = mode == 1u ? 16u : 32u;
+    if (!x || n_tok == 0u || head_dim == 0u ||
+        (head_dim % group_size) != 0u || mode > 3u) return 0;
+    const uint64_t bytes = (uint64_t)n_tok * head_dim * sizeof(float);
+    id<MTLBuffer> xbuf = ds4_gpu_tensor_buffer(x);
+    if (!xbuf || ds4_gpu_tensor_bytes(x) < bytes) return 0;
+
+    ds4_gpu_v41_cache_quantize_args args = {
+        .n_rows = n_tok,
+        .head_dim = head_dim,
+        .mode = mode,
+    };
+    int owned = 0;
+    id<MTLCommandBuffer> cb = ds4_gpu_command_buffer(&owned);
+    if (!cb) return 0;
+    id<MTLComputeCommandEncoder> enc = ds4_gpu_compute_encoder(cb);
+    [enc setComputePipelineState:g_v41_cache_quantize_pipeline];
+    [enc setBytes:&args length:sizeof(args) atIndex:0];
+    [enc setBuffer:xbuf offset:ds4_gpu_tensor_offset(x) atIndex:1];
+    [enc setThreadgroupMemoryLength:32u * sizeof(float) atIndex:0];
+    [enc dispatchThreadgroups:MTLSizeMake(n_tok, 1, 1)
+         threadsPerThreadgroup:MTLSizeMake(32u, 1, 1)];
+    ds4_gpu_end_compute_encoder(cb, enc);
+    return ds4_gpu_finish_command_buffer(
+        cb, owned, mode == 0u ? "V4.1 window KV quantize" :
+                   (mode == 1u ? "V4.1 compressed KV quantize" :
+                    (mode == 2u ? "V4.1 BF16 round" :
+                                  "V4.1 indexer QAT")));
+}
+
+int ds4_gpu_v41_window_kv_quantize_tensor(
+        ds4_gpu_tensor *x, uint32_t n_tok, uint32_t head_dim) {
+    return ds4_gpu_v41_cache_quantize_tensor(x, n_tok, head_dim, 0u);
+}
+
+int ds4_gpu_v41_compressed_kv_quantize_tensor(
+        ds4_gpu_tensor *x, uint32_t n_tok, uint32_t head_dim) {
+    return ds4_gpu_v41_cache_quantize_tensor(x, n_tok, head_dim, 1u);
+}
+
+int ds4_gpu_v41_round_bf16_tensor(
+        ds4_gpu_tensor *x, uint32_t n_tok, uint32_t width) {
+    return ds4_gpu_v41_cache_quantize_tensor(x, n_tok, width, 2u);
+}
+
+int ds4_gpu_v41_indexer_qat_tensor(
+        ds4_gpu_tensor *x, uint32_t n_rows, uint32_t head_dim) {
+    return ds4_gpu_v41_cache_quantize_tensor(x, n_rows, head_dim, 3u);
 }
 
 int ds4_gpu_dsv4_indexer_qat_tensor(

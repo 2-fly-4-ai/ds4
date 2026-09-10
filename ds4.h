@@ -489,6 +489,9 @@ void ds4_test_deepseek41_hc_transition(float *collapsed, float *next_hc,
 void ds4_test_deepseek41_compressor_pool(float *out, const float *values,
                                          const float *scores,
                                          uint32_t head_dim, uint32_t ratio);
+void ds4_test_deepseek41_window_kv_quantize(float *x, uint32_t head_dim);
+void ds4_test_deepseek41_compressed_kv_quantize(float *x, uint32_t head_dim);
+void ds4_test_deepseek41_indexer_qat(float *x, uint32_t head_dim);
 void ds4_test_deepseek41_candidate_mask(bool *out, const float *scores,
                                         uint32_t n_comp,
                                         uint32_t compress_len);

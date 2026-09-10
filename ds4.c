@@ -3657,6 +3657,8 @@ static void f16_round_inplace_cpu(float *x, uint32_t n) {
     for (uint32_t i = 0; i < n; i++) x[i] = f16_to_f32(f32_to_f16(x[i]));
 }
 
+static inline float ds4_f32_round_bf16(float value);
+
 static float dsv4_e4m3fn_value_cpu(int i) {
     static const float exp_scale[16] = {
         0.0f, 0.015625f, 0.03125f, 0.0625f,
@@ -3722,6 +3724,33 @@ static void dsv4_fp8_kv_quantize_row_inplace_cpu(float *x, uint32_t head_dim, ui
     }
 }
 
+/* DeepSeek-V4.1 has two cache round trips which are intentionally different
+ * from V4's legacy compressed-cache approximation. The sliding-window row is
+ * BF16 -> E4M3 with an E8M0 (power-of-two) scale per 32 values, over the whole
+ * post-RoPE row. A shared compressed row is BF16 -> E2M1 with an E4M3 scale per
+ * 16 values. Both official kernels write the dequantized result back as BF16. */
+static void deepseek41_window_kv_quantize_row_inplace_cpu(
+        float *x, uint32_t head_dim) {
+    if ((head_dim % 32u) != 0u) {
+        ds4_die("DeepSeek-V4.1 window KV quantization requires 32-aligned rows");
+    }
+    for (uint32_t off = 0; off < head_dim; off += 32u) {
+        float amax = 0.0f;
+        for (uint32_t i = 0; i < 32u; i++) {
+            x[off + i] = ds4_f32_round_bf16(x[off + i]);
+            amax = fmaxf(amax, fabsf(x[off + i]));
+        }
+        amax = fmaxf(amax, 1.0e-4f);
+        const float scale = ldexpf(1.0f,
+            (int)ceilf(log2f(amax / 448.0f)));
+        for (uint32_t i = 0; i < 32u; i++) {
+            const float q = dsv4_e4m3fn_dequant_cpu(
+                fminf(448.0f, fmaxf(-448.0f, x[off + i] / scale)));
+            x[off + i] = ds4_f32_round_bf16(q * scale);
+        }
+    }
+}
+
 static float dsv4_e2m1fn_value_cpu(int i) {
     static const float values[8] = {
         0.0f, 0.5f, 1.0f, 1.5f, 2.0f, 3.0f, 4.0f, 6.0f,
@@ -3742,6 +3771,51 @@ static float dsv4_e2m1fn_dequant_cpu(float x) {
         }
     }
     return sign * dsv4_e2m1fn_value_cpu(best);
+}
+
+static void deepseek41_compressed_kv_quantize_row_inplace_cpu(
+        float *x, uint32_t head_dim) {
+    if ((head_dim % 16u) != 0u) {
+        ds4_die("DeepSeek-V4.1 compressed KV quantization requires 16-aligned rows");
+    }
+    for (uint32_t off = 0; off < head_dim; off += 16u) {
+        float amax = 0.0f;
+        for (uint32_t i = 0; i < 16u; i++) {
+            x[off + i] = ds4_f32_round_bf16(x[off + i]);
+            amax = fmaxf(amax, fabsf(x[off + i]));
+        }
+        /* The official E4M3 scale path clamps amax to 6 * 2^-9 so an all-zero
+         * group still receives the smallest useful, non-zero scale. */
+        amax = fmaxf(amax, 6.0f * 0.001953125f);
+        const float scale = dsv4_e4m3fn_dequant_cpu(amax / 6.0f);
+        for (uint32_t i = 0; i < 16u; i++) {
+            const float q = dsv4_e2m1fn_dequant_cpu(
+                fminf(6.0f, fmaxf(-6.0f, x[off + i] / scale)));
+            x[off + i] = ds4_f32_round_bf16(q * scale);
+        }
+    }
+}
+
+static void deepseek41_indexer_qat_row_inplace_cpu(
+        float *x, uint32_t head_dim) {
+    if ((head_dim % 32u) != 0u) {
+        ds4_die("DeepSeek-V4.1 indexer QAT requires 32-aligned rows");
+    }
+    for (uint32_t off = 0; off < head_dim; off += 32u) {
+        float amax = 0.0f;
+        for (uint32_t i = 0; i < 32u; i++) {
+            x[off + i] = ds4_f32_round_bf16(x[off + i]);
+            amax = fmaxf(amax, fabsf(x[off + i]));
+        }
+        amax = fmaxf(amax, 7.052966104933725e-38f);
+        const float scale = ldexpf(1.0f,
+            (int)ceilf(log2f(amax / 6.0f)));
+        for (uint32_t i = 0; i < 32u; i++) {
+            const float q = dsv4_e2m1fn_dequant_cpu(
+                fminf(6.0f, fmaxf(-6.0f, x[off + i] / scale)));
+            x[off + i] = ds4_f32_round_bf16(q * scale);
+        }
+    }
 }
 
 static void dsv4_hadamard128_inplace_cpu(float *x) {
@@ -4306,6 +4380,10 @@ static inline float ds4_f32_round_bf16(float value) {
         bits |= 0x00010000u;
     }
     return ds4_bf16_to_f32((uint16_t)(bits >> 16));
+}
+
+static void bf16_round_inplace_cpu(float *x, uint32_t n) {
+    for (uint32_t i = 0; i < n; i++) x[i] = ds4_f32_round_bf16(x[i]);
 }
 
 /* Hash one already-compressed four-token lookback into the 24 disjoint
@@ -13340,8 +13418,15 @@ static void layer_q_projection_normed_one(
 
     matvec_q8_0(qr, model, layer->attn_q_a, norm);
     rms_norm_weight(qr_norm, qr, q_a_norm, q_rank, DS4_RMS_EPS);
+    if (ds4_model_is_deepseek41()) {
+        bf16_round_inplace_cpu(qr_norm, q_rank);
+    }
     matvec_q8_0(q, model, layer->attn_q_b, qr_norm);
-    head_rms_norm_inplace(q, DS4_N_HEAD, DS4_N_HEAD_DIM, DS4_RMS_EPS);
+    if (ds4_model_is_deepseek41()) {
+        bf16_round_inplace_cpu(q, DS4_N_HEAD * DS4_N_HEAD_DIM);
+    } else {
+        head_rms_norm_inplace(q, DS4_N_HEAD, DS4_N_HEAD_DIM, DS4_RMS_EPS);
+    }
 
     free(qr_norm);
     free(qr);
@@ -13359,8 +13444,15 @@ static void layer_q_projection_with_lora_one(
 
     matvec_q8_0(qr, model, layer->attn_q_a, norm);
     rms_norm_weight(qr_norm, qr, q_a_norm, q_rank, DS4_RMS_EPS);
+    if (ds4_model_is_deepseek41()) {
+        bf16_round_inplace_cpu(qr_norm, q_rank);
+    }
     matvec_q8_0(q, model, layer->attn_q_b, qr_norm);
-    head_rms_norm_inplace(q, DS4_N_HEAD, DS4_N_HEAD_DIM, DS4_RMS_EPS);
+    if (ds4_model_is_deepseek41()) {
+        bf16_round_inplace_cpu(q, DS4_N_HEAD * DS4_N_HEAD_DIM);
+    } else {
+        head_rms_norm_inplace(q, DS4_N_HEAD, DS4_N_HEAD_DIM, DS4_RMS_EPS);
+    }
 
     free(qr);
 }
@@ -13377,6 +13469,9 @@ static void layer_kv_projection_normed_one(
 
     matvec_q8_0(raw, model, layer->attn_kv, normed);
     rms_norm_weight(kv, raw, kv_norm, DS4_N_HEAD_DIM, DS4_RMS_EPS);
+    if (ds4_model_is_deepseek41()) {
+        bf16_round_inplace_cpu(kv, DS4_N_HEAD_DIM);
+    }
 
     free(raw);
 }
@@ -13392,8 +13487,15 @@ static void layer_q_projection_with_lora_one_decode_scratch(
 
     matvec_q8_0_decode_scratch(scratch->qr, model, layer->attn_q_a, norm, scratch);
     rms_norm_weight(qr_norm, scratch->qr, q_a_norm, DS4_N_LORA_Q, DS4_RMS_EPS);
+    if (ds4_model_is_deepseek41()) {
+        bf16_round_inplace_cpu(qr_norm, DS4_N_LORA_Q);
+    }
     matvec_q8_0_decode_scratch(q, model, layer->attn_q_b, qr_norm, scratch);
-    head_rms_norm_inplace(q, DS4_N_HEAD, DS4_N_HEAD_DIM, DS4_RMS_EPS);
+    if (ds4_model_is_deepseek41()) {
+        bf16_round_inplace_cpu(q, DS4_N_HEAD * DS4_N_HEAD_DIM);
+    } else {
+        head_rms_norm_inplace(q, DS4_N_HEAD, DS4_N_HEAD_DIM, DS4_RMS_EPS);
+    }
 }
 
 static void layer_kv_projection_normed_one_decode_scratch(
@@ -13406,6 +13508,9 @@ static void layer_kv_projection_normed_one_decode_scratch(
 
     matvec_q8_0_decode_scratch(scratch->kv_raw, model, layer->attn_kv, normed, scratch);
     rms_norm_weight(kv, scratch->kv_raw, kv_norm, DS4_N_HEAD_DIM, DS4_RMS_EPS);
+    if (ds4_model_is_deepseek41()) {
+        bf16_round_inplace_cpu(kv, DS4_N_HEAD_DIM);
+    }
 }
 
 static float rope_yarn_ramp(float low, float high, int i0) {
@@ -16000,16 +16105,17 @@ static bool compressor_decode_v41_one_decode_scratch(
         sqrtf((float)(ss / (double)DS4_N_HEAD_DIM) + DS4_RMS_EPS);
     for (uint32_t i = 0; i < DS4_N_HEAD_DIM; i++) {
         const float v = pooled[i] * inv_rms * tensor_1d_value(model, norm, i);
-        out_latent[i] = v;
-        out_comp[i] = v;
+        /* Compressor.forward returns BF16 before either the indexer or RoPE
+         * consumes the latent. Preserve that shared numerical boundary. */
+        out_latent[i] = ds4_f32_round_bf16(v);
+        out_comp[i] = out_latent[i];
     }
 
     const uint32_t comp_pos = pos + 1u - compress_ratio;
     rope_tail_layer_inplace(out_comp, 1, DS4_N_HEAD_DIM, DS4_N_ROT,
                             comp_pos, il, false);
-    dsv4_fp8_kv_quantize_row_inplace_cpu(out_comp,
-                                         DS4_N_HEAD_DIM,
-                                         DS4_N_ROT);
+    deepseek41_compressed_kv_quantize_row_inplace_cpu(
+        out_comp, DS4_N_HEAD_DIM);
     return true;
 }
 
@@ -16027,10 +16133,11 @@ static void index_key_v41_from_latent_decode_scratch(
     const float *norm = tensor_data(model, owner_layer->indexer_k_norm);
     rms_norm_weight(out_key, out_key, norm,
                     DS4_N_INDEXER_HEAD_DIM, DS4_RMS_EPS);
+    bf16_round_inplace_cpu(out_key, DS4_N_INDEXER_HEAD_DIM);
     rope_tail_layer_inplace(out_key, 1, DS4_N_INDEXER_HEAD_DIM,
                             DS4_N_ROT, comp_pos, owner_il, false);
-    dsv4_indexer_qat_row_inplace_cpu(out_key,
-                                     DS4_N_INDEXER_HEAD_DIM);
+    deepseek41_indexer_qat_row_inplace_cpu(
+        out_key, DS4_N_INDEXER_HEAD_DIM);
 }
 
 /* Attention over raw SWA rows plus optional compressed rows.  Ratio-4 layers
@@ -16363,10 +16470,23 @@ static bool *indexer_allowed_decode_one(
     float *scores = xmalloc((size_t)n_comp * sizeof(scores[0]));
 
     matvec_any(q, model, layer->indexer_attn_q_b, qr_norm);
+    if (ds4_model_is_deepseek41()) {
+        bf16_round_inplace_cpu(q, n_head * head_dim);
+    }
     rope_tail_layer_inplace(q, n_head, head_dim, DS4_N_ROT, pos, il, false);
-    dsv4_indexer_qat_rows_inplace_cpu(q, n_head, head_dim);
+    if (ds4_model_is_deepseek41()) {
+        for (uint32_t h = 0; h < n_head; h++) {
+            deepseek41_indexer_qat_row_inplace_cpu(
+                q + (uint64_t)h * head_dim, head_dim);
+        }
+    } else {
+        dsv4_indexer_qat_rows_inplace_cpu(q, n_head, head_dim);
+    }
 
     matvec_any(weights, model, layer->indexer_proj, cur);
+    if (ds4_model_is_deepseek41()) {
+        bf16_round_inplace_cpu(weights, n_head);
+    }
     const float scale = 1.0f / sqrtf((float)(head_dim * n_head));
     for (uint32_t h = 0; h < n_head; h++) weights[h] *= scale;
 
@@ -16434,10 +16554,23 @@ static bool *indexer_allowed_decode_one_decode_scratch(
     float *scores = scratch->index_scores;
 
     matvec_any_decode_scratch(q, model, layer->indexer_attn_q_b, qr_norm, scratch);
+    if (ds4_model_is_deepseek41()) {
+        bf16_round_inplace_cpu(q, n_head * head_dim);
+    }
     rope_tail_layer_inplace(q, n_head, head_dim, DS4_N_ROT, pos, il, false);
-    dsv4_indexer_qat_rows_inplace_cpu(q, n_head, head_dim);
+    if (ds4_model_is_deepseek41()) {
+        for (uint32_t h = 0; h < n_head; h++) {
+            deepseek41_indexer_qat_row_inplace_cpu(
+                q + (uint64_t)h * head_dim, head_dim);
+        }
+    } else {
+        dsv4_indexer_qat_rows_inplace_cpu(q, n_head, head_dim);
+    }
 
     matvec_any_decode_scratch(weights, model, layer->indexer_proj, cur, scratch);
+    if (ds4_model_is_deepseek41()) {
+        bf16_round_inplace_cpu(weights, n_head);
+    }
     const float scale = 1.0f / sqrtf((float)(head_dim * n_head));
     for (uint32_t h = 0; h < n_head; h++) weights[h] *= scale;
 
@@ -17020,7 +17153,15 @@ static void layer_forward_raw_swa_one(
     t0 = profile ? now_sec() : 0.0;
     rope_tail_layer_inplace(scratch->q, DS4_N_HEAD, DS4_N_HEAD_DIM, DS4_N_ROT, pos, il, false);
     rope_tail_layer_inplace(scratch->kv, DS4_N_HEAD_KV, DS4_N_HEAD_DIM, DS4_N_ROT, pos, il, false);
-    dsv4_fp8_kv_quantize_row_inplace_cpu(scratch->kv, DS4_N_HEAD_DIM, DS4_N_ROT);
+    if (ds4_model_is_deepseek41()) {
+        bf16_round_inplace_cpu(
+            scratch->q, DS4_N_HEAD * DS4_N_HEAD_DIM);
+        deepseek41_window_kv_quantize_row_inplace_cpu(
+            scratch->kv, DS4_N_HEAD_DIM);
+    } else {
+        dsv4_fp8_kv_quantize_row_inplace_cpu(
+            scratch->kv, DS4_N_HEAD_DIM, DS4_N_ROT);
+    }
 
     kv_cache_push_raw(cache, scratch->kv);
     if (profile) t_rope_cache = now_sec() - t0;
@@ -26534,6 +26675,12 @@ static bool metal_graph_decode_kv_store(
         ds4_gpu_tensor *raw_cache,
         uint32_t          raw_cap,
         uint32_t          raw_row) {
+    if (ds4_model_is_deepseek41()) {
+        return ds4_gpu_v41_window_kv_quantize_tensor(
+                   kv, 1, DS4_N_HEAD_DIM) != 0 &&
+               ds4_gpu_store_raw_kv_tensor(
+                   raw_cache, kv, raw_cap, raw_row, DS4_N_HEAD_DIM) != 0;
+    }
     if (metal_graph_use_reference_kv_decode()) {
         return ds4_gpu_dsv4_fp8_kv_quantize_tensor(kv, 1, DS4_N_HEAD_DIM, DS4_N_ROT) != 0 &&
                ds4_gpu_store_raw_kv_tensor(raw_cache, kv, raw_cap, raw_row, DS4_N_HEAD_DIM) != 0;
@@ -28455,8 +28602,13 @@ static bool metal_graph_decode_v41_compressed(
             const uint32_t row = g->layer_n_comp[owner];
             const uint32_t comp_pos = pos + 1u - ratio;
 
+            /* Compressor.forward returns BF16. Both the index-key projection
+             * and the later RoPE/FP4 cache path consume that exact latent. */
+            ok = ds4_gpu_v41_round_bf16_tensor(
+                    metal_graph_comp_sc_cur(g), 1, DS4_N_HEAD_DIM) != 0;
+
             /* Publish the index key from the RoPE-free normalized latent. */
-            ok = metal_graph_matmul_plain_tensor(
+            if (ok) ok = metal_graph_matmul_plain_tensor(
                     metal_graph_index_comp_kv_cur(g), model,
                     layer->indexer_attn_k,
                     DS4_N_HEAD_DIM, DS4_N_INDEXER_HEAD_DIM,
@@ -28467,13 +28619,16 @@ static bool metal_graph_decode_v41_compressed(
                     model->map, model->size,
                     layer->indexer_k_norm->abs_offset,
                     DS4_N_INDEXER_HEAD_DIM, DS4_RMS_EPS) != 0;
+            if (ok) ok = ds4_gpu_v41_round_bf16_tensor(
+                    metal_graph_index_comp_sc_cur(g), 1,
+                    DS4_N_INDEXER_HEAD_DIM) != 0;
             if (ok) ok = ds4_gpu_rope_tail_tensor(
                     metal_graph_index_comp_sc_cur(g), 1, 1,
                     DS4_N_INDEXER_HEAD_DIM, DS4_N_ROT,
                     comp_pos, (uint32_t)DS4_ROPE_ORIG_CTX,
                     false, freq_base, freq_scale, ext_factor, attn_factor,
                     DS4_ROPE_YARN_BETA_FAST, DS4_ROPE_YARN_BETA_SLOW) != 0;
-            if (ok) ok = ds4_gpu_dsv4_indexer_qat_tensor(
+            if (ok) ok = ds4_gpu_v41_indexer_qat_tensor(
                     metal_graph_index_comp_sc_cur(g), 1,
                     DS4_N_INDEXER_HEAD_DIM) != 0;
             ds4_gpu_tensor *index_row = ok ? ds4_gpu_tensor_view(
@@ -28496,8 +28651,8 @@ static bool metal_graph_decode_v41_compressed(
                     comp_pos, (uint32_t)DS4_ROPE_ORIG_CTX,
                     false, freq_base, freq_scale, ext_factor, attn_factor,
                     DS4_ROPE_YARN_BETA_FAST, DS4_ROPE_YARN_BETA_SLOW) != 0;
-            if (ok) ok = ds4_gpu_dsv4_fp8_kv_quantize_tensor(
-                    comp_row, 1, DS4_N_HEAD_DIM, DS4_N_ROT) != 0;
+            if (ok) ok = ds4_gpu_v41_compressed_kv_quantize_tensor(
+                    comp_row, 1, DS4_N_HEAD_DIM) != 0;
             ds4_gpu_tensor_free(comp_row);
             if (ok) ok = metal_graph_commit_attn_comp_stage(
                     g, owner, row, 1);
@@ -28520,13 +28675,15 @@ static bool metal_graph_decode_v41_compressed(
                  metal_graph_indexer_q(g), model,
                  layer->indexer_attn_q_b,
                  q_rank, q_dim, metal_graph_qr_norm(g), 1);
+        if (ok) ok = ds4_gpu_v41_round_bf16_tensor(
+                metal_graph_indexer_q(g), 1, (uint32_t)q_dim) != 0;
         if (ok) ok = ds4_gpu_rope_tail_tensor(
                 metal_graph_indexer_q(g), 1, DS4_N_INDEXER_HEAD,
                 DS4_N_INDEXER_HEAD_DIM, DS4_N_ROT, pos,
                 (uint32_t)DS4_ROPE_ORIG_CTX,
                 false, freq_base, freq_scale, ext_factor, attn_factor,
                 DS4_ROPE_YARN_BETA_FAST, DS4_ROPE_YARN_BETA_SLOW) != 0;
-        if (ok) ok = ds4_gpu_dsv4_indexer_qat_tensor(
+        if (ok) ok = ds4_gpu_v41_indexer_qat_tensor(
                 metal_graph_indexer_q(g), DS4_N_INDEXER_HEAD,
                 DS4_N_INDEXER_HEAD_DIM) != 0;
         if (ok) ok = metal_graph_matmul_plain_tensor(
@@ -28534,6 +28691,9 @@ static bool metal_graph_decode_v41_compressed(
                 layer->indexer_proj,
                 DS4_N_EMBD, DS4_N_INDEXER_HEAD,
                 metal_graph_attn_norm(g), 1);
+        if (ok) ok = ds4_gpu_v41_round_bf16_tensor(
+                metal_graph_indexer_weights(g), 1,
+                DS4_N_INDEXER_HEAD) != 0;
         const float scale = 1.0f /
             sqrtf((float)(DS4_N_INDEXER_HEAD_DIM * DS4_N_INDEXER_HEAD));
         if (ok) ok = ds4_gpu_indexer_score_one_tensor(
@@ -29183,7 +29343,8 @@ static bool metal_graph_encode_decode_layer_phase(
         if (ok) {
             metal_graph_debug_dump_tensor("KVraw", metal_graph_kv_raw(g), DS4_N_HEAD_DIM, il, pos);
         }
-        if (ok && g->cuda_qkv_kv_rope_fuse && !kvnorm_dump && DS4_N_HEAD_KV == 1u) {
+        if (ok && !ds4_model_is_deepseek41() &&
+            g->cuda_qkv_kv_rope_fuse && !kvnorm_dump && DS4_N_HEAD_KV == 1u) {
             ok = ds4_gpu_dsv4_qkv_rms_norm_rows_kv_rope_tensor(
                     metal_graph_qr_norm(g),
                     metal_graph_qr(g),
@@ -29214,6 +29375,7 @@ static bool metal_graph_encode_decode_layer_phase(
             /* Triple fusion: q/kv norm + KV RoPE tail + FP8/raw store in one
              * dispatch; verbatim arithmetic (see metal/norm.metal). */
             if (!metal_graph_tp_ablate("kv") &&
+                !ds4_model_is_deepseek41() &&
                 !kvnorm_dump &&
                 !metal_graph_use_reference_kv_decode() &&
                 !resume_after_kv_store &&
@@ -29279,6 +29441,10 @@ static bool metal_graph_encode_decode_layer_phase(
     if (ok) {
         metal_graph_debug_dump_tensor("q_lora_norm", metal_graph_qr_norm(g), q_rank, il, pos);
     }
+    if (ok && ds4_model_is_deepseek41()) {
+        ok = ds4_gpu_v41_round_bf16_tensor(
+                metal_graph_qr_norm(g), 1, (uint32_t)q_rank) != 0;
+    }
     if (qkv_rms_fused && ok && !kv_rope_fused) {
         metal_graph_debug_dump_tensor("KVnorm", metal_graph_kv(g), DS4_N_HEAD_DIM, il, pos);
     }
@@ -29307,7 +29473,7 @@ static bool metal_graph_encode_decode_layer_phase(
     }
     const bool decode_q_norm_debug = metal_graph_debug_wants("Qnorm", il, pos);
     bool decode_q_norm_rope_fused = false;
-    if (ok && !decode_q_norm_debug) {
+    if (ok && !ds4_model_is_deepseek41() && !decode_q_norm_debug) {
         decode_q_norm_rope_fused =
             ds4_gpu_head_rms_norm_rope_tail_tensor(metal_graph_q(g),
                                                    1,
@@ -29326,7 +29492,14 @@ static bool metal_graph_encode_decode_layer_phase(
                                                    DS4_RMS_EPS) != 0;
     }
     if (!decode_q_norm_rope_fused) {
-        if (ok) ok = ds4_gpu_head_rms_norm_tensor(metal_graph_q(g), 1, tp_heads, DS4_N_HEAD_DIM, DS4_RMS_EPS) != 0;
+        if (ok && ds4_model_is_deepseek41()) {
+            ok = ds4_gpu_v41_round_bf16_tensor(
+                    metal_graph_q(g), 1, tp_heads * DS4_N_HEAD_DIM) != 0;
+        } else if (ok) {
+            ok = ds4_gpu_head_rms_norm_tensor(
+                    metal_graph_q(g), 1, tp_heads,
+                    DS4_N_HEAD_DIM, DS4_RMS_EPS) != 0;
+        }
         if (ok) {
             metal_graph_debug_dump_tensor("Qnorm", metal_graph_q(g), q_dim, il, pos);
         }
@@ -29335,6 +29508,10 @@ static bool metal_graph_encode_decode_layer_phase(
                                                 compressed ? (uint32_t)DS4_ROPE_ORIG_CTX : 0,
                                                 false, freq_base, freq_scale, ext_factor, attn_factor,
                                                 DS4_ROPE_YARN_BETA_FAST, DS4_ROPE_YARN_BETA_SLOW) != 0;
+        if (ok && ds4_model_is_deepseek41()) {
+            ok = ds4_gpu_v41_round_bf16_tensor(
+                    metal_graph_q(g), 1, tp_heads * DS4_N_HEAD_DIM) != 0;
+        }
     }
     DS4_METAL_PROFILE_DECODE_STAGE("q_path");
     if (ok) {
@@ -29359,8 +29536,13 @@ static bool metal_graph_encode_decode_layer_phase(
             metal_graph_debug_dump_tensor("KVnorm", metal_graph_kv(g), DS4_N_HEAD_DIM, il, pos);
         }
     }
+    if (ok && ds4_model_is_deepseek41() && !kv_rope_fused) {
+        ok = ds4_gpu_v41_round_bf16_tensor(
+                metal_graph_kv(g), 1, DS4_N_HEAD_DIM) != 0;
+    }
     const bool tp_ablate_kv = metal_graph_tp_ablate("kv");
     fuse_kv_rope_store =
+        !ds4_model_is_deepseek41() &&
         !tp_ablate_kv && !kv_rope_fused &&
         !metal_graph_use_reference_kv_decode() &&
         !resume_after_kv_store &&
@@ -73001,6 +73183,18 @@ void ds4_test_deepseek41_compressor_pool(
     compressor_pool_decode_state(out, v, s, head_dim, ratio);
     free(s);
     free(v);
+}
+
+void ds4_test_deepseek41_window_kv_quantize(float *x, uint32_t head_dim) {
+    deepseek41_window_kv_quantize_row_inplace_cpu(x, head_dim);
+}
+
+void ds4_test_deepseek41_compressed_kv_quantize(float *x, uint32_t head_dim) {
+    deepseek41_compressed_kv_quantize_row_inplace_cpu(x, head_dim);
+}
+
+void ds4_test_deepseek41_indexer_qat(float *x, uint32_t head_dim) {
+    deepseek41_indexer_qat_row_inplace_cpu(x, head_dim);
 }
 
 void ds4_test_deepseek41_candidate_mask(
