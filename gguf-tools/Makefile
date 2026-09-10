@@ -1,5 +1,6 @@
 CC ?= cc
 CXX ?= c++
+PYTHON ?= python3
 UNAME_S := $(shell uname -s)
 LLAMA_CPP_DIR ?= ../../deepseek-v4-quants/llama.cpp
 LLAMA_CPP_BUILD ?= $(LLAMA_CPP_DIR)/build-remote
@@ -46,15 +47,18 @@ CFLAGS ?= -O3 -Wall -Wextra -std=c11 $(NATIVE_CPU_FLAG)
 CPPFLAGS ?= -D_GNU_SOURCE
 
 .PHONY: all clean quality-score quality-llama-score gguf-requantize-dense \
-	test-deepseek41-manifest test-deepseek41-mxfp4
+	test-deepseek41-manifest test-deepseek41-mxfp4 test-deepseek41-convert
 
 all: deepseek4-quantize gguf-requantize-dense $(QUANTS_SHARED)
 
 test-deepseek41-manifest:
-	python3 -m unittest tests/test_deepseek41_manifest.py
+	$(PYTHON) -m unittest tests/test_deepseek41_manifest.py
 
 test-deepseek41-mxfp4:
-	python3 -m unittest tests/test_deepseek41_mxfp4.py
+	$(PYTHON) -m unittest tests/test_deepseek41_mxfp4.py
+
+test-deepseek41-convert:
+	$(PYTHON) -m unittest tests/test_deepseek41_convert.py
 
 gguf-requantize-dense: gguf_requantize_dense.c quants.c quants.h
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ gguf_requantize_dense.c quants.c -lm -pthread
