@@ -23753,7 +23753,11 @@ static bool metal_graph_alloc_raw_cap(
             continue;
         }
         const uint32_t ratio = ds4_layer_compress_ratio(il);
-        if (ratio == 0) {
+        /* V4.1 consumers read the cache published by their source layer.
+         * Giving every consumer a full context-sized cache wastes several
+         * GiB and, worse, makes accidental per-layer access look valid. */
+        if (ratio == 0 ||
+            (ds4_model_is_deepseek41() && !ds4_v41_layer_owns_kv(il))) {
             g->layer_comp_cap[il] = 0;
         } else {
             g->layer_comp_cap[il] = ctx_size / ratio + 2u;
@@ -23899,7 +23903,8 @@ static bool metal_graph_alloc_raw_cap(
                     (uint64_t)raw_cap * DS4_N_HEAD_DIM * sizeof(float));
         }
         const uint32_t ratio = ds4_layer_compress_ratio(il);
-        if (ratio != 0) {
+        if (ratio != 0 &&
+            (!ds4_model_is_deepseek41() || ds4_v41_layer_owns_kv(il))) {
             const uint32_t coff = ratio == 4 ? 2u : 1u;
             const uint64_t attn_width = (uint64_t)coff * DS4_N_HEAD_DIM;
             const uint64_t attn_rows = (uint64_t)coff * ratio;
@@ -23944,7 +23949,11 @@ static bool metal_graph_alloc_raw_cap(
                                 metal_tensor_fill_f32(g->layer_attn_state_score[il], DS4_NEG_INF, attn_width * attn_rows);
             }
 
-            if (ratio == 4) {
+            /* Legacy V4 builds an index cache only for ratio-4 layers. V4.1
+             * always publishes a separate index key beside each shared
+             * compressed row, including its ratio-2 and ratio-1 owners. */
+            if (ratio == 4 ||
+                (ds4_model_is_deepseek41() && ds4_v41_layer_owns_kv(il))) {
                 const uint64_t index_width = (uint64_t)coff * DS4_N_INDEXER_HEAD_DIM;
                 const uint64_t index_rows = (uint64_t)coff * ratio;
                 g->layer_index_comp_cache[il] = metal_graph_alloc_kv_cache_tensor_on(
@@ -30358,7 +30367,7 @@ static bool metal_graph_encode_decode_layer_phase(
                         layer->attn_sinks->abs_offset,
                         metal_graph_q(g),
                         raw_cache,
-                        g->layer_attn_comp_cache[il],
+                        comp_cache,
                         metal_graph_attn_comp_cache_is_f16(),
                         comp_selected,
                         1,
@@ -30415,7 +30424,7 @@ static bool metal_graph_encode_decode_layer_phase(
                     layer->attn_sinks->abs_offset + (uint64_t)tp_head0 * (layer->attn_sinks->bytes / DS4_N_HEAD),
                     metal_graph_q(g),
                     raw_cache,
-                    g->layer_attn_comp_cache[il],
+                    comp_cache,
                     metal_graph_attn_comp_cache_is_f16(),
                     comp_selected,
                     1,
