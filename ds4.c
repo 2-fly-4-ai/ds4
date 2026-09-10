@@ -73868,6 +73868,30 @@ static int ds4_engine_open_internal(ds4_engine **out,
     model_open(&e->model, opt->model_path, graph_backend, !opt->inspect_only);
     if (opt->warm_weights) model_warm_weights(&e->model);
     config_validate_model(&e->model);
+    if (ds4_model_is_deepseek41() && !opt->inspect_only) {
+        /* V4.1 carries token-history-dependent Engram state in layers 1 and
+         * 14.  The distributed/layer-slice protocol does not transport that
+         * state yet, and the legacy MTP/DSpark verifier cannot clone it per
+         * proposal row.  Refuse those configurations rather than silently
+         * running a numerically different model. */
+        if (load_slice || opt->distributed.role != DS4_DISTRIBUTED_NONE) {
+            fprintf(stderr,
+                    "ds4: DeepSeek V4.1 distributed/layer-slice inference is "
+                    "not supported until the protocol carries Engram history\n");
+            ds4_engine_close(e);
+            *out = NULL;
+            return 1;
+        }
+        if (opt->mtp_path && opt->mtp_path[0]) {
+            fprintf(stderr,
+                    "ds4: DeepSeek V4.1 --mtp-model/DSpark is not supported "
+                    "until proposal verification preserves Engram and "
+                    "compressed-attention state per row\n");
+            ds4_engine_close(e);
+            *out = NULL;
+            return 1;
+        }
+    }
     if (opt->vision_path && opt->vision_path[0]) {
         if (!ds4_model_is_glm53() && !g_ds4_flash_vision_exp &&
             !ds4_model_is_deepseek41() && !ds4_model_is_qwen4()) {
