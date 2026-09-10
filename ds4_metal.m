@@ -18737,6 +18737,98 @@ int ds4_gpu_dsv4_topk_mask_tensor(
     return 1;
 }
 
+int ds4_gpu_v41_candidate_block_scores_tensor(
+        ds4_gpu_tensor       *block_scores,
+        const ds4_gpu_tensor *scores,
+        uint32_t              n_comp,
+        uint32_t              n_tokens,
+        uint32_t              visible0,
+        uint32_t              visible_step,
+        uint32_t              block_size) {
+    if (!g_initialized && !ds4_gpu_init()) return 0;
+    if (!block_scores || !scores || n_comp == 0 || n_tokens == 0 ||
+        block_size == 0) return 0;
+    const uint32_t n_blocks = (n_comp + block_size - 1u) / block_size;
+    const uint64_t score_bytes = (uint64_t)n_comp * n_tokens * sizeof(float);
+    const uint64_t block_bytes = (uint64_t)n_blocks * n_tokens * sizeof(float);
+    if (ds4_gpu_tensor_bytes(scores) < score_bytes ||
+        ds4_gpu_tensor_bytes(block_scores) < block_bytes) return 0;
+
+    @autoreleasepool {
+        id<MTLComputePipelineState> pipeline =
+            ds4_gpu_get_pipeline("kernel_v41_candidate_block_scores");
+        id<MTLBuffer> scorebuf = ds4_gpu_tensor_buffer(scores);
+        id<MTLBuffer> blockbuf = ds4_gpu_tensor_buffer(block_scores);
+        if (!pipeline || !scorebuf || !blockbuf) return 0;
+        const NSUInteger total = (NSUInteger)n_blocks * n_tokens;
+        NSUInteger nth = pipeline.maxTotalThreadsPerThreadgroup;
+        if (nth > 256u) nth = 256u;
+        if (nth > total) nth = total;
+        if (nth == 0u) nth = 1u;
+        int owned = 0;
+        id<MTLCommandBuffer> cb = ds4_gpu_command_buffer(&owned);
+        if (!cb) return 0;
+        id<MTLComputeCommandEncoder> enc = ds4_gpu_compute_encoder(cb);
+        [enc setComputePipelineState:pipeline];
+        [enc setBuffer:scorebuf offset:ds4_gpu_tensor_offset(scores) atIndex:0];
+        [enc setBuffer:blockbuf offset:ds4_gpu_tensor_offset(block_scores) atIndex:1];
+        [enc setBytes:&n_comp length:sizeof(n_comp) atIndex:2];
+        [enc setBytes:&n_tokens length:sizeof(n_tokens) atIndex:3];
+        [enc setBytes:&visible0 length:sizeof(visible0) atIndex:4];
+        [enc setBytes:&visible_step length:sizeof(visible_step) atIndex:5];
+        [enc setBytes:&block_size length:sizeof(block_size) atIndex:6];
+        [enc dispatchThreadgroups:MTLSizeMake((total + nth - 1u) / nth, 1, 1)
+             threadsPerThreadgroup:MTLSizeMake(nth, 1, 1)];
+        ds4_gpu_end_compute_encoder(cb, enc);
+        return ds4_gpu_finish_command_buffer(cb, owned,
+                                              "V4.1 candidate block scores");
+    }
+}
+
+int ds4_gpu_v41_candidate_expand_mask_tensor(
+        ds4_gpu_tensor       *row_mask,
+        const ds4_gpu_tensor *block_mask,
+        uint32_t              n_comp,
+        uint32_t              n_tokens,
+        uint32_t              block_size) {
+    if (!g_initialized && !ds4_gpu_init()) return 0;
+    if (!row_mask || !block_mask || n_comp == 0 || n_tokens == 0 ||
+        block_size == 0) return 0;
+    const uint32_t n_blocks = (n_comp + block_size - 1u) / block_size;
+    const uint64_t row_bytes = (uint64_t)n_comp * n_tokens * sizeof(float);
+    const uint64_t block_bytes = (uint64_t)n_blocks * n_tokens * sizeof(float);
+    if (ds4_gpu_tensor_bytes(row_mask) < row_bytes ||
+        ds4_gpu_tensor_bytes(block_mask) < block_bytes) return 0;
+
+    @autoreleasepool {
+        id<MTLComputePipelineState> pipeline =
+            ds4_gpu_get_pipeline("kernel_v41_candidate_expand_mask");
+        id<MTLBuffer> blockbuf = ds4_gpu_tensor_buffer(block_mask);
+        id<MTLBuffer> rowbuf = ds4_gpu_tensor_buffer(row_mask);
+        if (!pipeline || !blockbuf || !rowbuf) return 0;
+        const NSUInteger total = (NSUInteger)n_comp * n_tokens;
+        NSUInteger nth = pipeline.maxTotalThreadsPerThreadgroup;
+        if (nth > 256u) nth = 256u;
+        if (nth > total) nth = total;
+        if (nth == 0u) nth = 1u;
+        int owned = 0;
+        id<MTLCommandBuffer> cb = ds4_gpu_command_buffer(&owned);
+        if (!cb) return 0;
+        id<MTLComputeCommandEncoder> enc = ds4_gpu_compute_encoder(cb);
+        [enc setComputePipelineState:pipeline];
+        [enc setBuffer:blockbuf offset:ds4_gpu_tensor_offset(block_mask) atIndex:0];
+        [enc setBuffer:rowbuf offset:ds4_gpu_tensor_offset(row_mask) atIndex:1];
+        [enc setBytes:&n_comp length:sizeof(n_comp) atIndex:2];
+        [enc setBytes:&n_tokens length:sizeof(n_tokens) atIndex:3];
+        [enc setBytes:&block_size length:sizeof(block_size) atIndex:4];
+        [enc dispatchThreadgroups:MTLSizeMake((total + nth - 1u) / nth, 1, 1)
+             threadsPerThreadgroup:MTLSizeMake(nth, 1, 1)];
+        ds4_gpu_end_compute_encoder(cb, enc);
+        return ds4_gpu_finish_command_buffer(cb, owned,
+                                              "V4.1 candidate row mask");
+    }
+}
+
 static int ds4_gpu_matmul_q8_0_legacy_tensor(
         ds4_gpu_tensor       *out,
         const void             *model_map,

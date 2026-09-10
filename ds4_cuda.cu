@@ -14133,6 +14133,47 @@ __global__ static void topk_mask_kernel(float *mask, const uint32_t *topk, uint3
     mask[gid] = v;
 }
 
+__global__ static void v41_candidate_block_scores_kernel(
+        float *block_scores, const float *scores,
+        uint32_t n_comp, uint32_t n_tokens,
+        uint32_t visible0, uint32_t visible_step,
+        uint32_t block_size) {
+    const uint32_t n_blocks = (n_comp + block_size - 1u) / block_size;
+    const uint64_t gid = (uint64_t)blockIdx.x * blockDim.x + threadIdx.x;
+    const uint64_t total = (uint64_t)n_blocks * n_tokens;
+    if (gid >= total) return;
+    const uint32_t t = (uint32_t)(gid / n_blocks);
+    const uint32_t b = (uint32_t)(gid - (uint64_t)t * n_blocks);
+    const uint64_t visible_wide = (uint64_t)visible0 +
+                                  (uint64_t)t * visible_step;
+    const uint32_t visible = visible_wide < n_comp
+        ? (uint32_t)visible_wide : n_comp;
+    const uint32_t begin = b * block_size;
+    const uint32_t end = min(min(begin + block_size, visible), n_comp);
+    float best = -CUDART_INF_F;
+    for (uint32_t c = begin; c < end; c++) {
+        best = fmaxf(best, scores[(uint64_t)t * n_comp + c]);
+    }
+    if (visible != 0u && b == (visible - 1u) / block_size) {
+        best = CUDART_INF_F;
+    }
+    block_scores[(uint64_t)t * n_blocks + b] = best;
+}
+
+__global__ static void v41_candidate_expand_mask_kernel(
+        float *row_mask, const float *block_mask,
+        uint32_t n_comp, uint32_t n_tokens,
+        uint32_t block_size) {
+    const uint64_t gid = (uint64_t)blockIdx.x * blockDim.x + threadIdx.x;
+    const uint64_t total = (uint64_t)n_comp * n_tokens;
+    if (gid >= total) return;
+    const uint32_t n_blocks = (n_comp + block_size - 1u) / block_size;
+    const uint32_t t = (uint32_t)(gid / n_comp);
+    const uint32_t c = (uint32_t)(gid - (uint64_t)t * n_comp);
+    row_mask[(uint64_t)t * n_comp + c] =
+        block_mask[(uint64_t)t * n_blocks + c / block_size];
+}
+
 extern "C" int ds4_gpu_embed_token_hc_tensor(ds4_gpu_tensor *out_hc, const void *model_map, uint64_t model_size, uint64_t weight_offset, uint32_t n_vocab, uint32_t token, uint32_t n_embd, uint32_t n_hc) {
     (void)n_vocab;
     if (!out_hc || !model_map || weight_offset >= model_size) return 0;
@@ -14668,6 +14709,46 @@ extern "C" int ds4_gpu_dsv4_topk_mask_tensor(
                                       (const uint32_t *)topk->ptr,
                                       n_comp, n_tokens, top_k);
     return cuda_ok(cudaGetLastError(), "topk mask launch");
+}
+
+extern "C" int ds4_gpu_v41_candidate_block_scores_tensor(
+        ds4_gpu_tensor       *block_scores,
+        const ds4_gpu_tensor *scores,
+        uint32_t              n_comp,
+        uint32_t              n_tokens,
+        uint32_t              visible0,
+        uint32_t              visible_step,
+        uint32_t              block_size) {
+    if (!block_scores || !scores || n_comp == 0 || n_tokens == 0 ||
+        block_size == 0) return 0;
+    const uint32_t n_blocks = (n_comp + block_size - 1u) / block_size;
+    if (scores->bytes < (uint64_t)n_comp * n_tokens * sizeof(float) ||
+        block_scores->bytes <
+            (uint64_t)n_blocks * n_tokens * sizeof(float)) return 0;
+    const uint64_t total = (uint64_t)n_blocks * n_tokens;
+    v41_candidate_block_scores_kernel<<<(total + 255u) / 256u, 256>>>(
+        (float *)block_scores->ptr, (const float *)scores->ptr,
+        n_comp, n_tokens, visible0, visible_step, block_size);
+    return cuda_ok(cudaGetLastError(), "V4.1 candidate block scores launch");
+}
+
+extern "C" int ds4_gpu_v41_candidate_expand_mask_tensor(
+        ds4_gpu_tensor       *row_mask,
+        const ds4_gpu_tensor *block_mask,
+        uint32_t              n_comp,
+        uint32_t              n_tokens,
+        uint32_t              block_size) {
+    if (!row_mask || !block_mask || n_comp == 0 || n_tokens == 0 ||
+        block_size == 0) return 0;
+    const uint32_t n_blocks = (n_comp + block_size - 1u) / block_size;
+    if (row_mask->bytes < (uint64_t)n_comp * n_tokens * sizeof(float) ||
+        block_mask->bytes <
+            (uint64_t)n_blocks * n_tokens * sizeof(float)) return 0;
+    const uint64_t total = (uint64_t)n_comp * n_tokens;
+    v41_candidate_expand_mask_kernel<<<(total + 255u) / 256u, 256>>>(
+        (float *)row_mask->ptr, (const float *)block_mask->ptr,
+        n_comp, n_tokens, block_size);
+    return cuda_ok(cudaGetLastError(), "V4.1 candidate row mask launch");
 }
 /* GLM opt-in: batched q8_0 matmuls with blocks > 32 may run as a
  * streaming dequant-to-f16 GEMM (exact-q8 native kernels only cover

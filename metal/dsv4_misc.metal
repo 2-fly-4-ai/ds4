@@ -5779,6 +5779,55 @@ kernel void kernel_dsv4_topk_mask_scatter(
     }
 }
 
+// V4.1 candidate-source reduction: one thread reduces one small contiguous
+// block. The newest reachable block is pinned so a partly-filled recent block
+// cannot lose merely because older blocks contain more candidates.
+kernel void kernel_v41_candidate_block_scores(
+        device const float *scores [[buffer(0)]],
+        device       float *block_scores [[buffer(1)]],
+        constant uint &n_comp [[buffer(2)]],
+        constant uint &n_tokens [[buffer(3)]],
+        constant uint &visible0 [[buffer(4)]],
+        constant uint &visible_step [[buffer(5)]],
+        constant uint &block_size [[buffer(6)]],
+        uint gid [[thread_position_in_grid]]) {
+    const uint n_blocks = (n_comp + block_size - 1u) / block_size;
+    const uint total = n_blocks * n_tokens;
+    if (gid >= total) return;
+    const uint t = gid / n_blocks;
+    const uint b = gid - t * n_blocks;
+    const ulong visible_wide = (ulong)visible0 + (ulong)t * visible_step;
+    const uint visible = visible_wide < (ulong)n_comp
+        ? (uint)visible_wide : n_comp;
+    const uint begin = b * block_size;
+    const uint end = min(min(begin + block_size, visible), n_comp);
+    float best = -INFINITY;
+    for (uint c = begin; c < end; c++) {
+        best = max(best, scores[(ulong)t * n_comp + c]);
+    }
+    if (visible != 0u && b == (visible - 1u) / block_size) {
+        best = INFINITY;
+    }
+    block_scores[(ulong)t * n_blocks + b] = best;
+}
+
+// Expand a dense 0/-inf mask over candidate blocks to the corresponding rows.
+kernel void kernel_v41_candidate_expand_mask(
+        device const float *block_mask [[buffer(0)]],
+        device       float *row_mask [[buffer(1)]],
+        constant uint &n_comp [[buffer(2)]],
+        constant uint &n_tokens [[buffer(3)]],
+        constant uint &block_size [[buffer(4)]],
+        uint gid [[thread_position_in_grid]]) {
+    const uint total = n_comp * n_tokens;
+    if (gid >= total) return;
+    const uint n_blocks = (n_comp + block_size - 1u) / block_size;
+    const uint t = gid / n_comp;
+    const uint c = gid - t * n_comp;
+    row_mask[(ulong)t * n_comp + c] =
+        block_mask[(ulong)t * n_blocks + c / block_size];
+}
+
 // Sorts each token's selected compressed rows by row id. The indexer selects by
 // score, but attention scans compressed K/V in cache order in the dense graph.
 // Sorting preserves that order while still letting the indexed attention kernel

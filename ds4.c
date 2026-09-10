@@ -1225,6 +1225,7 @@ typedef struct {
     float *comp_latent;
 
     bool *index_allowed;
+    bool *v41_candidate_allowed;
     float *index_q;
     float *index_weights;
     float *index_scores;
@@ -15236,6 +15237,7 @@ static void cpu_decode_scratch_init(ds4_cpu_decode_scratch *scratch, uint32_t ct
     scratch->comp_latent = xmalloc((size_t)DS4_N_HEAD_DIM * sizeof(float));
 
     scratch->index_allowed = xmalloc((size_t)comp_cap * sizeof(bool));
+    scratch->v41_candidate_allowed = xmalloc((size_t)comp_cap * sizeof(bool));
     scratch->index_q = xmalloc((size_t)DS4_N_INDEXER_HEAD * DS4_N_INDEXER_HEAD_DIM * sizeof(float));
     scratch->index_weights = xmalloc((size_t)DS4_N_INDEXER_HEAD * sizeof(float));
     scratch->index_scores = xmalloc((size_t)comp_cap * sizeof(float));
@@ -15295,6 +15297,7 @@ static void cpu_decode_scratch_free(ds4_cpu_decode_scratch *scratch) {
     free(scratch->index_scores);
     free(scratch->index_weights);
     free(scratch->index_q);
+    free(scratch->v41_candidate_allowed);
     free(scratch->index_allowed);
     free(scratch->comp_latent);
     free(scratch->comp_pooled);
@@ -16016,6 +16019,66 @@ static void layer_attention_prefix_batch(
                               1);
 }
 
+typedef struct {
+    float score;
+    uint32_t block;
+} ds4_v41_candidate_block;
+
+static int ds4_v41_candidate_block_cmp(const void *a, const void *b) {
+    const ds4_v41_candidate_block *aa = a;
+    const ds4_v41_candidate_block *bb = b;
+    if (aa->score > bb->score) return -1;
+    if (aa->score < bb->score) return 1;
+    return aa->block < bb->block ? -1 : aa->block > bb->block;
+}
+
+/* Exact CPU reference for V4.1's first-stage sparse indexer.  Blocks are
+ * ranked by their best reachable row and the newest partly-filled block is
+ * pinned.  Later index-source layers apply this mask before choosing their
+ * own top-512 rows. */
+static void deepseek41_candidate_mask_from_scores(
+        bool        * out,
+        const float * scores,
+        uint32_t      n_comp,
+        uint32_t      compress_len) {
+    if (!out || n_comp == 0) return;
+    memset(out, 0, (size_t)n_comp * sizeof(out[0]));
+    if (compress_len > n_comp) compress_len = n_comp;
+    if (compress_len == 0) return;
+
+    const uint32_t block_size =
+        DS4_SHAPE_V41_FLASH.n_candidate_block_size;
+    const uint32_t n_blocks = (n_comp + block_size - 1u) / block_size;
+    const uint32_t configured_top =
+        DS4_SHAPE_V41_FLASH.n_candidate_topk_blocks;
+    const uint32_t top_blocks = configured_top < n_blocks
+        ? configured_top : n_blocks;
+    ds4_v41_candidate_block *blocks =
+        xmalloc((size_t)n_blocks * sizeof(blocks[0]));
+    for (uint32_t b = 0; b < n_blocks; b++) {
+        const uint32_t begin = b * block_size;
+        uint32_t end = begin + block_size;
+        if (end > compress_len) end = compress_len;
+        float best = DS4_NEG_INF;
+        for (uint32_t c = begin; c < end; c++) {
+            if (scores[c] > best) best = scores[c];
+        }
+        blocks[b].score = best;
+        blocks[b].block = b;
+    }
+    blocks[(compress_len - 1u) / block_size].score = FLT_MAX;
+    qsort(blocks, n_blocks, sizeof(blocks[0]),
+          ds4_v41_candidate_block_cmp);
+    for (uint32_t k = 0; k < top_blocks; k++) {
+        if (blocks[k].score <= DS4_NEG_INF * 0.5f) break;
+        const uint32_t begin = blocks[k].block * block_size;
+        uint32_t end = begin + block_size;
+        if (end > n_comp) end = n_comp;
+        for (uint32_t c = begin; c < end; c++) out[c] = true;
+    }
+    free(blocks);
+}
+
 /* Ratio-4 layers use an auxiliary indexer to select which compressed rows are
  * visible to attention.  This is the CPU allocation-owning helper. */
 static bool *indexer_allowed_decode_one(
@@ -16090,7 +16153,9 @@ static bool *indexer_allowed_decode_one_decode_scratch(
         uint32_t                  n_comp,
         uint32_t                  il,
         uint32_t                  pos,
-        ds4_cpu_decode_scratch  * scratch) {
+        ds4_cpu_decode_scratch  * scratch,
+        const bool              * candidate_filter,
+        bool                    * candidate_out) {
     if (n_comp == 0) return NULL;
     if (n_comp > scratch->comp_cap) ds4_die("CPU decode indexer scratch buffer is too small");
 
@@ -16098,6 +16163,9 @@ static bool *indexer_allowed_decode_one_decode_scratch(
     memset(allowed, 0, (size_t)n_comp * sizeof(allowed[0]));
     const uint32_t top_k = DS4_N_INDEXER_TOP_K < n_comp ? DS4_N_INDEXER_TOP_K : n_comp;
     if (top_k == n_comp) {
+        if (candidate_out) {
+            for (uint32_t i = 0; i < n_comp; i++) candidate_out[i] = true;
+        }
         for (uint32_t i = 0; i < n_comp; i++) allowed[i] = true;
         return allowed;
     }
@@ -16128,15 +16196,23 @@ static bool *indexer_allowed_decode_one_decode_scratch(
         scores[c] = s;
     }
 
+    if (candidate_out) {
+        deepseek41_candidate_mask_from_scores(candidate_out, scores,
+                                               n_comp, n_comp);
+    }
+
     for (uint32_t k = 0; k < top_k; k++) {
         uint32_t best = 0;
         float best_score = DS4_NEG_INF;
         for (uint32_t c = 0; c < n_comp; c++) {
-            if (!allowed[c] && scores[c] > best_score) {
+            if (!allowed[c] &&
+                (!candidate_filter || candidate_filter[c]) &&
+                scores[c] > best_score) {
                 best = c;
                 best_score = scores[c];
             }
         }
+        if (best_score <= DS4_NEG_INF * 0.5f) break;
         allowed[best] = true;
     }
 
@@ -16762,11 +16838,17 @@ static void layer_forward_raw_swa_one(
     if (ds4_model_is_deepseek41() && ratio != 0) {
         if (ds4_v41_layer_owns_index(il)) {
             t0 = profile ? now_sec() : 0.0;
+            const bool is_candidate_source =
+                il == (uint32_t)DS4_CANDIDATE_SOURCE_LAYER;
+            const bool *candidate_filter =
+                il > (uint32_t)DS4_CANDIDATE_SOURCE_LAYER
+                    ? scratch->v41_candidate_allowed : NULL;
             comp_allowed = indexer_allowed_decode_one_decode_scratch(
                 model, layer, scratch->attn_norm, scratch->qr_norm,
                 shared_cache->index_comp_kv,
                 shared_cache->n_index_comp,
-                il, pos, scratch);
+                il, pos, scratch, candidate_filter,
+                is_candidate_source ? scratch->v41_candidate_allowed : NULL);
             if (profile) t_indexer = now_sec() - t0;
         } else if (shared_cache->n_comp != 0) {
             comp_allowed = scratch->index_allowed;
@@ -16779,7 +16861,8 @@ static void layer_forward_raw_swa_one(
                                                                  cache->index_comp_kv,
                                                                  cache->n_index_comp,
                                                                  il, pos,
-                                                                 scratch);
+                                                                 scratch,
+                                                                 NULL, NULL);
         if (profile) t_indexer = now_sec() - t0;
     }
 
@@ -21027,6 +21110,12 @@ typedef struct {
     ds4_gpu_tensor *indexer_scores_by_tier[DS4_MAX_GPUS];
     ds4_gpu_tensor *comp_mask_by_tier[DS4_MAX_GPUS];
     ds4_gpu_tensor *comp_selected_by_tier[DS4_MAX_GPUS];
+    ds4_gpu_tensor *v41_candidate_block_scores_by_tier[DS4_MAX_GPUS];
+    ds4_gpu_tensor *v41_candidate_block_selected_by_tier[DS4_MAX_GPUS];
+    uint64_t v41_candidate_epoch;
+    uint64_t v41_candidate_tier_epoch[DS4_MAX_GPUS];
+    uint32_t v41_candidate_n_comp;
+    int v41_candidate_source_tier;
     ds4_gpu_tensor *heads_by_tier[DS4_MAX_GPUS];
     ds4_gpu_tensor *attn_low_by_tier[DS4_MAX_GPUS];
     ds4_gpu_tensor *attn_out_by_tier[DS4_MAX_GPUS];
@@ -21372,6 +21461,8 @@ DS4_GPU_GRAPH_CLASS_P_ACCESSOR(indexer_weights)
 DS4_GPU_GRAPH_CLASS_P_ACCESSOR(indexer_scores)
 DS4_GPU_GRAPH_CLASS_P_ACCESSOR(comp_mask)
 DS4_GPU_GRAPH_CLASS_P_ACCESSOR(comp_selected)
+DS4_GPU_GRAPH_CLASS_P_ACCESSOR(v41_candidate_block_scores)
+DS4_GPU_GRAPH_CLASS_P_ACCESSOR(v41_candidate_block_selected)
 DS4_GPU_GRAPH_CLASS_P_ACCESSOR(heads)
 DS4_GPU_GRAPH_CLASS_P_ACCESSOR(attn_low)
 DS4_GPU_GRAPH_CLASS_P_ACCESSOR(attn_out)
@@ -21597,6 +21688,23 @@ static bool metal_graph_set_active_tier_decode(ds4_gpu_graph *g, int tier) {
                     (uint64_t)DS4_N_INDEXER_TOP_K * sizeof(int32_t))) {
                 return false;
             }
+            if (g->v41_candidate_epoch != 0 &&
+                g->v41_candidate_tier_epoch[tier] !=
+                    g->v41_candidate_epoch &&
+                g->v41_candidate_source_tier >= 0 &&
+                g->v41_candidate_source_tier < DS4_MAX_GPUS) {
+                ds4_gpu_tensor *src_mask =
+                    g->comp_mask_by_tier[g->v41_candidate_source_tier];
+                ds4_gpu_tensor *dst_mask = g->comp_mask_by_tier[tier];
+                if (src_mask && dst_mask &&
+                    !ds4_gpu_tensor_copy_xdev(
+                        dst_mask, src_mask,
+                        (uint64_t)g->v41_candidate_n_comp * sizeof(float))) {
+                    return false;
+                }
+                g->v41_candidate_tier_epoch[tier] =
+                    g->v41_candidate_epoch;
+            }
         }
     }
     g->active_tier = tier;
@@ -21810,6 +21918,8 @@ static void metal_graph_free(ds4_gpu_graph *g) {
         ds4_gpu_tensor_free(g->attn_comp_stage_by_tier[t]);
         ds4_gpu_tensor_free(g->comp_mask_by_tier[t]);
         ds4_gpu_tensor_free(g->comp_selected_by_tier[t]);
+        ds4_gpu_tensor_free(g->v41_candidate_block_scores_by_tier[t]);
+        ds4_gpu_tensor_free(g->v41_candidate_block_selected_by_tier[t]);
         ds4_gpu_tensor_free(g->indexer_scores_by_tier[t]);
         ds4_gpu_tensor_free(g->indexer_weights_by_tier[t]);
         ds4_gpu_tensor_free(g->indexer_q_by_tier[t]);
@@ -22920,6 +23030,7 @@ static bool metal_graph_alloc_raw_cap(
     const int saved_dspark_exec_tier = g->dspark_exec_tier;
     memset(g, 0, sizeof(*g));
     g->dspark_exec_tier = saved_dspark_exec_tier;
+    g->v41_candidate_source_tier = -1;
     g->owns_prefill_workspace = shared_prefill_workspace == NULL;
     g->cpu_router_norm = xmalloc((size_t)DS4_N_EMBD * sizeof(g->cpu_router_norm[0]));
     g->active_tier = placement ? -1 : 0;
@@ -23273,6 +23384,18 @@ static bool metal_graph_alloc_raw_cap(
         g->comp_mask_by_tier[t] = ds4_gpu_tensor_alloc_ptr_on(t, (uint64_t)g->comp_cap * pc * sizeof(float));
         g->comp_selected_by_tier[t] = ds4_gpu_tensor_alloc_ptr_on(t,
                 (uint64_t)(DS4_N_INDEXER_TOP_K ? DS4_N_INDEXER_TOP_K : 1u) * pc * sizeof(uint32_t));
+        if (ds4_model_is_deepseek41()) {
+            const uint32_t candidate_blocks =
+                (g->comp_cap + DS4_N_CANDIDATE_BLOCK_SIZE - 1u) /
+                DS4_N_CANDIDATE_BLOCK_SIZE;
+            g->v41_candidate_block_scores_by_tier[t] =
+                ds4_gpu_tensor_alloc_ptr_on(
+                    t, (uint64_t)candidate_blocks * pc * sizeof(float));
+            g->v41_candidate_block_selected_by_tier[t] =
+                ds4_gpu_tensor_alloc_ptr_on(
+                    t, (uint64_t)DS4_N_CANDIDATE_TOPK_BLOCKS * pc *
+                       sizeof(uint32_t));
+        }
         g->heads_by_tier[t] = ds4_gpu_tensor_alloc_ptr_on(t, q_dim * sizeof(float));
         g->attn_low_by_tier[t] = ds4_gpu_tensor_alloc_ptr_on(t, low_dim * sizeof(float));
         g->attn_out_by_tier[t] = ds4_gpu_tensor_alloc_ptr_on(t, (uint64_t)DS4_N_EMBD * sizeof(float));
@@ -23508,6 +23631,9 @@ static bool metal_graph_alloc_raw_cap(
             (!DS4_GPU_ATTN_COMP_CACHE_F16 || g->attn_comp_stage_by_tier[t]) &&
             g->indexer_q_by_tier[t] && g->indexer_weights_by_tier[t] && g->indexer_scores_by_tier[t] &&
             g->comp_mask_by_tier[t] && g->comp_selected_by_tier[t] &&
+            (!ds4_model_is_deepseek41() ||
+             (g->v41_candidate_block_scores_by_tier[t] &&
+              g->v41_candidate_block_selected_by_tier[t])) &&
             g->heads_by_tier[t] && g->attn_low_by_tier[t] && g->attn_out_by_tier[t] &&
             g->after_attn_hc_by_tier[t] && g->ffn_cur_by_tier[t] && g->ffn_norm_by_tier[t] &&
             g->shared_gate_by_tier[t] && g->shared_up_by_tier[t] && g->shared_mid_by_tier[t] &&
@@ -28097,6 +28223,62 @@ static bool metal_graph_decode_v41_compressed(
                 g->layer_index_comp_cache[owner], n_comp,
                 DS4_N_INDEXER_HEAD, DS4_N_INDEXER_HEAD_DIM,
                 scale) != 0;
+
+        const uint32_t candidate_width =
+            DS4_N_CANDIDATE_TOPK_BLOCKS * DS4_N_CANDIDATE_BLOCK_SIZE;
+        if (ok && il == (uint32_t)DS4_CANDIDATE_SOURCE_LAYER &&
+            n_comp > candidate_width) {
+            const uint32_t n_blocks =
+                (n_comp + DS4_N_CANDIDATE_BLOCK_SIZE - 1u) /
+                DS4_N_CANDIDATE_BLOCK_SIZE;
+            ok = ds4_gpu_v41_candidate_block_scores_tensor(
+                    metal_graph_v41_candidate_block_scores(g),
+                    metal_graph_indexer_scores(g),
+                    n_comp, 1, n_comp, 0,
+                    DS4_N_CANDIDATE_BLOCK_SIZE) != 0;
+            if (ok) ok = ds4_gpu_indexer_topk_tensor(
+                    metal_graph_v41_candidate_block_selected(g),
+                    metal_graph_v41_candidate_block_scores(g),
+                    n_blocks, 1,
+                    DS4_N_CANDIDATE_TOPK_BLOCKS) != 0;
+            if (ok) ok = ds4_gpu_dsv4_topk_mask_tensor(
+                    metal_graph_v41_candidate_block_scores(g),
+                    metal_graph_v41_candidate_block_selected(g),
+                    n_blocks, 1,
+                    DS4_N_CANDIDATE_TOPK_BLOCKS) != 0;
+            if (ok) ok = ds4_gpu_v41_candidate_expand_mask_tensor(
+                    metal_graph_comp_mask(g),
+                    metal_graph_v41_candidate_block_scores(g),
+                    n_comp, 1,
+                    DS4_N_CANDIDATE_BLOCK_SIZE) != 0;
+            if (ok) {
+                if (++g->v41_candidate_epoch == 0) {
+                    g->v41_candidate_epoch = 1;
+                    memset(g->v41_candidate_tier_epoch, 0,
+                           sizeof(g->v41_candidate_tier_epoch));
+                }
+                g->v41_candidate_source_tier = g->active_tier;
+                g->v41_candidate_n_comp = n_comp;
+                g->v41_candidate_tier_epoch[g->active_tier] =
+                    g->v41_candidate_epoch;
+            }
+        } else if (ok && il > (uint32_t)DS4_CANDIDATE_SOURCE_LAYER &&
+                   n_comp > candidate_width) {
+            if (g->v41_candidate_epoch == 0 ||
+                g->v41_candidate_tier_epoch[g->active_tier] !=
+                    g->v41_candidate_epoch ||
+                g->v41_candidate_n_comp != n_comp) {
+                fprintf(stderr,
+                        "ds4: DeepSeek-V4.1 candidate mask is unavailable at layer %u\n",
+                        il);
+                ok = false;
+            } else {
+                ok = ds4_gpu_add_tensor(
+                        metal_graph_indexer_scores(g),
+                        metal_graph_indexer_scores(g),
+                        metal_graph_comp_mask(g), n_comp) != 0;
+            }
+        }
         if (ok) ok = ds4_gpu_indexer_topk_tensor(
                 metal_graph_comp_selected(g),
                 metal_graph_indexer_scores(g), n_comp, 1,
@@ -72384,6 +72566,15 @@ void ds4_test_deepseek41_compressor_pool(
     compressor_pool_decode_state(out, v, s, head_dim, ratio);
     free(s);
     free(v);
+}
+
+void ds4_test_deepseek41_candidate_mask(
+        bool        * out,
+        const float * scores,
+        uint32_t      n_comp,
+        uint32_t      compress_len) {
+    deepseek41_candidate_mask_from_scores(out, scores,
+                                           n_comp, compress_len);
 }
 
 int ds4_test_tensor_to_entry(const char *name, int name_len) {

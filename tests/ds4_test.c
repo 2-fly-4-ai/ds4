@@ -1349,6 +1349,60 @@ static void test_metal_v41_compressor_pool(void) {
     ds4_gpu_tensor_free(v);
 }
 
+static void test_metal_v41_candidate_blocks(void) {
+    enum { N_COMP = 21, BLOCK = 4, N_BLOCKS = 6, TOP = 2 };
+    const float scores[N_COMP] = {
+         1,  0, -1, -2,
+         9,  2,  1,  0,
+         8,  1,  0, -1,
+         7,  6,  5,  4,
+       -10,-20,-30,-40,
+       100,
+    };
+    float block_got[N_BLOCKS] = {0};
+    float mask_got[N_COMP] = {0};
+    uint32_t selected_got[TOP] = {0};
+    ds4_gpu_tensor *score_t = ds4_gpu_tensor_alloc(sizeof(scores));
+    ds4_gpu_tensor *block_t = ds4_gpu_tensor_alloc(sizeof(block_got));
+    ds4_gpu_tensor *selected_t = ds4_gpu_tensor_alloc(sizeof(selected_got));
+    ds4_gpu_tensor *mask_t = ds4_gpu_tensor_alloc(sizeof(mask_got));
+    TEST_ASSERT(score_t && block_t && selected_t && mask_t);
+    TEST_ASSERT(ds4_gpu_tensor_write(score_t, 0, scores,
+                                     sizeof(scores)) != 0);
+    TEST_ASSERT(ds4_gpu_v41_candidate_block_scores_tensor(
+        block_t, score_t, N_COMP, 1, 19, 0, BLOCK) != 0);
+    TEST_ASSERT(ds4_gpu_tensor_read(block_t, 0, block_got,
+                                    sizeof(block_got)) != 0);
+    TEST_ASSERT(block_got[0] == 1.0f);
+    TEST_ASSERT(block_got[1] == 9.0f);
+    TEST_ASSERT(block_got[2] == 8.0f);
+    TEST_ASSERT(block_got[3] == 7.0f);
+    TEST_ASSERT(block_got[4] > 1.0e30f);
+    TEST_ASSERT(isinf(block_got[5]) && block_got[5] < 0.0f);
+
+    TEST_ASSERT(ds4_gpu_indexer_topk_tensor(selected_t, block_t,
+                                             N_BLOCKS, 1, TOP) != 0);
+    TEST_ASSERT(ds4_gpu_tensor_read(selected_t, 0, selected_got,
+                                    sizeof(selected_got)) != 0);
+    TEST_ASSERT((selected_got[0] == 4 && selected_got[1] == 1) ||
+                (selected_got[0] == 1 && selected_got[1] == 4));
+    TEST_ASSERT(ds4_gpu_dsv4_topk_mask_tensor(block_t, selected_t,
+                                               N_BLOCKS, 1, TOP) != 0);
+    TEST_ASSERT(ds4_gpu_v41_candidate_expand_mask_tensor(
+        mask_t, block_t, N_COMP, 1, BLOCK) != 0);
+    TEST_ASSERT(ds4_gpu_tensor_read(mask_t, 0, mask_got,
+                                    sizeof(mask_got)) != 0);
+    for (uint32_t c = 0; c < N_COMP; c++) {
+        const bool want = (c >= 4 && c < 8) || (c >= 16 && c < 20);
+        if (want) TEST_ASSERT(mask_got[c] == 0.0f);
+        else TEST_ASSERT(isinf(mask_got[c]) && mask_got[c] < 0.0f);
+    }
+    ds4_gpu_tensor_free(mask_t);
+    ds4_gpu_tensor_free(selected_t);
+    ds4_gpu_tensor_free(block_t);
+    ds4_gpu_tensor_free(score_t);
+}
+
 static void test_metal_f16_compressor_pair_state_store_exact_case(
         uint32_t width,
         uint32_t ratio,
@@ -6279,6 +6333,7 @@ static void test_metal_kernel_group(void) {
     test_metal_q8_0_decode_pair_exact();
 #if defined(__APPLE__)
     test_metal_v41_compressor_pool();
+    test_metal_v41_candidate_blocks();
     test_metal_batch_qkv_finalizer_exact();
     test_metal_f16_compressor_pair_state_store_exact();
     test_metal_comp_rows_update_exact();

@@ -115,6 +115,37 @@ static void test_ratio2_per_dimension_softmax_pool(void) {
     for (int i = 0; i < 3; i++) assert(fabsf(out[i] - want[i]) < 1e-6f);
 }
 
+static void test_candidate_block_selection(void) {
+    enum { N = 2049 * 8 + 3 };
+    float scores[N];
+    bool mask[N];
+    for (uint32_t i = 0; i < N; i++) scores[i] = -(float)i;
+
+    /* There are 2,050 blocks, so exactly two lose.  Block 2049 is the newest
+     * partial block and must remain pinned even though its values rank last. */
+    ds4_test_deepseek41_candidate_mask(mask, scores, N, N);
+    uint32_t kept_blocks = 0;
+    for (uint32_t b = 0; b < 2050; b++) {
+        const bool kept = mask[b * 8];
+        if (kept) kept_blocks++;
+        for (uint32_t c = b * 8; c < N && c < (b + 1u) * 8u; c++) {
+            assert(mask[c] == kept);
+        }
+    }
+    assert(kept_blocks == 2048);
+    assert(mask[2049 * 8]);
+    assert(!mask[2047 * 8]);
+    assert(!mask[2048 * 8]);
+
+    /* Unreachable tail blocks are never kept, even if their stored values are
+     * large; the newest reachable partial block is the one that gets pinned. */
+    const uint32_t visible = 17;
+    for (uint32_t i = visible; i < N; i++) scores[i] = 1000000.0f;
+    ds4_test_deepseek41_candidate_mask(mask, scores, N, visible);
+    for (uint32_t i = 24; i < N; i++) assert(!mask[i]);
+    assert(mask[16]);
+}
+
 int main(void) {
     test_profile();
     test_compress_ratios();
@@ -122,6 +153,7 @@ int main(void) {
     test_reasoning_effort();
     test_previous_pre_mix_hc_transition();
     test_ratio2_per_dimension_softmax_pool();
+    test_candidate_block_selection();
     puts("deepseek41 spec tests: ok");
     return 0;
 }

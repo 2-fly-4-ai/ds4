@@ -706,6 +706,26 @@ int ds4_gpu_dsv4_topk_mask_tensor(
         uint32_t                n_tokens,
         uint32_t                top_k);
 
+/* DeepSeek-V4.1's first-stage sparse indexer.  The first kernel reduces each
+ * contiguous block to its best reachable score and pins the newest reachable
+ * block.  After ordinary top-k plus dsv4_topk_mask, the second kernel expands
+ * the block mask back to one 0/-inf entry per compressed row. */
+int ds4_gpu_v41_candidate_block_scores_tensor(
+        ds4_gpu_tensor       *block_scores,
+        const ds4_gpu_tensor *scores,
+        uint32_t              n_comp,
+        uint32_t              n_tokens,
+        uint32_t              visible0,
+        uint32_t              visible_step,
+        uint32_t              block_size);
+
+int ds4_gpu_v41_candidate_expand_mask_tensor(
+        ds4_gpu_tensor       *row_mask,
+        const ds4_gpu_tensor *block_mask,
+        uint32_t              n_comp,
+        uint32_t              n_tokens,
+        uint32_t              block_size);
+
 /* =========================================================================
  * Dense Projections, Norms, RoPE, and KV Rounding.
  * =========================================================================
