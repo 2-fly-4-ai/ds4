@@ -33077,6 +33077,18 @@ static bool metal_graph_matmul_plain_tensor(
         return ds4_gpu_matmul_f32_tensor(out, model->map, model->size,
                                            w->abs_offset, in_dim, out_dim, x, n_tok) != 0;
     }
+    if (w->type == DS4_TENSOR_BF16) {
+        if (in_dim > UINT32_MAX || out_dim > UINT32_MAX ||
+            n_tok > UINT32_MAX) return false;
+        return ds4_gpu_glm53_matmul_bf16(out,
+                                         model->map,
+                                         model->size,
+                                         w->abs_offset,
+                                         (uint32_t)in_dim,
+                                         (uint32_t)out_dim,
+                                         x,
+                                         (uint32_t)n_tok) != 0;
+    }
     if (w->type == DS4_TENSOR_Q8_0) {
         return ds4_gpu_matmul_q8_0_tensor(out, model->map, model->size,
                                             w->abs_offset, in_dim, out_dim, x, n_tok) != 0;
