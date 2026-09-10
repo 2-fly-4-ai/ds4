@@ -49,6 +49,7 @@
 /tests/test_glm_stream_interleave
 /tests/test_qwen_stream_interleave
 /tests/test_deepseek4_vision_image
+/tests/test_deepseek41_spec
 /speed-bench/route_repeat_bench
 /speed-bench/fixed_teacher_bench
 *.o
