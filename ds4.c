@@ -64467,6 +64467,22 @@ static uint32_t session_raw_live_rows(const ds4_gpu_graph *g, uint32_t checkpoin
     return rows;
 }
 
+static uint32_t session_graph_layer_count(void) {
+    return ds4_model_executable_layer_count();
+}
+
+static bool session_graph_layer_owns_compressed_state(uint32_t il) {
+    const uint32_t ratio = ds4_layer_compress_ratio(il);
+    return ratio != 0 &&
+           (!ds4_model_is_deepseek41() || ds4_v41_layer_owns_kv(il));
+}
+
+static bool session_graph_layer_owns_index_state(uint32_t il) {
+    return session_graph_layer_owns_compressed_state(il) &&
+           (ds4_layer_compress_ratio(il) == 4 ||
+            ds4_model_is_deepseek41());
+}
+
 /* Return the exact engine-owned payload size, excluding the server's KVC file
  * header and observability text.  This is deliberately based on live row counts
  * rather than capacities so the disk cache scales with saved tokens, not with
@@ -64474,14 +64490,15 @@ static uint32_t session_raw_live_rows(const ds4_gpu_graph *g, uint32_t checkpoin
 static uint64_t session_payload_live_tensor_bytes(const ds4_gpu_graph *g, uint32_t checkpoint_len) {
     uint64_t bytes = 0;
     const uint32_t raw_live = session_raw_live_rows(g, checkpoint_len);
-    for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
+    const uint32_t n_layers = session_graph_layer_count();
+    for (uint32_t il = 0; il < n_layers; il++) {
         bytes += (uint64_t)raw_live * DS4_N_HEAD_DIM * sizeof(float);
         const uint32_t ratio = ds4_layer_compress_ratio(il);
-        if (ratio == 0) continue;
+        if (!session_graph_layer_owns_compressed_state(il)) continue;
         bytes += (uint64_t)g->layer_n_comp[il] * DS4_N_HEAD_DIM * sizeof(float);
         bytes += layer_attn_state_bytes(ratio);
         bytes += layer_attn_state_bytes(ratio);
-        if (ratio == 4) {
+        if (session_graph_layer_owns_index_state(il)) {
             bytes += (uint64_t)g->layer_n_index_comp[il] * DS4_N_INDEXER_HEAD_DIM * sizeof(float);
             bytes += layer_index_state_bytes(ratio);
             bytes += layer_index_state_bytes(ratio);
@@ -64965,6 +64982,10 @@ uint64_t ds4_session_layer_payload_bytes(ds4_session *s,
     if (!s || !s->checkpoint_valid ||
         !ds4_layer_payload_range_valid(layer_start, layer_end))
         return 0;
+    /* V4.1 shares compressed/index state across layer groups and is rejected
+     * by the distributed engine today.  Do not let the legacy per-layer shard
+     * format accidentally serialize a plausible-looking incomplete payload. */
+    if (ds4_model_is_deepseek41()) return 0;
     if (ds4_session_is_cpu(s)) return 0;
     if (ds4_session_is_glm(s)) {
 #ifdef DS4_NO_GPU
@@ -65034,6 +65055,11 @@ int ds4_session_save_layer_payload(ds4_session *s, FILE *fp,
     if (!s || !fp || !s->checkpoint_valid ||
         !ds4_layer_payload_range_valid(layer_start, layer_end)) {
         payload_set_err(err, errlen, "invalid session layer payload save");
+        return 1;
+    }
+    if (ds4_model_is_deepseek41()) {
+        payload_set_err(err, errlen,
+                        "DeepSeek V4.1 distributed layer snapshots are unsupported");
         return 1;
     }
     if (ds4_session_is_cpu(s)) {
@@ -65302,6 +65328,11 @@ int ds4_session_load_layer_payload(ds4_session *s, FILE *fp,
     if (!s || !fp || !tokens ||
         !ds4_layer_payload_range_valid(layer_start, layer_end)) {
         payload_set_err(err, errlen, "invalid session layer payload load");
+        return 1;
+    }
+    if (ds4_model_is_deepseek41()) {
+        payload_set_err(err, errlen,
+                        "DeepSeek V4.1 distributed layer snapshots are unsupported");
         return 1;
     }
     if (ds4_session_is_cpu(s)) {
@@ -65984,6 +66015,10 @@ uint64_t ds4_session_payload_bytes(ds4_session *s) {
     if (!s || !s->checkpoint_valid) return 0;
     if (s->distributed) return 0;
     if (ds4_session_is_cpu(s)) {
+        /* The V4.1 CPU cache still has the legacy one-compressor-per-layer
+         * topology. Until it gains exact Engram/shared-state persistence,
+         * explicitly keep it out of the durable cache format. */
+        if (ds4_model_is_deepseek41()) return 0;
         uint64_t bytes = (uint64_t)DS4_SESSION_PAYLOAD_U32_FIELDS * sizeof(uint32_t);
         bytes += (uint64_t)s->checkpoint.len * sizeof(uint32_t);
         bytes += (uint64_t)DS4_N_VOCAB * sizeof(float);
@@ -66015,11 +66050,16 @@ uint64_t ds4_session_payload_bytes(ds4_session *s) {
     return 0;
 #else
     const ds4_gpu_graph *g = &s->graph;
+    /* Token-only payloads cannot reconstruct which positions were replaced by
+     * visual embeddings. Refuse those checkpoints instead of silently
+     * restoring text-token Engram history for image rows. */
+    if (ds4_model_is_deepseek41() && s->checkpoint_image_count != 0) return 0;
+    const uint32_t n_layers = session_graph_layer_count();
     uint64_t bytes = (uint64_t)DS4_SESSION_PAYLOAD_U32_FIELDS * sizeof(uint32_t);
     bytes += (uint64_t)s->checkpoint.len * sizeof(uint32_t);
     bytes += (uint64_t)DS4_N_VOCAB * sizeof(float);
-    bytes += (uint64_t)DS4_N_LAYER * sizeof(uint32_t);
-    bytes += (uint64_t)DS4_N_LAYER * sizeof(uint32_t);
+    bytes += (uint64_t)n_layers * sizeof(uint32_t);
+    bytes += (uint64_t)n_layers * sizeof(uint32_t);
     bytes += session_payload_live_tensor_bytes(g, (uint32_t)s->checkpoint.len);
     return bytes;
 #endif
@@ -66345,6 +66385,11 @@ int ds4_session_save_payload(ds4_session *s, FILE *fp, char *err, size_t errlen)
     if (s->distributed) {
         return ds4_dist_session_save_payload(s->distributed, s, fp, err, errlen);
     }
+    if (ds4_model_is_deepseek41() && s->checkpoint_image_count != 0) {
+        payload_set_err(err, errlen,
+                        "DeepSeek V4.1 image checkpoints cannot yet restore visual-token state");
+        return 1;
+    }
     if (ds4_session_is_qwen4(s)) {
 #ifdef DS4_NO_GPU
         payload_set_err(err, errlen, "graph backend support is not compiled in");
@@ -66485,6 +66530,11 @@ int ds4_session_save_payload(ds4_session *s, FILE *fp, char *err, size_t errlen)
 #endif
     }
     if (ds4_session_is_cpu(s)) {
+        if (ds4_model_is_deepseek41()) {
+            payload_set_err(err, errlen,
+                            "DeepSeek V4.1 CPU checkpoints are unsupported");
+            return 1;
+        }
         const uint32_t raw_live = session_cpu_raw_live_rows(s);
         const uint32_t raw_cap = ds4_default_raw_cap((uint32_t)s->ctx_size);
         const uint32_t comp_cap = session_cpu_comp_cap(s);
@@ -66560,6 +66610,7 @@ int ds4_session_save_payload(ds4_session *s, FILE *fp, char *err, size_t errlen)
 
     ds4_gpu_graph *g = &s->graph;
     const uint32_t raw_live = session_raw_live_rows(g, (uint32_t)s->checkpoint.len);
+    const uint32_t n_layers = session_graph_layer_count();
     /* Header fields:
      *   0 magic, 1 version, 2 ctx, 3 prefill chunk, 4 raw cap,
      *   5 raw window, 6 compressed cap, 7 token count,
@@ -66575,7 +66626,7 @@ int ds4_session_save_payload(ds4_session *s, FILE *fp, char *err, size_t errlen)
         g->raw_window,
         g->comp_cap,
         (uint32_t)s->checkpoint.len,
-        DS4_N_LAYER,
+        n_layers,
         DS4_N_HEAD_DIM,
         DS4_N_INDEXER_HEAD_DIM,
         DS4_N_VOCAB,
@@ -66588,16 +66639,16 @@ int ds4_session_save_payload(ds4_session *s, FILE *fp, char *err, size_t errlen)
         if (payload_write_u32(fp, (uint32_t)s->checkpoint.v[i], err, errlen) != 0) return 1;
     }
     if (payload_write_bytes(fp, s->logits, (uint64_t)DS4_N_VOCAB * sizeof(float), err, errlen) != 0) return 1;
-    for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
+    for (uint32_t il = 0; il < n_layers; il++) {
         if (payload_write_u32(fp, g->layer_n_comp[il], err, errlen) != 0) return 1;
     }
-    for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
+    for (uint32_t il = 0; il < n_layers; il++) {
         if (payload_write_u32(fp, g->layer_n_index_comp[il], err, errlen) != 0) return 1;
     }
 
     uint8_t *buf = xmalloc(DS4_SESSION_IO_CHUNK);
     int rc = 0;
-    for (uint32_t il = 0; rc == 0 && il < DS4_N_LAYER; il++) {
+    for (uint32_t il = 0; rc == 0 && il < n_layers; il++) {
         /* Write the raw ring in logical position order.  The file does not care
          * where the rows happened to live physically in the source graph. */
         const uint32_t raw_first = (uint32_t)s->checkpoint.len - raw_live;
@@ -66614,7 +66665,7 @@ int ds4_session_save_payload(ds4_session *s, FILE *fp, char *err, size_t errlen)
                                            errlen);
         }
         const uint32_t ratio = ds4_layer_compress_ratio(il);
-        if (rc != 0 || ratio == 0) continue;
+        if (rc != 0 || !session_graph_layer_owns_compressed_state(il)) continue;
         /* Compressed rows are append-only from row zero, so the live prefix is
          * contiguous.  The two compressor state tensors hold the partial window
          * that will become the next compressed row. */
@@ -66653,7 +66704,7 @@ int ds4_session_save_payload(ds4_session *s, FILE *fp, char *err, size_t errlen)
                                                     DS4_SESSION_IO_CHUNK,
                                                     err,
                                                     errlen);
-        if (rc == 0 && ratio == 4) {
+        if (rc == 0 && session_graph_layer_owns_index_state(il)) {
             rc = payload_write_tensor_span(fp,
                                            g->layer_index_comp_cache[il],
                                            0,
@@ -66695,6 +66746,11 @@ int ds4_session_load_payload(ds4_session *s, FILE *fp, uint64_t payload_bytes, c
     }
     if (s->distributed) {
         return ds4_dist_session_load_payload(s->distributed, s, fp, payload_bytes, err, errlen);
+    }
+    if (ds4_model_is_deepseek41() && ds4_session_is_cpu(s)) {
+        payload_set_err(err, errlen,
+                        "DeepSeek V4.1 CPU checkpoints are unsupported");
+        return 1;
     }
     uint64_t remaining = payload_bytes;
     uint32_t h[DS4_SESSION_PAYLOAD_U32_FIELDS];
@@ -67075,6 +67131,7 @@ int ds4_session_load_payload(ds4_session *s, FILE *fp, uint64_t payload_bytes, c
     return 1;
 #else
     ds4_gpu_graph *g = &s->graph;
+    const uint32_t n_layers = session_graph_layer_count();
     const uint32_t saved_ctx = h[2];
     const uint32_t saved_prefill_cap = h[3];
     const uint32_t saved_raw_cap = h[4];
@@ -67086,7 +67143,7 @@ int ds4_session_load_payload(ds4_session *s, FILE *fp, uint64_t payload_bytes, c
         payload_set_err(err, errlen, "KV checkpoint does not fit current context");
         return 1;
     }
-    if (h[8] != DS4_N_LAYER || h[9] != DS4_N_HEAD_DIM ||
+    if (h[8] != n_layers || h[9] != DS4_N_HEAD_DIM ||
         h[10] != DS4_N_INDEXER_HEAD_DIM || h[11] != DS4_N_VOCAB)
     {
         payload_set_err(err, errlen, "KV checkpoint was written for a different DS4 layout");
@@ -67129,9 +67186,9 @@ int ds4_session_load_payload(ds4_session *s, FILE *fp, uint64_t payload_bytes, c
         token_vec_free(&new_checkpoint);
         return 1;
     }
-    uint32_t n_comp[DS4_MAX_LAYER];
-    uint32_t n_index_comp[DS4_MAX_LAYER];
-    for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
+    uint32_t n_comp[DS4_MAX_LAYER] = {0};
+    uint32_t n_index_comp[DS4_MAX_LAYER] = {0};
+    for (uint32_t il = 0; il < n_layers; il++) {
         if (payload_read_u32(fp, &n_comp[il], &remaining, err, errlen) != 0) {
             token_vec_free(&new_checkpoint);
             return 1;
@@ -67142,7 +67199,7 @@ int ds4_session_load_payload(ds4_session *s, FILE *fp, uint64_t payload_bytes, c
             return 1;
         }
     }
-    for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
+    for (uint32_t il = 0; il < n_layers; il++) {
         if (payload_read_u32(fp, &n_index_comp[il], &remaining, err, errlen) != 0) {
             token_vec_free(&new_checkpoint);
             return 1;
@@ -67167,7 +67224,7 @@ int ds4_session_load_payload(ds4_session *s, FILE *fp, uint64_t payload_bytes, c
 
     uint8_t *buf = xmalloc(DS4_SESSION_IO_CHUNK);
     int rc = 0;
-    for (uint32_t il = 0; rc == 0 && il < DS4_N_LAYER; il++) {
+    for (uint32_t il = 0; rc == 0 && il < n_layers; il++) {
         /* Rebuild the physical raw ring expected by the current graph.  This is
          * why the file stores rows in logical order instead of dumping bytes from
          * the old ring layout. */
@@ -67186,7 +67243,7 @@ int ds4_session_load_payload(ds4_session *s, FILE *fp, uint64_t payload_bytes, c
                                           errlen);
         }
         const uint32_t ratio = ds4_layer_compress_ratio(il);
-        if (rc != 0 || ratio == 0) continue;
+        if (rc != 0 || !session_graph_layer_owns_compressed_state(il)) continue;
         if (DS4_GPU_ATTN_COMP_CACHE_F16) {
             rc = payload_read_tensor_span_f32_as_f16(fp,
                                                      g->layer_attn_comp_cache[il],
@@ -67226,7 +67283,7 @@ int ds4_session_load_payload(ds4_session *s, FILE *fp, uint64_t payload_bytes, c
                                                    &remaining,
                                                    err,
                                                    errlen);
-        if (rc == 0 && ratio == 4) {
+        if (rc == 0 && session_graph_layer_owns_index_state(il)) {
             rc = payload_read_tensor_span(fp,
                                           g->layer_index_comp_cache[il],
                                           0,
@@ -67272,9 +67329,37 @@ int ds4_session_load_payload(ds4_session *s, FILE *fp, uint64_t payload_bytes, c
         return 1;
     }
 
+    if (ds4_model_is_deepseek41()) {
+        if (!g->v41_engram_tokens || saved_tokens > g->v41_engram_token_cap) {
+            token_vec_free(&new_checkpoint);
+            payload_set_err(err, errlen,
+                            "KV checkpoint cannot restore DeepSeek V4.1 Engram history");
+            return 1;
+        }
+        for (uint32_t pos = 0; pos < g->v41_engram_token_cap; pos++) {
+            g->v41_engram_tokens[pos] = -1;
+        }
+        for (uint32_t pos = 0; pos < saved_tokens; pos++) {
+            const int tok = new_checkpoint.v[pos];
+            if (tok < 0 || tok >= (int)DS4_N_VOCAB) {
+                token_vec_free(&new_checkpoint);
+                payload_set_err(err, errlen,
+                                "KV checkpoint has an invalid DeepSeek V4.1 token id");
+                return 1;
+            }
+            g->v41_engram_tokens[pos] =
+                (int32_t)g_ds4_v41_engram_token_map[tok];
+        }
+        g->v41_candidate_epoch = 0;
+        g->v41_candidate_n_comp = 0;
+        g->v41_candidate_source_tier = -1;
+        memset(g->v41_candidate_tier_epoch, 0,
+               sizeof(g->v41_candidate_tier_epoch));
+    }
+
     token_vec_free(&s->checkpoint);
     s->checkpoint = new_checkpoint;
-    for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
+    for (uint32_t il = 0; il < n_layers; il++) {
         g->layer_n_comp[il] = n_comp[il];
         g->layer_n_index_comp[il] = n_index_comp[il];
     }
