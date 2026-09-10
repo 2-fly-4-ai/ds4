@@ -479,6 +479,13 @@ int32_t ds4_test_deepseek41_kv_source(uint32_t layer);
 int32_t ds4_test_deepseek41_index_source(uint32_t layer);
 int ds4_test_deepseek41_owns_kv(uint32_t layer);
 int ds4_test_deepseek41_owns_index(uint32_t layer);
+void ds4_test_deepseek41_hc_transition(float *collapsed, float *next_hc,
+                                       const float *residual_hc,
+                                       const float *incoming_pre,
+                                       const float *current_post,
+                                       const float *current_comb,
+                                       const float *sublayer_out,
+                                       uint32_t n_embd, uint32_t n_hc);
 int ds4_test_sample_logits(const float *logits, uint32_t n_vocab,
                            float temperature, int top_k,
                            float top_p, float min_p, uint64_t *rng,

@@ -1253,6 +1253,9 @@ typedef struct {
     float *output_weights;
     float *output_embd;
     float *output_norm;
+
+    /* V4.1 consumes the pre-mix produced by the previous sublayer. */
+    float v41_pre_mix[DS4_MAX_HC];
 } ds4_cpu_decode_scratch;
 
 static const uint8_t kmask_iq2xs[8] = {
@@ -12749,13 +12752,13 @@ static void hc_weighted_sum_one(
 
 /* HC pre step for one token.  It normalizes the HC state, projects the control
  * vector, runs the Sinkhorn split, and emits the sublayer input plus post data. */
-static void hc_pre_from_state_one_scratch(
+static void hc_mixes_from_state_one_scratch(
         const ds4_model   * model,
         const ds4_tensor  * fn,
         const ds4_tensor  * scale_tensor,
         const ds4_tensor  * base_tensor,
         const float       * residual_hc,
-        float             * out,
+        float             * pre,
         float             * post,
         float             * comb,
         float             * flat,
@@ -12776,10 +12779,30 @@ static void hc_pre_from_state_one_scratch(
     const float *scale = tensor_data(model, scale_tensor);
     const float *base = tensor_data(model, base_tensor);
     hc_split_sinkhorn_one(split, mix, scale, base, (int)n_hc, DS4_N_HC_SINKHORN_ITER, 1.0e-6f);
-    hc_weighted_sum_one(out, residual_hc, split, DS4_N_EMBD, n_hc);
 
+    memcpy(pre, split, n_hc * sizeof(pre[0]));
     memcpy(post, split + n_hc, n_hc * sizeof(post[0]));
     memcpy(comb, split + 2 * n_hc, n_hc * n_hc * sizeof(comb[0]));
+}
+
+/* Legacy HC pre step: derive and immediately consume the current pre-mix.
+ * V4.1 calls the split helper directly and consumes its carried pre-mix. */
+static void hc_pre_from_state_one_scratch(
+        const ds4_model   * model,
+        const ds4_tensor  * fn,
+        const ds4_tensor  * scale_tensor,
+        const ds4_tensor  * base_tensor,
+        const float       * residual_hc,
+        float             * out,
+        float             * post,
+        float             * comb,
+        float             * flat,
+        bool                serial_fn) {
+    float pre[DS4_MAX_HC];
+    hc_mixes_from_state_one_scratch(model, fn, scale_tensor, base_tensor,
+                                     residual_hc, pre, post, comb, flat,
+                                     serial_fn);
+    hc_weighted_sum_one(out, residual_hc, pre, DS4_N_EMBD, DS4_N_HC);
 }
 
 static void hc_pre_from_state_one(
@@ -14644,15 +14667,27 @@ static void layer_ffn_one_decode_scratch(
     double t_post = 0.0;
     float post[4];
     float comb[16];
+    float pre[DS4_MAX_HC];
 
     double t0 = profile ? now_sec() : 0.0;
-    hc_pre_from_state_one_scratch(model,
-                                  layer->hc_ffn_fn,
-                                  layer->hc_ffn_scale,
-                                  layer->hc_ffn_base,
-                                  inp_hc, scratch->ffn_cur, post, comb,
-                                  scratch->hc_flat,
-                                  false);
+    if (ds4_model_is_deepseek41()) {
+        hc_mixes_from_state_one_scratch(model,
+                                        layer->hc_ffn_fn,
+                                        layer->hc_ffn_scale,
+                                        layer->hc_ffn_base,
+                                        inp_hc, pre, post, comb,
+                                        scratch->hc_flat, false);
+        hc_weighted_sum_one(scratch->ffn_cur, inp_hc,
+                            scratch->v41_pre_mix, DS4_N_EMBD, n_hc);
+        memcpy(scratch->v41_pre_mix, pre, n_hc * sizeof(pre[0]));
+    } else {
+        hc_pre_from_state_one_scratch(model,
+                                      layer->hc_ffn_fn,
+                                      layer->hc_ffn_scale,
+                                      layer->hc_ffn_base,
+                                      inp_hc, scratch->ffn_cur, post, comb,
+                                      scratch->hc_flat, false);
+    }
     if (profile) t_hc = now_sec() - t0;
 
     t0 = profile ? now_sec() : 0.0;
@@ -16508,16 +16543,29 @@ static void layer_forward_raw_swa_one(
     bool *comp_allowed = NULL;
     float post[4];
     float comb[16];
+    float pre[DS4_MAX_HC];
 
     double t0 = profile ? now_sec() : 0.0;
     memcpy(scratch->attn_residual, inp_hc, (size_t)n_hc * DS4_N_EMBD * sizeof(inp_hc[0]));
-    hc_pre_from_state_one_scratch(model,
-                                  layer->hc_attn_fn,
-                                  layer->hc_attn_scale,
-                                  layer->hc_attn_base,
-                                  scratch->attn_residual, scratch->attn_cur, post, comb,
-                                  scratch->hc_flat,
-                                  false);
+    if (ds4_model_is_deepseek41()) {
+        hc_mixes_from_state_one_scratch(model,
+                                        layer->hc_attn_fn,
+                                        layer->hc_attn_scale,
+                                        layer->hc_attn_base,
+                                        scratch->attn_residual,
+                                        pre, post, comb,
+                                        scratch->hc_flat, false);
+        hc_weighted_sum_one(scratch->attn_cur, scratch->attn_residual,
+                            scratch->v41_pre_mix, DS4_N_EMBD, n_hc);
+        memcpy(scratch->v41_pre_mix, pre, n_hc * sizeof(pre[0]));
+    } else {
+        hc_pre_from_state_one_scratch(model,
+                                      layer->hc_attn_fn,
+                                      layer->hc_attn_scale,
+                                      layer->hc_attn_base,
+                                      scratch->attn_residual, scratch->attn_cur,
+                                      post, comb, scratch->hc_flat, false);
+    }
     if (profile) t_hc = now_sec() - t0;
 
     t0 = profile ? now_sec() : 0.0;
@@ -16670,7 +16718,15 @@ static void forward_token_raw_swa_cpu_decode_scratch(
     embed_token_f16(model, weights, token, scratch->plain);
     hc_from_plain_embedding(cur, scratch->plain, DS4_N_EMBD, DS4_N_HC);
 
-    for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
+    if (ds4_model_is_deepseek41()) {
+        memset(scratch->v41_pre_mix, 0, sizeof(scratch->v41_pre_mix));
+        scratch->v41_pre_mix[0] = 1.0f;
+    }
+
+    const uint32_t n_backbone = ds4_model_is_deepseek41()
+        ? directional_steering_layer_count()
+        : DS4_N_LAYER;
+    for (uint32_t il = 0; il < n_backbone; il++) {
         layer_forward_raw_swa_one(next, model, &weights->layer[il], &cache->layer[il],
                                   cur, il, pos, token,
                                   steering_dirs,
@@ -16965,6 +17021,7 @@ static void output_hc_head_one(
         const float       * inp_hc) {
     const uint32_t n_hc = DS4_N_HC;
     const uint64_t hc_dim = (uint64_t)DS4_N_EMBD * n_hc;
+
     float *flat = xmalloc((size_t)hc_dim * sizeof(flat[0]));
     float *pre = xmalloc((size_t)n_hc * sizeof(pre[0]));
     float *w = xmalloc((size_t)n_hc * sizeof(w[0]));
@@ -20608,6 +20665,17 @@ static void output_logits_one_decode_scratch(
         ds4_cpu_decode_scratch * scratch) {
     const uint32_t n_hc = DS4_N_HC;
     const uint64_t hc_dim = (uint64_t)DS4_N_EMBD * n_hc;
+
+    if (ds4_model_is_deepseek41()) {
+        hc_weighted_sum_one(scratch->output_embd, inp_hc,
+                            scratch->v41_pre_mix, DS4_N_EMBD, n_hc);
+        rms_norm_weight(scratch->output_norm, scratch->output_embd,
+                        tensor_data(model, weights->output_norm),
+                        DS4_N_EMBD, DS4_RMS_EPS);
+        matvec_q8_0_decode_scratch(logits, model, weights->output,
+                                   scratch->output_norm, scratch);
+        return;
+    }
 
     rms_norm_no_weight(scratch->output_flat, inp_hc, hc_dim, DS4_RMS_EPS);
     matvec_f16(scratch->output_pre, model, weights->output_hc_fn, scratch->output_flat);
@@ -71832,6 +71900,21 @@ int ds4_test_deepseek41_owns_kv(uint32_t layer) {
 
 int ds4_test_deepseek41_owns_index(uint32_t layer) {
     return ds4_v41_layer_owns_index(layer) ? 1 : 0;
+}
+
+void ds4_test_deepseek41_hc_transition(
+        float       * collapsed,
+        float       * next_hc,
+        const float * residual_hc,
+        const float * incoming_pre,
+        const float * current_post,
+        const float * current_comb,
+        const float * sublayer_out,
+        uint32_t      n_embd,
+        uint32_t      n_hc) {
+    hc_weighted_sum_one(collapsed, residual_hc, incoming_pre, n_embd, n_hc);
+    hc_post_one(next_hc, sublayer_out, residual_hc,
+                current_post, current_comb, n_embd, n_hc);
 }
 
 int ds4_test_tensor_to_entry(const char *name, int name_len) {

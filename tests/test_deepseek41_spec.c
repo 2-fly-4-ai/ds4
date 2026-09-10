@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 
 static void test_profile(void) {
     uint32_t p[16] = {0};
@@ -77,11 +78,34 @@ static void test_reasoning_effort(void) {
                   "Reasoning Effort: 100 ") != NULL);
 }
 
+static void test_previous_pre_mix_hc_transition(void) {
+    const float residual[6] = {1, 2, 3, 10, 20, 30};
+    const float incoming_pre[2] = {0.25f, 0.75f};
+    const float post[2] = {0.5f, 2.0f};
+    const float comb[4] = {1, 0, 0, 1};
+    const float sublayer[3] = {4, 5, 6};
+    const float want_collapsed[3] = {7.75f, 15.5f, 23.25f};
+    const float want_next[6] = {3, 4.5f, 6, 18, 30, 42};
+    float collapsed[3] = {0};
+    float next[6] = {0};
+
+    ds4_test_deepseek41_hc_transition(collapsed, next, residual,
+                                      incoming_pre, post, comb, sublayer,
+                                      3, 2);
+    for (int i = 0; i < 3; i++) {
+        assert(fabsf(collapsed[i] - want_collapsed[i]) < 1e-6f);
+    }
+    for (int i = 0; i < 6; i++) {
+        assert(fabsf(next[i] - want_next[i]) < 1e-6f);
+    }
+}
+
 int main(void) {
     test_profile();
     test_compress_ratios();
     test_shared_sources();
     test_reasoning_effort();
+    test_previous_pre_mix_hc_transition();
     puts("deepseek41 spec tests: ok");
     return 0;
 }
