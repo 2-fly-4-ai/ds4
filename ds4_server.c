@@ -669,6 +669,7 @@ typedef enum {
 
 typedef enum {
     SERVER_MODEL_SYNTAX_DEEPSEEK,
+    SERVER_MODEL_SYNTAX_DEEPSEEK41,
     SERVER_MODEL_SYNTAX_GLM,
     SERVER_MODEL_SYNTAX_QWEN,
 } server_model_syntax;
@@ -1152,6 +1153,7 @@ static bool parse_output_config_effort(const char **p, ds4_think_mode *effort) {
 static bool model_alias_disables_thinking(const char *model) {
     return model &&
            (!strcmp(model, "deepseek-chat") ||
+            !strcmp(model, "deepseek-v4.1-flash-chat") ||
             !strcmp(model, "qwen3.8-flash-next-chat") ||
             !strcmp(model, "qwen3.8-flash-next-no-think") ||
             !strcmp(model, "qwen3.8-flash-next-nothink") ||
@@ -1169,6 +1171,7 @@ static bool model_alias_disables_thinking(const char *model) {
 static bool model_alias_enables_thinking(const char *model) {
     return model &&
            (!strcmp(model, "deepseek-reasoner") ||
+            !strcmp(model, "deepseek-v4.1-flash-reasoner") ||
             !strcmp(model, "qwen3.8-flash-next-reasoner") ||
             !strcmp(model, "qwen/qwen3.8-flash-next-reasoner") ||
             !strcmp(model, "glm-5.2-reasoner") ||
@@ -1179,6 +1182,7 @@ static bool model_alias_enables_thinking(const char *model) {
 
 static server_model_syntax server_model_syntax_for_engine(ds4_engine *engine) {
     if (ds4_engine_is_qwen4(engine)) return SERVER_MODEL_SYNTAX_QWEN;
+    if (ds4_engine_is_deepseek41(engine)) return SERVER_MODEL_SYNTAX_DEEPSEEK41;
     return ds4_engine_is_glm_dsa(engine) ?
            SERVER_MODEL_SYNTAX_GLM : SERVER_MODEL_SYNTAX_DEEPSEEK;
 }
@@ -1187,6 +1191,7 @@ static const char *server_model_id_from_engine(ds4_engine *engine) {
     if (ds4_engine_is_qwen4(engine)) return "qwen3.8-flash-next";
     if (ds4_engine_is_glm53(engine)) return "glm-5.3-flash";
     if (ds4_engine_is_glm_dsa(engine)) return "glm-5.2";
+    if (ds4_engine_is_deepseek41(engine)) return "deepseek-v4.1-flash";
     return ds4_engine_model_id(engine) == 1 ?
            "deepseek-v4-pro" : "deepseek-v4-flash";
 }
@@ -1194,6 +1199,9 @@ static const char *server_model_id_from_engine(ds4_engine *engine) {
 static bool server_model_alias_known(const char *id) {
     return id &&
            (!strcmp(id, "deepseek-v4-flash") ||
+            !strcmp(id, "deepseek-v4.1-flash") ||
+            !strcmp(id, "deepseek-v4.1-flash-chat") ||
+            !strcmp(id, "deepseek-v4.1-flash-reasoner") ||
             !strcmp(id, "qwen3.8-flash-next") ||
             !strcmp(id, "qwen3.8-flash-next-chat") ||
             !strcmp(id, "qwen3.8-flash-next-no-think") ||
@@ -2514,6 +2522,33 @@ static void append_tools_prompt_text(buf *b, const char *tool_schemas) {
                 "Use the exact parameter names from the schemas.");
 }
 
+/* DeepSeek V4.1 deliberately changed the DSML element names: the leading
+ * space is part of each tag name.  Keep this renderer separate from V4 so a
+ * compatibility cleanup cannot silently retokenize one model's tool grammar. */
+static void append_v41_tools_prompt_text(buf *b, const char *tool_schemas) {
+    if (!tool_schemas || !tool_schemas[0]) return;
+    buf_puts(b,
+        "## Tools\n\n"
+        "You have access to a set of tools to help answer the user's question. "
+        "You can invoke tools by writing a \"<｜DSML｜ calls>\" block like the following:\n\n"
+        "<｜DSML｜ calls>\n"
+        "<｜DSML｜ invoke name=\"$TOOL_NAME\">\n"
+        "<｜DSML｜ parameter name=\"$PARAMETER_NAME\" string=\"true|false\">$PARAMETER_VALUE</｜DSML｜ parameter>\n"
+        "...\n"
+        "</｜DSML｜ invoke>\n"
+        "<｜DSML｜ invoke name=\"$TOOL_NAME2\">\n"
+        "...\n"
+        "</｜DSML｜ invoke>\n"
+        "</｜DSML｜ calls>\n\n"
+        "String parameters should be specified as is and set `string=\"true\"`. "
+        "For all other types (numbers, booleans, arrays, objects), pass the value in JSON format and set `string=\"false\"`.\n\n"
+        "If thinking_mode is enabled (triggered by <think>), you MUST output your complete reasoning inside <think>...</think> BEFORE any tool calls or final response.\n\n"
+        "Otherwise, output directly after </think> with tool calls or final response.\n\n"
+        "### Available Tool Schemas\n\n");
+    buf_puts(b, tool_schemas);
+    buf_puts(b, "\n\nYou MUST strictly follow the above defined tool name and parameter schemas to invoke tool calls.");
+}
+
 static void json_escape(buf *b, const char *s);
 
 typedef struct {
@@ -2695,6 +2730,19 @@ static void append_dsml_parameter_text(buf *b, const char *s) {
     }
 }
 
+static void append_v41_dsml_parameter_text(buf *b, const char *s) {
+    const char *end = "</｜DSML｜ parameter>";
+    const size_t endlen = strlen(end);
+    for (s = s ? s : ""; *s;) {
+        if (!strncmp(s, end, endlen)) {
+            buf_puts(b, "&lt;");
+            s++;
+        } else {
+            buf_putc(b, *s++);
+        }
+    }
+}
+
 static void append_glm_tag_body_text(buf *b, const char *s, const char *end) {
     const size_t endlen = strlen(end);
     for (s = s ? s : ""; *s;) {
@@ -2788,6 +2836,19 @@ static void append_dsml_json_literal(buf *b, const char *s) {
     }
 }
 
+static void append_v41_dsml_json_literal(buf *b, const char *s) {
+    const char *end = "</｜DSML｜ parameter>";
+    const size_t endlen = strlen(end);
+    for (s = s ? s : ""; *s;) {
+        if (!strncmp(s, end, endlen)) {
+            buf_puts(b, "\\u003c");
+            s++;
+        } else {
+            buf_putc(b, *s++);
+        }
+    }
+}
+
 static void append_dsml_arg(buf *b, const json_arg *arg) {
     buf_puts(b, "<｜DSML｜parameter name=\"");
     append_dsml_attr_escaped(b, arg->key);
@@ -2797,6 +2858,17 @@ static void append_dsml_arg(buf *b, const json_arg *arg) {
     if (arg->is_string) append_dsml_parameter_text(b, arg->value);
     else append_dsml_json_literal(b, arg->value);
     buf_puts(b, "</｜DSML｜parameter>\n");
+}
+
+static void append_v41_dsml_arg(buf *b, const json_arg *arg) {
+    buf_puts(b, "<｜DSML｜ parameter name=\"");
+    append_dsml_attr_escaped(b, arg->key);
+    buf_puts(b, "\" string=\"");
+    buf_puts(b, arg->is_string ? "true" : "false");
+    buf_puts(b, "\">");
+    if (arg->is_string) append_v41_dsml_parameter_text(b, arg->value);
+    else append_v41_dsml_json_literal(b, arg->value);
+    buf_puts(b, "</｜DSML｜ parameter>\n");
 }
 
 static void append_glm_arg(buf *b, const json_arg *arg) {
@@ -2821,6 +2893,26 @@ static bool append_dsml_arguments_from_json(buf *b, const char *json, const tool
     for (int i = 0; i < args.len; i++) {
         if (args.v[i].used) continue;
         append_dsml_arg(b, &args.v[i]);
+    }
+    json_args_free(&args);
+    return true;
+}
+
+static bool append_v41_dsml_arguments_from_json(buf *b, const char *json,
+                                                const tool_schema_order *order) {
+    json_args args = {0};
+    if (!json_args_parse(json, &args)) return false;
+    if (order) {
+        for (int i = 0; i < order->len; i++) {
+            int idx = json_args_find_unused(&args, order->prop[i]);
+            if (idx < 0) continue;
+            append_v41_dsml_arg(b, &args.v[idx]);
+            args.v[idx].used = true;
+        }
+    }
+    for (int i = 0; i < args.len; i++) {
+        if (args.v[i].used) continue;
+        append_v41_dsml_arg(b, &args.v[i]);
     }
     json_args_free(&args);
     return true;
@@ -2889,6 +2981,28 @@ static void append_dsml_tool_calls_text(buf *b, const tool_calls *calls) {
         buf_puts(b, "</｜DSML｜invoke>\n");
     }
     buf_puts(b, "</｜DSML｜tool_calls>");
+}
+
+static void append_v41_dsml_tool_calls_text(buf *b, const tool_calls *calls) {
+    if (!calls || calls->len == 0) return;
+    if (calls->raw_tool_text && calls->raw_tool_text[0]) {
+        buf_puts(b, calls->raw_tool_text);
+        return;
+    }
+    buf_puts(b, "\n\n<｜DSML｜ calls>\n");
+    for (int i = 0; i < calls->len; i++) {
+        const tool_call *tc = &calls->v[i];
+        buf_puts(b, "<｜DSML｜ invoke name=\"");
+        append_dsml_attr_escaped(b, tc->name);
+        buf_puts(b, "\">\n");
+        if (!append_v41_dsml_arguments_from_json(b, tc->arguments, NULL)) {
+            buf_puts(b, "<｜DSML｜ parameter name=\"arguments\" string=\"true\">");
+            append_v41_dsml_parameter_text(b, tc->arguments);
+            buf_puts(b, "</｜DSML｜ parameter>\n");
+        }
+        buf_puts(b, "</｜DSML｜ invoke>\n");
+    }
+    buf_puts(b, "</｜DSML｜ calls>");
 }
 
 static void append_glm_tool_calls_text(buf *b, const tool_calls *calls,
@@ -2976,6 +3090,8 @@ static void append_tool_calls_text_for_syntax(buf *b,
         append_glm_tool_calls_text(b, calls, tool_orders);
     } else if (syntax == SERVER_MODEL_SYNTAX_QWEN) {
         append_qwen_tool_calls_text(b, calls, b->len > 0, tool_orders);
+    } else if (syntax == SERVER_MODEL_SYNTAX_DEEPSEEK41) {
+        append_v41_dsml_tool_calls_text(b, calls);
     } else {
         append_dsml_tool_calls_text(b, calls);
     }
@@ -3080,6 +3196,88 @@ static char *render_deepseek_chat_prompt_text(const chat_msgs *msgs, const char 
     }
 
     buf_free(&system);
+    return buf_take(&out);
+}
+
+static char *render_deepseek41_chat_prompt_text(const chat_msgs *msgs,
+                                                const char *tool_schemas,
+                                                const tool_schema_orders *tool_orders,
+                                                ds4_think_mode think_mode) {
+    (void)tool_orders;
+    const bool think = ds4_think_mode_enabled(think_mode);
+    const bool tool_context = chat_history_uses_tool_context(msgs, tool_schemas);
+    int last_user_idx = -1;
+    for (int i = 0; i < msgs->len; i++) {
+        if (role_is_user_like(msgs->v[i].role) ||
+            (role_is_system(msgs->v[i].role) && i > 0))
+            last_user_idx = i;
+    }
+
+    buf out = {0};
+    buf_puts(&out, "<｜begin▁of▁sentence｜>");
+    const bool first_is_system = msgs->len > 0 && role_is_system(msgs->v[0].role);
+    const bool synthetic_system = think ||
+                                  ((tool_schemas && tool_schemas[0]) && !first_is_system);
+    if (synthetic_system) {
+        buf_puts(&out, "<｜System｜>");
+        if (think) {
+            const char *effort = ds4_deepseek41_reasoning_effort_text(think_mode);
+            if (effort) buf_puts(&out, effort);
+        }
+        if (tool_schemas && tool_schemas[0] && !first_is_system)
+            append_v41_tools_prompt_text(&out, tool_schemas);
+    }
+
+    bool pending_assistant = false;
+    bool pending_tool_result = false;
+    for (int i = 0; i < msgs->len; i++) {
+        const chat_msg *m = &msgs->v[i];
+        if (role_is_system(m->role)) {
+            /* The first system message shares the leading marker already
+             * emitted for reasoning effort.  Later system messages retain
+             * their exact position and each receives its own marker. */
+            if (!(i == 0 && synthetic_system)) buf_puts(&out, "<｜System｜>");
+            buf_puts(&out, m->content ? m->content : "");
+            if (i == 0 && tool_schemas && tool_schemas[0]) {
+                if (m->content && m->content[0]) buf_puts(&out, "\n\n");
+                append_v41_tools_prompt_text(&out, tool_schemas);
+            }
+            pending_assistant = i > 0;
+            pending_tool_result = false;
+        } else if (!strcmp(m->role, "user")) {
+            buf_puts(&out, "<｜User｜>");
+            buf_puts(&out, m->content ? m->content : "");
+            pending_assistant = true;
+            pending_tool_result = false;
+        } else if (!strcmp(m->role, "tool") || !strcmp(m->role, "function")) {
+            if (!pending_tool_result) buf_puts(&out, "<｜User｜>");
+            buf_puts(&out, "<tool_result>");
+            append_tool_result_text(&out, m->content);
+            buf_puts(&out, "</tool_result>");
+            pending_assistant = true;
+            pending_tool_result = true;
+        } else if (!strcmp(m->role, "assistant")) {
+            if (pending_assistant) {
+                buf_puts(&out, "<｜Assistant｜>");
+                if (think && (tool_context || i > last_user_idx)) {
+                    buf_puts(&out, "<think>");
+                    buf_puts(&out, m->reasoning ? m->reasoning : "");
+                    buf_puts(&out, "</think>");
+                } else {
+                    buf_puts(&out, "</think>");
+                }
+            }
+            buf_puts(&out, m->content ? m->content : "");
+            append_v41_dsml_tool_calls_text(&out, &m->calls);
+            buf_puts(&out, "<｜end▁of▁sentence｜>");
+            pending_assistant = false;
+            pending_tool_result = false;
+        }
+    }
+    if (pending_assistant) {
+        buf_puts(&out, "<｜Assistant｜>");
+        buf_puts(&out, think ? "<think>" : "</think>");
+    }
     return buf_take(&out);
 }
 
@@ -3365,6 +3563,10 @@ static char *render_chat_prompt_text_for_syntax(server_model_syntax syntax,
     }
     if (syntax == SERVER_MODEL_SYNTAX_QWEN) {
         return render_qwen_chat_prompt_text(msgs, tool_schemas, tool_orders, think_mode);
+    }
+    if (syntax == SERVER_MODEL_SYNTAX_DEEPSEEK41) {
+        return render_deepseek41_chat_prompt_text(msgs, tool_schemas,
+                                                  tool_orders, think_mode);
     }
     return render_deepseek_chat_prompt_text(msgs, tool_schemas,
                                             tool_orders, think_mode);
@@ -5542,10 +5744,17 @@ static void json_escape_fragment_n(buf *b, const char *s, size_t n) {
 #define DS4_INVOKE_END_SHORT "</" DS4_DSML_SHORT "invoke>"
 #define DS4_PARAM_START_SHORT "<" DS4_DSML_SHORT "parameter"
 #define DS4_PARAM_END_SHORT "</" DS4_DSML_SHORT "parameter>"
+#define DS4_V41_TOOL_CALLS_START "<" DS4_DSML " calls>"
+#define DS4_V41_TOOL_CALLS_END "</" DS4_DSML " calls>"
+#define DS4_V41_INVOKE_START "<" DS4_DSML " invoke"
+#define DS4_V41_INVOKE_END "</" DS4_DSML " invoke>"
+#define DS4_V41_PARAM_START "<" DS4_DSML " parameter"
+#define DS4_V41_PARAM_END "</" DS4_DSML " parameter>"
 
 static const char *find_any_tool_start(const char *s) {
     const char *best = NULL;
     const char *candidates[] = {
+        strstr(s, DS4_V41_TOOL_CALLS_START),
         strstr(s, DS4_TOOL_CALLS_START),
         strstr(s, DS4_TOOL_CALLS_START_SHORT),
         strstr(s, "<tool_calls>"),
@@ -5560,6 +5769,7 @@ static const char *find_any_tool_start(const char *s) {
 static const char *find_any_tool_end(const char *s) {
     const char *best = NULL;
     const char *candidates[] = {
+        strstr(s, DS4_V41_TOOL_CALLS_END),
         strstr(s, DS4_TOOL_CALLS_END),
         strstr(s, DS4_TOOL_CALLS_END_SHORT),
         strstr(s, "</tool_calls>"),
@@ -5834,7 +6044,15 @@ static bool parse_deepseek_generated_message_ex(const char *text,
     }
 
     const char *start = strstr(tool_search, "\n\n" DS4_TOOL_CALLS_START);
-    int style = 0; /* 0: DSML, 1: plain XML, 2: DSML with the first vertical bar omitted. */
+    int style = 0; /* 0: V4 DSML, 1: plain XML, 2: missing bar, 3: V4.1 spaced DSML. */
+    if (!start) {
+        start = strstr(tool_search, "\n\n" DS4_V41_TOOL_CALLS_START);
+        style = start ? 3 : style;
+    }
+    if (!start) {
+        start = strstr(tool_search, DS4_V41_TOOL_CALLS_START);
+        style = start ? 3 : style;
+    }
     if (!start) start = strstr(tool_search, DS4_TOOL_CALLS_START);
     if (!start) {
         start = strstr(tool_search, "\n\n" DS4_TOOL_CALLS_START_SHORT);
@@ -5879,6 +6097,13 @@ static bool parse_deepseek_generated_message_ex(const char *text,
         invoke_end = DS4_INVOKE_END_SHORT;
         param_start = DS4_PARAM_START_SHORT;
         param_end = DS4_PARAM_END_SHORT;
+    } else if (style == 3) {
+        tool_calls_start = DS4_V41_TOOL_CALLS_START;
+        tool_calls_end = DS4_V41_TOOL_CALLS_END;
+        invoke_start = DS4_V41_INVOKE_START;
+        invoke_end = DS4_V41_INVOKE_END;
+        param_start = DS4_V41_PARAM_START;
+        param_end = DS4_V41_PARAM_END;
     }
 
     const char *p = strstr(start, tool_calls_start);
@@ -17643,6 +17868,89 @@ static void test_reasoning_effort_mapping(void) {
                                            (int)ds4_think_max_min_context()) == DS4_THINK_MAX);
 }
 
+static void test_deepseek41_prompt_and_dsml_contract(void) {
+    chat_msgs msgs = {0};
+    chat_msg user = {0};
+    user.role = xstrdup("user");
+    user.content = xstrdup("question");
+    chat_msgs_push(&msgs, user);
+
+    char *chat = render_chat_prompt_text_for_syntax(
+        SERVER_MODEL_SYNTAX_DEEPSEEK41, &msgs, NULL, NULL,
+        DS4_THINK_NONE);
+    TEST_ASSERT(!strcmp(chat,
+        "<｜begin▁of▁sentence｜><｜User｜>question<｜Assistant｜></think>"));
+    free(chat);
+
+    char *thinking = render_chat_prompt_text_for_syntax(
+        SERVER_MODEL_SYNTAX_DEEPSEEK41, &msgs, NULL, NULL,
+        DS4_THINK_HIGH);
+    TEST_ASSERT(!strcmp(thinking,
+        "<｜begin▁of▁sentence｜><｜System｜>"
+        "Reasoning Effort: 75 (range 1-100, the higher the value, the more thorough the reasoning)\n\n"
+        "<｜User｜>question<｜Assistant｜><think>"));
+    free(thinking);
+
+    chat_msgs system_history = {0};
+    chat_msg leading_system = {0};
+    leading_system.role = xstrdup("system");
+    leading_system.content = xstrdup("sys");
+    chat_msgs_push(&system_history, leading_system);
+    chat_msg first_user = {0};
+    first_user.role = xstrdup("user");
+    first_user.content = xstrdup("q1");
+    chat_msgs_push(&system_history, first_user);
+    chat_msg first_assistant = {0};
+    first_assistant.role = xstrdup("assistant");
+    first_assistant.content = xstrdup("a1");
+    first_assistant.reasoning = xstrdup("r1");
+    chat_msgs_push(&system_history, first_assistant);
+    chat_msg mid_system = {0};
+    mid_system.role = xstrdup("system");
+    mid_system.content = xstrdup("mid sys");
+    chat_msgs_push(&system_history, mid_system);
+    char *mid = render_chat_prompt_text_for_syntax(
+        SERVER_MODEL_SYNTAX_DEEPSEEK41, &system_history, NULL, NULL,
+        DS4_THINK_HIGH);
+    TEST_ASSERT(!strcmp(mid,
+        "<｜begin▁of▁sentence｜><｜System｜>"
+        "Reasoning Effort: 75 (range 1-100, the higher the value, the more thorough the reasoning)\n\n"
+        "sys<｜User｜>q1<｜Assistant｜></think>a1<｜end▁of▁sentence｜>"
+        "<｜System｜>mid sys<｜Assistant｜><think>"));
+    free(mid);
+    chat_msgs_free(&system_history);
+
+    tool_calls calls = {0};
+    tool_call tc = {0};
+    tc.name = xstrdup("lookup");
+    tc.arguments = xstrdup("{\"query\":\"value\",\"limit\":2}");
+    tool_calls_push(&calls, tc);
+    buf rendered = {0};
+    append_tool_calls_text_for_syntax(&rendered,
+                                      SERVER_MODEL_SYNTAX_DEEPSEEK41,
+                                      &calls, NULL);
+    TEST_ASSERT(strstr(rendered.ptr, "<｜DSML｜ calls>") != NULL);
+    TEST_ASSERT(strstr(rendered.ptr, "<｜DSML｜ invoke name=\"lookup\">") != NULL);
+    TEST_ASSERT(strstr(rendered.ptr, "<｜DSML｜ parameter name=\"query\"") != NULL);
+    TEST_ASSERT(strstr(rendered.ptr, "<｜DSML｜tool_calls>") == NULL);
+
+    char *content = NULL;
+    char *reasoning = NULL;
+    tool_calls parsed = {0};
+    TEST_ASSERT(parse_generated_message_ex_for_syntax(
+        SERVER_MODEL_SYNTAX_DEEPSEEK41, rendered.ptr, false,
+        &content, &reasoning, &parsed));
+    TEST_ASSERT(parsed.len == 1);
+    TEST_ASSERT(!strcmp(parsed.v[0].name, "lookup"));
+    TEST_ASSERT(strstr(parsed.v[0].arguments, "\"limit\": 2") != NULL);
+    free(content);
+    free(reasoning);
+    tool_calls_free(&parsed);
+    buf_free(&rendered);
+    tool_calls_free(&calls);
+    chat_msgs_free(&msgs);
+}
+
 static void test_model_alias_thinking_controls(void) {
     TEST_ASSERT(model_alias_disables_thinking("deepseek-chat"));
     TEST_ASSERT(model_alias_disables_thinking("glm-5.2-chat"));
@@ -21642,6 +21950,7 @@ static void ds4_server_unit_tests_run(void) {
     test_server_stream_batch_preserves_first_token_and_time_cap();
     test_chat_ignore_eos_contract();
     test_reasoning_effort_mapping();
+    test_deepseek41_prompt_and_dsml_contract();
     test_model_alias_thinking_controls();
     test_api_thinking_controls_parse();
     test_render_think_max_prompt_prefix();

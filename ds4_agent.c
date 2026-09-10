@@ -258,6 +258,7 @@ typedef struct {
 
 typedef enum {
     AGENT_TOOL_SYNTAX_DSML,
+    AGENT_TOOL_SYNTAX_DSML41,
     AGENT_TOOL_SYNTAX_GLM,
     AGENT_TOOL_SYNTAX_QWEN,
 } agent_tool_syntax;
@@ -374,8 +375,14 @@ static int agent_read_default_lines(agent_worker *w);
 
 static agent_tool_syntax agent_tool_syntax_for_engine(ds4_engine *engine) {
     if (ds4_engine_is_qwen4(engine)) return AGENT_TOOL_SYNTAX_QWEN;
+    if (ds4_engine_is_deepseek41(engine)) return AGENT_TOOL_SYNTAX_DSML41;
     return ds4_engine_is_glm_dsa(engine) ? AGENT_TOOL_SYNTAX_GLM
                                          : AGENT_TOOL_SYNTAX_DSML;
+}
+
+static bool agent_syntax_is_dsml(agent_tool_syntax syntax) {
+    return syntax == AGENT_TOOL_SYNTAX_DSML ||
+           syntax == AGENT_TOOL_SYNTAX_DSML41;
 }
 
 static bool agent_tool_syntax_assistant_turn_uses_eos(agent_tool_syntax syntax) {
@@ -384,7 +391,7 @@ static bool agent_tool_syntax_assistant_turn_uses_eos(agent_tool_syntax syntax) 
 
 /* GLM and Qwen both open a call with <tool_call> and render as chat messages */
 static bool agent_syntax_is_xml_tool_call(agent_tool_syntax syntax) {
-    return syntax != AGENT_TOOL_SYNTAX_DSML;
+    return !agent_syntax_is_dsml(syntax);
 }
 
 static void agent_worker_append_assistant_turn_end(agent_worker *w) {
@@ -515,6 +522,23 @@ static char *agent_input_buf_take(agent_input_buf *b) {
     char *p = b->ptr;
     memset(b, 0, sizeof(*b));
     return p;
+}
+
+static char *agent_replace_all_owned(char *input,
+                                     const char *needle,
+                                     const char *replacement) {
+    agent_input_buf out = {0};
+    const size_t needle_len = strlen(needle);
+    const char *p = input;
+    const char *hit;
+    while ((hit = strstr(p, needle)) != NULL) {
+        agent_input_buf_append(&out, p, (size_t)(hit - p));
+        agent_input_buf_append(&out, replacement, strlen(replacement));
+        p = hit + needle_len;
+    }
+    agent_input_buf_append(&out, p, strlen(p));
+    free(input);
+    return agent_input_buf_take(&out);
 }
 
 static void agent_input_buf_free(agent_input_buf *b) {
@@ -1263,6 +1287,14 @@ static char *agent_build_dsml_tools_prompt(bool edit_upto) {
     return out;
 }
 
+static char *agent_build_dsml41_tools_prompt(bool edit_upto) {
+    char *out = agent_build_dsml_tools_prompt(edit_upto);
+    out = agent_replace_all_owned(out, "｜DSML｜tool_calls", "｜DSML｜ calls");
+    out = agent_replace_all_owned(out, "｜DSML｜invoke", "｜DSML｜ invoke");
+    out = agent_replace_all_owned(out, "｜DSML｜parameter", "｜DSML｜ parameter");
+    return out;
+}
+
 static const char agent_glm_tools_prompt_intro[] =
     "You are a coding agent running in a local workspace. Use tools for local file and system work. "
     "Avoid printing large file contents or large code blocks as answers; create or edit files with tools, "
@@ -1385,6 +1417,7 @@ static char *agent_build_tools_prompt(ds4_engine *engine, bool edit_upto) {
     const agent_tool_syntax syntax = agent_tool_syntax_for_engine(engine);
     if (syntax == AGENT_TOOL_SYNTAX_QWEN) return agent_build_qwen_tools_prompt(edit_upto);
     if (syntax == AGENT_TOOL_SYNTAX_GLM) return agent_build_glm_tools_prompt(edit_upto);
+    if (syntax == AGENT_TOOL_SYNTAX_DSML41) return agent_build_dsml41_tools_prompt(edit_upto);
     return agent_build_dsml_tools_prompt(edit_upto);
 }
 
@@ -1395,6 +1428,14 @@ static const char agent_dsml_syntax_reminder[] =
     "<｜DSML｜parameter name=\"$PARAMETER_NAME\" string=\"true|false\">$PARAMETER_VALUE</｜DSML｜parameter>\n"
     "</｜DSML｜invoke>\n"
     "</｜DSML｜tool_calls>\n";
+
+static const char agent_dsml41_syntax_reminder[] =
+    "DeepSeek V4.1 DSML syntax reminder:\n"
+    "<｜DSML｜ calls>\n"
+    "<｜DSML｜ invoke name=\"$TOOL_NAME\">\n"
+    "<｜DSML｜ parameter name=\"$PARAMETER_NAME\" string=\"true|false\">$PARAMETER_VALUE</｜DSML｜ parameter>\n"
+    "</｜DSML｜ invoke>\n"
+    "</｜DSML｜ calls>\n";
 
 static const char agent_glm_syntax_reminder[] =
     "GLM tool-call syntax reminder:\n"
@@ -1792,21 +1833,25 @@ static void agent_trim_span(const char **p, const char **end) {
 }
 
 static bool agent_dsml_open_tag_is(const char *tag, const char *name) {
-    char prefix[64];
-    snprintf(prefix, sizeof(prefix), "<｜DSML｜%s", name);
-    size_t prefix_len = strlen(prefix);
-    if (strncmp(tag, prefix, prefix_len) != 0) return false;
-    char c = tag[prefix_len];
+    static const char prefix[] = "<｜DSML｜";
+    if (strncmp(tag, prefix, sizeof(prefix) - 1) != 0) return false;
+    const char *p = tag + sizeof(prefix) - 1;
+    while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
+    const size_t name_len = strlen(name);
+    if (strncmp(p, name, name_len) != 0) return false;
+    char c = p[name_len];
     return c == '>' || c == ' ' || c == '\t' || c == '\r' || c == '\n';
 }
 
 static bool agent_dsml_close_tag_at(const char *s, const char *name, size_t *tag_len) {
-    char prefix[64];
+    static const char prefix[] = "</｜DSML｜";
     static const char dsml_bar[] = "｜";
-    snprintf(prefix, sizeof(prefix), "</｜DSML｜%s", name);
-    size_t prefix_len = strlen(prefix);
-    if (strncmp(s, prefix, prefix_len) != 0) return false;
-    const char *p = s + prefix_len;
+    if (strncmp(s, prefix, sizeof(prefix) - 1) != 0) return false;
+    const char *p = s + sizeof(prefix) - 1;
+    while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
+    const size_t name_len = strlen(name);
+    if (strncmp(p, name, name_len) != 0) return false;
+    p += name_len;
     while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
     if (strncmp(p, dsml_bar, strlen(dsml_bar)) == 0) p += strlen(dsml_bar);
     while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
@@ -1821,7 +1866,7 @@ static bool agent_dsml_close_tag_at(const char *s, const char *name, size_t *tag
  * parameter to finish. */
 static bool agent_dsml_parameter_close_tail(const char *tail, size_t len,
                                             bool *complete) {
-    static const char prefix[] = "</｜DSML｜parameter";
+    static const char prefix[] = "</｜DSML｜";
     static const char dsml_bar[] = "｜";
     const size_t prefix_len = sizeof(prefix) - 1;
     const size_t bar_len = sizeof(dsml_bar) - 1;
@@ -1831,6 +1876,11 @@ static bool agent_dsml_parameter_close_tail(const char *tail, size_t len,
     size_t i = prefix_len;
     while (i < len && (tail[i] == ' ' || tail[i] == '\t' ||
                        tail[i] == '\r' || tail[i] == '\n')) i++;
+    static const char name[] = "parameter";
+    const size_t name_len = sizeof(name) - 1;
+    if (len - i <= name_len) return memcmp(name, tail + i, len - i) == 0;
+    if (memcmp(name, tail + i, name_len) != 0) return false;
+    i += name_len;
     if (i < len && len - i <= bar_len) {
         if (memcmp(dsml_bar, tail + i, len - i) == 0) return true;
     }
@@ -2249,7 +2299,9 @@ static void agent_dsml_parse(agent_dsml_parser *p) {
         if (p->parse_pos >= p->raw_len) return;
 
         size_t close_len = 0;
-        if (agent_dsml_close_tag_at(p->raw + p->parse_pos, "tool_calls", &close_len)) {
+        const char *block_name = p->syntax == AGENT_TOOL_SYNTAX_DSML41 ?
+                                 "calls" : "tool_calls";
+        if (agent_dsml_close_tag_at(p->raw + p->parse_pos, block_name, &close_len)) {
             agent_tool_calls_push(&p->calls, &p->current);
             p->parse_pos += close_len;
             p->state = AGENT_DSML_DONE;
@@ -2303,7 +2355,8 @@ static void agent_dsml_parse(agent_dsml_parser *p) {
 
 static void agent_dsml_start(agent_dsml_parser *p) {
     const char *start = agent_syntax_is_xml_tool_call(p->syntax) ?
-        "<tool_call>" : "<｜DSML｜tool_calls>";
+        "<tool_call>" : p->syntax == AGENT_TOOL_SYNTAX_DSML41 ?
+        "<｜DSML｜ calls>" : "<｜DSML｜tool_calls>";
     p->state = AGENT_DSML_STRUCTURAL;
     p->search_len = 0;
     agent_dsml_raw_append(p, start, strlen(start));
@@ -2312,7 +2365,8 @@ static void agent_dsml_start(agent_dsml_parser *p) {
 
 static void agent_dsml_feed(agent_dsml_parser *p, const char *s, size_t n) {
     const char *start = agent_syntax_is_xml_tool_call(p->syntax) ?
-        "<tool_call>" : "<｜DSML｜tool_calls>";
+        "<tool_call>" : p->syntax == AGENT_TOOL_SYNTAX_DSML41 ?
+        "<｜DSML｜ calls>" : "<｜DSML｜tool_calls>";
     const size_t start_len = strlen(start);
     if (p->state == AGENT_DSML_DONE || p->state == AGENT_DSML_ERROR) return;
 
@@ -4069,16 +4123,18 @@ static bool agent_stream_dsml_start_match(agent_tool_syntax syntax,
     }
 
     static const char canonical[] = "<｜DSML｜tool_calls>";
+    static const char canonical41[] = "<｜DSML｜ calls>";
     static const char missing_bar[] = "<DSML｜tool_calls>";
     static const char invoke[] = "<｜DSML｜invoke";
+    static const char invoke41[] = "<｜DSML｜ invoke";
     static const char invoke_missing_bar[] = "<DSML｜invoke";
     struct {
         const char *text;
         bool implicit_invoke;
     } forms[] = {
-        {canonical, false},
+        {syntax == AGENT_TOOL_SYNTAX_DSML41 ? canonical41 : canonical, false},
         {missing_bar, false},
-        {invoke, true},
+        {syntax == AGENT_TOOL_SYNTAX_DSML41 ? invoke41 : invoke, true},
         {invoke_missing_bar, true},
     };
     *complete = false;
@@ -4149,8 +4205,10 @@ static void agent_stream_note_plain_dsml_byte(agent_stream_renderer *sr,
  * can split "<｜DSML｜tool_calls>" across arbitrary tokens. */
 static void agent_stream_normal_byte(agent_stream_renderer *sr, char c) {
     static const char canonical_invoke[] = "<｜DSML｜invoke";
+    static const char canonical41_invoke[] = "<｜DSML｜ invoke";
     const char *start = agent_syntax_is_xml_tool_call(sr->syntax) ?
-        "<tool_call>" : "<｜DSML｜tool_calls>";
+        "<tool_call>" : sr->syntax == AGENT_TOOL_SYNTAX_DSML41 ?
+        "<｜DSML｜ calls>" : "<｜DSML｜tool_calls>";
     if (sr->parser->state == AGENT_DSML_ERROR) return;
     agent_stream_note_thinking_dsml_byte(sr, c);
 
@@ -4182,9 +4240,11 @@ static void agent_stream_normal_byte(agent_stream_renderer *sr, char c) {
                  * implicit tool_calls block; the model often knows it wants a
                  * tool but forgets the outer wrapper. */
                 agent_stream_start_dsml(sr, sr->in_think);
-                if (sr->syntax == AGENT_TOOL_SYNTAX_DSML && implicit_invoke) {
-                    for (size_t i = 0; i < sizeof(canonical_invoke) - 1; i++)
-                        agent_stream_feed_dsml_byte(sr, canonical_invoke[i]);
+                if (agent_syntax_is_dsml(sr->syntax) && implicit_invoke) {
+                    const char *invoke_seed = sr->syntax == AGENT_TOOL_SYNTAX_DSML41 ?
+                        canonical41_invoke : canonical_invoke;
+                    for (size_t i = 0; invoke_seed[i]; i++)
+                        agent_stream_feed_dsml_byte(sr, invoke_seed[i]);
                 }
             }
             return;
@@ -4925,7 +4985,9 @@ static void agent_worker_build_system_tokens(agent_worker *w, ds4_tokens *out) {
     ds4_chat_begin(w->engine, out);
     ds4_think_mode think_mode = effective_think_mode(w->cfg);
     const agent_tool_syntax syntax = agent_tool_syntax_for_engine(w->engine);
-    if (syntax == AGENT_TOOL_SYNTAX_QWEN) {
+    if (ds4_engine_is_deepseek41(w->engine)) {
+        ds4_chat_append_reasoning_effort_prefix(w->engine, out, think_mode);
+    } else if (syntax == AGENT_TOOL_SYNTAX_QWEN) {
         const char *effort = ds4_qwen4_reasoning_effort_text(think_mode);
         if (effort) ds4_chat_append_message(w->engine, out, "system", effort);
     } else if (syntax == AGENT_TOOL_SYNTAX_GLM) {
@@ -7529,6 +7591,36 @@ static void test_agent_dsml_stream_tool_call_chunked(void) {
     agent_dsml_parser_free(&p);
 }
 
+static void test_agent_dsml41_stream_tool_call_chunked(void) {
+    const char *chunks[] = {
+        "<｜D",
+        "SML｜ calls><｜DSML｜ invoke name=\"read\">"
+        "<｜DSML｜ parameter name=\"path\" string=\"true\">ds4_agent.c</｜DSML｜ parameter>"
+        "</｜DSML｜ invoke></｜DSML｜ calls>",
+    };
+    agent_dsml_parser p;
+    char *out = agent_test_stream_capture(AGENT_TOOL_SYNTAX_DSML41,
+                                          chunks,
+                                          sizeof(chunks)/sizeof(chunks[0]),
+                                          &p,
+                                          NULL);
+
+    AGENT_TEST_ASSERT(p.state == AGENT_DSML_DONE);
+    AGENT_TEST_ASSERT(p.calls.len == 1);
+    AGENT_TEST_ASSERT(p.calls.v[0].name && !strcmp(p.calls.v[0].name, "read"));
+    AGENT_TEST_ASSERT(!strcmp(agent_tool_arg_value(&p.calls.v[0], "path"),
+                              "ds4_agent.c"));
+    AGENT_TEST_ASSERT(strstr(out, "DSML") == NULL);
+
+    free(out);
+    agent_dsml_parser_free(&p);
+
+    char *prompt = agent_build_dsml41_tools_prompt(false);
+    AGENT_TEST_ASSERT(strstr(prompt, "<｜DSML｜ calls>") != NULL);
+    AGENT_TEST_ASSERT(strstr(prompt, "<｜DSML｜tool_calls>") == NULL);
+    free(prompt);
+}
+
 static void test_agent_glm_tool_parser_rejects_missing_value(void) {
     const char *text = "<tool_call>list<arg_key>path</arg_key></tool_call>";
     agent_dsml_parser p = {
@@ -7716,6 +7808,7 @@ static void ds4_agent_unit_tests_run(void) {
     test_agent_glm_stream_ignores_tool_inside_think();
     test_agent_glm_stream_greedy_sampling_boundaries();
     test_agent_dsml_stream_tool_call_chunked();
+    test_agent_dsml41_stream_tool_call_chunked();
     test_agent_glm_tool_parser_rejects_missing_value();
     test_agent_terminal_wrap_output_is_deferred();
 }
@@ -9826,6 +9919,7 @@ static int worker_run_turn(agent_worker *w, const char *user_text) {
                 &observation,
                 tool_syntax == AGENT_TOOL_SYNTAX_QWEN ? agent_qwen_syntax_reminder :
                 tool_syntax == AGENT_TOOL_SYNTAX_GLM ? agent_glm_syntax_reminder :
+                tool_syntax == AGENT_TOOL_SYNTAX_DSML41 ? agent_dsml41_syntax_reminder :
                 agent_dsml_syntax_reminder);
         } else {
             agent_tool_observation_free(&observation);

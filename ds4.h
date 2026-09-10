@@ -312,6 +312,9 @@ bool ds4_engine_is_glm_dsa(ds4_engine *e);
 bool ds4_engine_is_glm53(ds4_engine *e);
 bool ds4_engine_is_qwen4(ds4_engine *e);
 bool ds4_engine_is_qwen(ds4_engine *e);
+bool ds4_engine_is_deepseek41(ds4_engine *e);
+/* Official V4.1 numeric reasoning-effort prefix (NULL when thinking is off). */
+const char *ds4_deepseek41_reasoning_effort_text(ds4_think_mode mode);
 /* Qwen3.8 reasoning-effort system instruction for a think mode (NULL when none) */
 const char *ds4_qwen4_reasoning_effort_text(ds4_think_mode mode);
 const char *ds4_backend_name(ds4_backend backend);
@@ -379,6 +382,9 @@ void ds4_encode_chat_prompt(
         ds4_think_mode think_mode,
         ds4_tokens *out);
 void ds4_chat_append_max_effort_prefix(ds4_engine *e, ds4_tokens *tokens);
+void ds4_chat_append_reasoning_effort_prefix(ds4_engine *e,
+                                             ds4_tokens *tokens,
+                                             ds4_think_mode mode);
 void ds4_chat_append_message(ds4_engine *e, ds4_tokens *tokens, const char *role, const char *content);
 void ds4_chat_append_assistant_prefix(ds4_engine *e, ds4_tokens *tokens, ds4_think_mode think_mode);
 

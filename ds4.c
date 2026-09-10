@@ -373,6 +373,13 @@ static const char DS4_REASONING_EFFORT_MAX_PREFIX[] =
     "You MUST be very thorough in your thinking and comprehensively decompose the problem to resolve the root cause, rigorously stress-testing your logic against all potential paths, edge cases, and adversarial scenarios.\n"
     "Explicitly write out your entire deliberation process, documenting every intermediate step, considered alternative, and rejected hypothesis to ensure absolutely no assumption is left unchecked.\n\n";
 
+static const char DS4_V41_REASONING_LOW[] =
+    "Reasoning Effort: 50 (range 1-100, the higher the value, the more thorough the reasoning)\n\n";
+static const char DS4_V41_REASONING_HIGH[] =
+    "Reasoning Effort: 75 (range 1-100, the higher the value, the more thorough the reasoning)\n\n";
+static const char DS4_V41_REASONING_MAX[] =
+    "Reasoning Effort: 100 (range 1-100, the higher the value, the more thorough the reasoning)\n\n";
+
 /* DeepSeek recommends Think Max only with at least a 384K-token context window.
  * Below that size we keep ordinary thinking to avoid injecting a prompt that
  * asks for a reasoning budget the allocated context is not meant to hold. */
@@ -45626,7 +45633,8 @@ static void vocab_load(ds4_vocab *vocab, const ds4_model *model) {
     if (vocab->eos_id < 0) vocab->eos_id = vocab_lookup_optional(vocab, "</s>");
     if (vocab->eos_id < 0) vocab->eos_id = vocab_lookup_optional(vocab, "<|im_end|>");
     if (vocab->eos_id < 0) vocab->eos_id = 151643;
-    vocab->system_id    = -1;
+    vocab->system_id    = ds4_model_is_deepseek41() ?
+                          vocab_lookup_optional(vocab, "<｜System｜>") : -1;
     vocab->user_id      = vocab_lookup_optional(vocab, "<｜User｜>");
     if (vocab->user_id < 0) vocab->user_id = vocab_lookup_optional(vocab, "<|im_start|>");
     if (vocab->user_id < 0) vocab->user_id = 1;
@@ -45680,7 +45688,13 @@ const char *ds4_glm_reasoning_effort_text(ds4_think_mode mode) {
 static void chat_push_think_prefix(const ds4_vocab *vocab,
                                    ds4_think_mode   think_mode,
                                    token_vec       *out) {
-    if (DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_GLM_DSA) {
+    if (ds4_model_is_deepseek41()) {
+        const char *effort = ds4_deepseek41_reasoning_effort_text(think_mode);
+        if (effort) {
+            token_vec_push(out, vocab->system_id);
+            bpe_tokenize_text(vocab, effort, out);
+        }
+    } else if (DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_GLM_DSA) {
         const char *effort = ds4_glm_reasoning_effort_text(think_mode);
         if (effort) {
             token_vec_push(out, vocab->system_id);
@@ -45764,7 +45778,8 @@ static void encode_chat_prompt(
         vocab->user_id < 0 ||
         vocab->assistant_id < 0 ||
         vocab->think_end_id < 0 ||
-        (DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_GLM_DSA && vocab->system_id < 0) ||
+        ((DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_GLM_DSA ||
+          ds4_model_is_deepseek41()) && vocab->system_id < 0) ||
         (need_think_start && vocab->think_start_id < 0)) {
         ds4_die("this tokenizer does not provide the DeepSeek chat markers; use raw prompt tokenization");
     }
@@ -45772,7 +45787,8 @@ static void encode_chat_prompt(
     chat_push_bos_sequence(vocab, out);
     chat_push_think_prefix(vocab, think_mode, out);
     if (system && system[0]) {
-        if (DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_GLM_DSA)
+        if (DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_GLM_DSA ||
+            (ds4_model_is_deepseek41() && !ds4_think_mode_enabled(think_mode)))
             token_vec_push(out, vocab->system_id);
         bpe_tokenize_text(vocab, system, out);
     }
@@ -45805,6 +45821,7 @@ static bool special_token_at(const ds4_vocab *vocab, const char *p, int *token, 
         {"<|system|>",             vocab->system_id},
         {"<｜User｜>",              vocab->user_id},
         {"<｜Assistant｜>",         vocab->assistant_id},
+        {"<｜System｜>",            vocab->system_id},
         {"<|user|>",               vocab->user_id},
         {"<|assistant|>",          vocab->assistant_id},
         {"<|observation|>",        vocab->observation_id},
@@ -45887,6 +45904,16 @@ void ds4_chat_append_max_effort_prefix(ds4_engine *e, ds4_tokens *tokens) {
     bpe_tokenize_text(&e->vocab, DS4_REASONING_EFFORT_MAX_PREFIX, tokens);
 }
 
+void ds4_chat_append_reasoning_effort_prefix(ds4_engine *e,
+                                             ds4_tokens *tokens,
+                                             ds4_think_mode mode) {
+    if (!ds4_model_is_deepseek41()) return;
+    const char *effort = ds4_deepseek41_reasoning_effort_text(mode);
+    if (!effort) return;
+    token_vec_push(tokens, e->vocab.system_id);
+    bpe_tokenize_text(&e->vocab, effort, tokens);
+}
+
 static void bpe_tokenize_wrapped_payload_text(ds4_vocab *vocab, const char *content,
                                               const char *end, token_vec *out) {
     /* Tool output is plain data inside the model-family wrapper.
@@ -45959,6 +45986,39 @@ void ds4_chat_append_message(ds4_engine *e, ds4_tokens *tokens, const char *role
             tokenize_rendered_chat_vocab(vocab, "<tool_response>", tokens);
             bpe_tokenize_tool_response_text(vocab, content, tokens);
             tokenize_rendered_chat_vocab(vocab, "</tool_response>", tokens);
+        } else {
+            token_vec_push(tokens, vocab->user_id);
+            bpe_tokenize_text(vocab, content, tokens);
+        }
+        return;
+    }
+
+    if (ds4_model_is_deepseek41()) {
+        if (!strcmp(role, "system") || !strcmp(role, "developer")) {
+            bool saw_system = false;
+            bool saw_conversation = false;
+            for (int i = 0; i < tokens->len; i++) {
+                const int tok = tokens->v[i];
+                saw_system |= tok == vocab->system_id;
+                saw_conversation |= tok == vocab->user_id ||
+                                    tok == vocab->assistant_id;
+            }
+            /* Consecutive leading system fragments share one System block;
+             * a system instruction after a turn gets its own marker. */
+            if (!saw_system || saw_conversation)
+                token_vec_push(tokens, vocab->system_id);
+            tokenize_rendered_chat_vocab(vocab, content, tokens);
+        } else if (!strcmp(role, "assistant")) {
+            token_vec_push(tokens, vocab->assistant_id);
+            if (strncmp(content, "<think>", 7) != 0 &&
+                strncmp(content, "</think>", 8) != 0)
+                token_vec_push(tokens, vocab->think_end_id);
+            tokenize_rendered_chat_vocab(vocab, content, tokens);
+        } else if (!strcmp(role, "tool") || !strcmp(role, "function")) {
+            token_vec_push(tokens, vocab->user_id);
+            bpe_tokenize_text(vocab, "<tool_result>", tokens);
+            bpe_tokenize_tool_result_text(vocab, content, tokens);
+            bpe_tokenize_text(vocab, "</tool_result>", tokens);
         } else {
             token_vec_push(tokens, vocab->user_id);
             bpe_tokenize_text(vocab, content, tokens);
@@ -74159,6 +74219,22 @@ bool ds4_engine_is_glm_dsa(ds4_engine *e) {
 bool ds4_engine_is_qwen(ds4_engine *e) {
     (void)e;
     return DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_QWEN;
+}
+
+bool ds4_engine_is_deepseek41(ds4_engine *e) {
+    (void)e;
+    return ds4_model_is_deepseek41();
+}
+
+const char *ds4_deepseek41_reasoning_effort_text(ds4_think_mode mode) {
+    switch (mode) {
+    case DS4_THINK_LOW:    return DS4_V41_REASONING_LOW;
+    case DS4_THINK_MEDIUM:
+    case DS4_THINK_HIGH:   return DS4_V41_REASONING_HIGH;
+    case DS4_THINK_MAX:    return DS4_V41_REASONING_MAX;
+    case DS4_THINK_NONE:   return NULL;
+    }
+    return NULL;
 }
 
 bool ds4_engine_dflash_ready(const ds4_engine *e) {

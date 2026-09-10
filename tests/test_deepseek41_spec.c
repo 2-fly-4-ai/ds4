@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 static void test_profile(void) {
     uint32_t p[16] = {0};
@@ -66,10 +67,21 @@ static void test_shared_sources(void) {
     }
 }
 
+static void test_reasoning_effort(void) {
+    assert(ds4_deepseek41_reasoning_effort_text(DS4_THINK_NONE) == NULL);
+    assert(strstr(ds4_deepseek41_reasoning_effort_text(DS4_THINK_LOW),
+                  "Reasoning Effort: 50 ") != NULL);
+    assert(strstr(ds4_deepseek41_reasoning_effort_text(DS4_THINK_HIGH),
+                  "Reasoning Effort: 75 ") != NULL);
+    assert(strstr(ds4_deepseek41_reasoning_effort_text(DS4_THINK_MAX),
+                  "Reasoning Effort: 100 ") != NULL);
+}
+
 int main(void) {
     test_profile();
     test_compress_ratios();
     test_shared_sources();
+    test_reasoning_effort();
     puts("deepseek41 spec tests: ok");
     return 0;
 }

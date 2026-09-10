@@ -542,7 +542,9 @@ static void build_chat_prompt(ds4_engine *engine,
                               ds4_tokens *out) {
     const ds4_think_mode think_mode = cli_effective_think_mode(gen);
     ds4_chat_begin(engine, out);
-    if (ds4_engine_is_glm_dsa(engine)) {
+    if (ds4_engine_is_deepseek41(engine)) {
+        ds4_chat_append_reasoning_effort_prefix(engine, out, think_mode);
+    } else if (ds4_engine_is_glm_dsa(engine)) {
         const char *effort = ds4_glm_reasoning_effort_text(think_mode);
         if (effort) ds4_chat_append_message(engine, out, "system", effort);
     } else if (think_mode == DS4_THINK_MAX) {
@@ -1517,7 +1519,9 @@ static const char *repl_glm_reasoning_effort_text(ds4_think_mode mode) {
 static void repl_chat_build_think_prefix(ds4_engine *engine,
                                          ds4_think_mode mode,
                                          ds4_tokens *prefix) {
-    if (ds4_engine_is_glm_dsa(engine)) {
+    if (ds4_engine_is_deepseek41(engine)) {
+        ds4_chat_append_reasoning_effort_prefix(engine, prefix, mode);
+    } else if (ds4_engine_is_glm_dsa(engine)) {
         const char *effort = repl_glm_reasoning_effort_text(mode);
         if (effort) ds4_chat_append_message(engine, prefix, "system", effort);
     } else if (mode == DS4_THINK_MAX) {
