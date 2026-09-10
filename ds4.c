@@ -479,6 +479,7 @@ typedef enum {
     DS4_MODEL_FAMILY_GLM_DSA   = 1,
     DS4_MODEL_FAMILY_QWEN4_EXP = 2,
     DS4_MODEL_FAMILY_QWEN      = 3,
+    DS4_MODEL_FAMILY_DEEPSEEK41 = 4,
 } ds4_model_family;
 
 typedef enum {
@@ -489,6 +490,7 @@ typedef enum {
     DS4_VARIANT_QWEN4_EXP = 4,
     DS4_VARIANT_QWEN4_MINI = 5,
     DS4_VARIANT_QWEN38 = 6,
+    DS4_VARIANT_V41_FLASH = 7,
 } ds4_variant;
 
 typedef struct {
@@ -537,6 +539,14 @@ typedef struct {
     uint32_t n_ple_heads_per_ngram;
     uint32_t n_ple_conv;
     uint32_t n_ple_head_dim;
+    uint32_t n_candidate_topk_blocks;
+    uint32_t n_candidate_block_size;
+    int32_t candidate_source_layer;
+    uint32_t n_engram_layer;
+    uint32_t n_engram_max_ngram;
+    uint32_t n_engram_head;
+    uint32_t n_engram_head_dim;
+    uint32_t n_engram_compressed_vocab;
     int32_t ple_eos_id;
     float rms_eps;
     float hc_eps;
@@ -625,6 +635,56 @@ static const ds4_shape DS4_SHAPE_PRO = {
     .rope_yarn_beta_slow = DS4_DEFAULT_ROPE_YARN_BETA_SLOW,
     .compress_rope_freq_base = DS4_DEFAULT_COMPRESS_ROPE_FREQ_BASE,
     .rope_orig_ctx = DS4_DEFAULT_ROPE_ORIG_CTX,
+};
+
+/* DeepSeek V4.1 Flash has 40 executable backbone blocks followed by three
+ * optional DSpark stages.  It deliberately has its own family: V4.1 shares
+ * kernels with V4, but not the old model's KV/index ownership or Engram
+ * dataflow, so selecting the old binder would silently produce wrong logits. */
+static const ds4_shape DS4_SHAPE_V41_FLASH = {
+    .name = "DeepSeek V4.1 Flash",
+    .family = DS4_MODEL_FAMILY_DEEPSEEK41,
+    .variant = DS4_VARIANT_V41_FLASH,
+    .n_layer = 43,
+    .n_embd = 5120,
+    .n_vocab = 129280,
+    .n_head = 64,
+    .n_head_kv = 1,
+    .n_head_dim = 512,
+    .n_value_dim = 512,
+    .n_rot = 64,
+    .n_out_group = 8,
+    .n_lora_q = 1280,
+    .n_lora_o = 1024,
+    .n_expert = 384,
+    .n_expert_used = 6,
+    .n_expert_shared = 1,
+    .n_ff_exp = 2304,
+    .n_swa = 128,
+    .n_indexer_head = 32,
+    .n_indexer_head_dim = 128,
+    .n_indexer_top_k = 512,
+    .n_hc = 4,
+    .n_hc_sinkhorn_iter = 20,
+    .n_nextn_predict = 3,
+    .n_candidate_topk_blocks = 2048,
+    .n_candidate_block_size = 8,
+    .candidate_source_layer = 20,
+    .n_engram_layer = 2,
+    .n_engram_max_ngram = 4,
+    .n_engram_head = 8,
+    .n_engram_head_dim = 256,
+    .n_engram_compressed_vocab = 99092,
+    .rms_eps = 1.0e-20f,
+    .hc_eps = 1.0e-6f,
+    .expert_weight_scale = 1.5f,
+    .swiglu_clamp_exp = 10.0f,
+    .rope_freq_base = 10000.0f,
+    .rope_scale_factor = 16.0f,
+    .rope_yarn_beta_fast = 32.0f,
+    .rope_yarn_beta_slow = 1.0f,
+    .compress_rope_freq_base = 160000.0f,
+    .rope_orig_ctx = 65536,
 };
 
 static const ds4_shape DS4_SHAPE_GLM52 = {
@@ -912,6 +972,14 @@ static uint32_t g_ds4_compress_ratios[DS4_MAX_LAYER] = {0};
 #define DS4_N_PLE_CONV                (g_ds4_shape.n_ple_conv)
 #define DS4_N_PLE_HEAD_DIM            (g_ds4_shape.n_ple_head_dim)
 #define DS4_PLE_EOS_ID                (g_ds4_shape.ple_eos_id)
+#define DS4_N_CANDIDATE_TOPK_BLOCKS   (g_ds4_shape.n_candidate_topk_blocks)
+#define DS4_N_CANDIDATE_BLOCK_SIZE    (g_ds4_shape.n_candidate_block_size)
+#define DS4_CANDIDATE_SOURCE_LAYER    (g_ds4_shape.candidate_source_layer)
+#define DS4_N_ENGRAM_LAYER            (g_ds4_shape.n_engram_layer)
+#define DS4_N_ENGRAM_MAX_NGRAM        (g_ds4_shape.n_engram_max_ngram)
+#define DS4_N_ENGRAM_HEAD             (g_ds4_shape.n_engram_head)
+#define DS4_N_ENGRAM_HEAD_DIM         (g_ds4_shape.n_engram_head_dim)
+#define DS4_N_ENGRAM_COMPRESSED_VOCAB (g_ds4_shape.n_engram_compressed_vocab)
 #define DS4_N_PLE_HEADS               ((DS4_N_PLE_NGRAM - 1u) * DS4_N_PLE_HEADS_PER_NGRAM)
 #define DS4_N_LIN_CONV_DIM            (2u * DS4_N_LIN_K_HEAD * DS4_N_LIN_HEAD_DIM + DS4_N_LIN_V_HEAD * DS4_N_LIN_HEAD_DIM)
 
@@ -929,6 +997,51 @@ static ds4_qwen4_ple_hash g_ds4_qwen4_ple;
 
 static bool ds4_model_is_glm53(void) {
     return DS4_MODEL_VARIANT == DS4_VARIANT_GLM53;
+}
+
+static bool ds4_model_is_deepseek41(void) {
+    return DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_DEEPSEEK41;
+}
+
+static uint32_t ds4_v41_expected_compress_ratio(uint32_t il) {
+    if (il < 2u || il >= 40u) return 0u;
+    return il < 20u ? 2u : 1u;
+}
+
+static int32_t ds4_v41_source_at_or_before(
+        uint32_t il,
+        const uint8_t *sources,
+        uint32_t n_sources) {
+    int32_t result = -1;
+    for (uint32_t i = 0; i < n_sources && sources[i] <= il; i++) {
+        result = sources[i];
+    }
+    return result;
+}
+
+/* A source layer publishes shared state; following layers with the same
+ * compression regime consume it.  Keeping these maps explicit prevents the
+ * old V4 alternating-ratio heuristic from being applied to V4.1. */
+static int32_t ds4_v41_kv_source_for_layer(uint32_t il) {
+    static const uint8_t sources[] = {2, 8, 14, 20};
+    if (il >= 40u) return -1;
+    return ds4_v41_source_at_or_before(
+            il, sources, (uint32_t)(sizeof(sources) / sizeof(sources[0])));
+}
+
+static int32_t ds4_v41_index_source_for_layer(uint32_t il) {
+    static const uint8_t sources[] = {2, 8, 14, 20, 24, 28, 32, 36};
+    if (il >= 40u) return -1;
+    return ds4_v41_source_at_or_before(
+            il, sources, (uint32_t)(sizeof(sources) / sizeof(sources[0])));
+}
+
+static bool ds4_v41_layer_owns_kv(uint32_t il) {
+    return ds4_v41_kv_source_for_layer(il) == (int32_t)il;
+}
+
+static bool ds4_v41_layer_owns_index(uint32_t il) {
+    return ds4_v41_index_source_for_layer(il) == (int32_t)il;
 }
 
 static uint32_t directional_steering_layer_count(void) {
@@ -1322,7 +1435,8 @@ static void ds4_die(const char *msg) {
 /* Attention compression is read from GGUF metadata after validating that it
  * matches the exact layout expected for the loaded model shape. */
 static uint32_t ds4_layer_compress_ratio(uint32_t il) {
-    if (DS4_MODEL_FAMILY != DS4_MODEL_FAMILY_DEEPSEEK4) return 0;
+    if (DS4_MODEL_FAMILY != DS4_MODEL_FAMILY_DEEPSEEK4 &&
+        DS4_MODEL_FAMILY != DS4_MODEL_FAMILY_DEEPSEEK41) return 0;
     if (il >= DS4_N_LAYER) ds4_die("DeepSeek4 layer index is outside the loaded model layout");
     return g_ds4_compress_ratios[il];
 }
@@ -1331,6 +1445,8 @@ static uint32_t ds4_expected_layer_compress_ratio(uint32_t il) {
     if (il >= DS4_N_LAYER) ds4_die("DeepSeek4 layer index is outside the loaded model layout");
 
     switch (DS4_MODEL_VARIANT) {
+    case DS4_VARIANT_V41_FLASH:
+        return ds4_v41_expected_compress_ratio(il);
     case DS4_VARIANT_FLASH:
         if (il < 2) return 0;
         return (il & 1u) == 0 ? 4u : 128u;
@@ -6513,6 +6629,45 @@ static void config_expect_bool(const char *name, bool got, bool expected) {
     exit(1);
 }
 
+static void config_expect_u32_array(
+        const ds4_model *m,
+        const char *key,
+        const uint32_t *expected,
+        uint32_t n_expected) {
+    ds4_array_ref arr;
+    if (!model_get_array(m, key, &arr) ||
+        (arr.type != GGUF_VALUE_UINT32 && arr.type != GGUF_VALUE_INT32 &&
+         arr.type != GGUF_VALUE_UINT64 && arr.type != GGUF_VALUE_INT64) ||
+        arr.len != n_expected) {
+        fprintf(stderr, "ds4: %s must be an integer array of length %u\n",
+                key, n_expected);
+        exit(1);
+    }
+    ds4_cursor c = cursor_at(m, arr.data_pos);
+    for (uint32_t i = 0; i < n_expected; i++) {
+        uint64_t got = 0;
+        if (arr.type == GGUF_VALUE_UINT64 || arr.type == GGUF_VALUE_INT64) {
+            if (!cursor_read(&c, &got, sizeof(got))) ds4_die(c.error);
+            if (arr.type == GGUF_VALUE_INT64 && (int64_t)got < 0) {
+                ds4_die("metadata array contains a negative value");
+            }
+        } else {
+            uint32_t got32 = 0;
+            if (!cursor_u32(&c, &got32)) ds4_die(c.error);
+            if (arr.type == GGUF_VALUE_INT32 && (int32_t)got32 < 0) {
+                ds4_die("metadata array contains a negative value");
+            }
+            got = got32;
+        }
+        if (got != expected[i]) {
+            fprintf(stderr,
+                    "ds4: unexpected %s[%u]: got %" PRIu64 ", expected %u\n",
+                    key, i, got, expected[i]);
+            exit(1);
+        }
+    }
+}
+
 static void config_validate_fixed_shape(uint32_t n_layer) {
     config_expect_u32("block_count",                  n_layer,                 DS4_N_LAYER);
 }
@@ -6652,6 +6807,171 @@ static void config_validate_deepseek4_model(const ds4_model *m) {
     config_expect_f32("hyper_connection.epsilon", hc_eps, DS4_HC_EPS);
     const bool expert_weight_norm = required_bool(m, "deepseek4.expert_weights_norm");
     config_expect_bool("expert_weights_norm", expert_weight_norm, true);
+}
+
+static void config_validate_deepseek41_model(const ds4_model *m) {
+    static const uint32_t compress_ratios[43] = {
+        0, 0,
+        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        0, 0, 0,
+    };
+    static const uint32_t kv_sources[] = {2, 8, 14, 20};
+    static const uint32_t index_sources[] = {2, 8, 14, 20, 24, 28, 32, 36};
+    static const uint32_t engram_layers[] = {1, 14};
+    static const uint32_t engram_rows[] = {384006168, 384016682};
+    static const uint32_t dspark_targets[] = {37, 38, 39};
+
+    g_ds4_shape = DS4_SHAPE_V41_FLASH;
+    g_ds4_flash_vision_exp = false;
+    memset(g_ds4_compress_ratios, 0, sizeof(g_ds4_compress_ratios));
+
+    config_expect_u32("block_count", required_u32(m, "deepseek41.block_count"),
+                      DS4_N_LAYER);
+    config_expect_u32("trunk_block_count",
+                      required_u32(m, "deepseek41.trunk_block_count"),
+                      DS4_N_LAYER - DS4_N_NEXTN_PREDICT);
+    config_expect_u32("nextn_predict_layers",
+                      required_u32(m, "deepseek41.nextn_predict_layers"),
+                      DS4_N_NEXTN_PREDICT);
+    config_expect_u64("context_length",
+                      required_u64_compat(m, "deepseek41.context_length"),
+                      UINT64_C(1048576));
+    config_expect_u32("embedding_length",
+                      required_u32(m, "deepseek41.embedding_length"), DS4_N_EMBD);
+    config_expect_u32("vocab_size", required_u32(m, "deepseek41.vocab_size"),
+                      DS4_N_VOCAB);
+    config_expect_u32("attention.head_count",
+                      required_u32(m, "deepseek41.attention.head_count"), DS4_N_HEAD);
+    config_expect_u32("attention.head_count_kv",
+                      required_u32(m, "deepseek41.attention.head_count_kv"),
+                      DS4_N_HEAD_KV);
+    config_expect_u32("attention.key_length",
+                      required_u32(m, "deepseek41.attention.key_length"),
+                      DS4_N_HEAD_DIM);
+    config_expect_u32("attention.value_length",
+                      required_u32(m, "deepseek41.attention.value_length"),
+                      DS4_N_VALUE_DIM);
+    config_expect_u32("rope.dimension_count",
+                      required_u32(m, "deepseek41.rope.dimension_count"), DS4_N_ROT);
+    config_expect_u32("attention.q_lora_rank",
+                      required_u32(m, "deepseek41.attention.q_lora_rank"),
+                      DS4_N_LORA_Q);
+    config_expect_u32("attention.output_lora_rank",
+                      required_u32(m, "deepseek41.attention.output_lora_rank"),
+                      DS4_N_LORA_O);
+    config_expect_u32("attention.output_group_count",
+                      required_u32(m, "deepseek41.attention.output_group_count"),
+                      DS4_N_OUT_GROUP);
+    config_expect_u32("attention.sliding_window",
+                      required_u32(m, "deepseek41.attention.sliding_window"), DS4_N_SWA);
+    config_expect_u32("attention.indexer.head_count",
+                      required_u32(m, "deepseek41.attention.indexer.head_count"),
+                      DS4_N_INDEXER_HEAD);
+    config_expect_u32("attention.indexer.key_length",
+                      required_u32(m, "deepseek41.attention.indexer.key_length"),
+                      DS4_N_INDEXER_HEAD_DIM);
+    config_expect_u32("attention.indexer.top_k",
+                      required_u32(m, "deepseek41.attention.indexer.top_k"),
+                      DS4_N_INDEXER_TOP_K);
+    config_expect_u32("attention.candidate_source_layer",
+                      required_u32(m, "deepseek41.attention.candidate_source_layer"),
+                      (uint32_t)DS4_CANDIDATE_SOURCE_LAYER);
+    config_expect_u32("attention.candidate_top_k_blocks",
+                      required_u32(m, "deepseek41.attention.candidate_top_k_blocks"),
+                      DS4_N_CANDIDATE_TOPK_BLOCKS);
+    config_expect_u32("attention.candidate_block_size",
+                      required_u32(m, "deepseek41.attention.candidate_block_size"),
+                      DS4_N_CANDIDATE_BLOCK_SIZE);
+
+    config_expect_u32("expert_count", required_u32(m, "deepseek41.expert_count"),
+                      DS4_N_EXPERT);
+    config_expect_u32("expert_used_count",
+                      required_u32(m, "deepseek41.expert_used_count"),
+                      DS4_N_EXPERT_USED);
+    config_expect_u32("expert_shared_count",
+                      required_u32(m, "deepseek41.expert_shared_count"),
+                      DS4_N_EXPERT_SHARED);
+    config_expect_u32("expert_feed_forward_length",
+                      required_u32(m, "deepseek41.expert_feed_forward_length"),
+                      DS4_N_FF_EXP);
+    config_expect_f32("expert_weights_scale",
+                      required_f32(m, "deepseek41.expert_weights_scale"),
+                      DS4_EXPERT_WEIGHT_SCALE);
+    config_expect_bool("expert_weights_norm",
+                       required_bool(m, "deepseek41.expert_weights_norm"), true);
+
+    config_expect_u32("hyper_connection.count",
+                      required_u32(m, "deepseek41.hyper_connection.count"), DS4_N_HC);
+    config_expect_u32("hyper_connection.sinkhorn_iterations",
+                      required_u32(m, "deepseek41.hyper_connection.sinkhorn_iterations"),
+                      DS4_N_HC_SINKHORN_ITER);
+    config_expect_epsilon("attention.layer_norm_rms_epsilon",
+                          required_f32(m, "deepseek41.attention.layer_norm_rms_epsilon"),
+                          DS4_RMS_EPS);
+    config_expect_f32("hyper_connection.epsilon",
+                      required_f32(m, "deepseek41.hyper_connection.epsilon"), DS4_HC_EPS);
+    config_expect_f32("swiglu_limit", required_f32(m, "deepseek41.swiglu_limit"),
+                      DS4_SWIGLU_CLAMP_EXP);
+    config_expect_f32("rope.freq_base", required_f32(m, "deepseek41.rope.freq_base"),
+                      DS4_ROPE_FREQ_BASE);
+    config_expect_f32("rope.scaling.factor",
+                      required_f32(m, "deepseek41.rope.scaling.factor"),
+                      DS4_ROPE_SCALE_FACTOR);
+    config_expect_u64("rope.scaling.original_context_length",
+                      required_u64_compat(m,
+                          "deepseek41.rope.scaling.original_context_length"),
+                      DS4_ROPE_ORIG_CTX);
+    config_expect_f32("attention.compress_rope_freq_base",
+                      required_f32(m, "deepseek41.attention.compress_rope_freq_base"),
+                      DS4_COMPRESS_ROPE_FREQ_BASE);
+
+    config_expect_u32("engram.max_ngram_size",
+                      required_u32(m, "deepseek41.engram.max_ngram_size"),
+                      DS4_N_ENGRAM_MAX_NGRAM);
+    config_expect_u32("engram.head_count",
+                      required_u32(m, "deepseek41.engram.head_count"), DS4_N_ENGRAM_HEAD);
+    config_expect_u32("engram.head_dim",
+                      required_u32(m, "deepseek41.engram.head_dim"),
+                      DS4_N_ENGRAM_HEAD_DIM);
+    config_expect_u32("engram.compressed_vocab_size",
+                      required_u32(m, "deepseek41.engram.compressed_vocab_size"),
+                      DS4_N_ENGRAM_COMPRESSED_VOCAB);
+    config_expect_u32("engram.pad_token_id",
+                      required_u32(m, "deepseek41.engram.pad_token_id"), 2u);
+
+    config_expect_u32("dspark.block_size",
+                      required_u32(m, "deepseek41.dspark.block_size"), 5u);
+    config_expect_u32("dspark.markov_rank",
+                      required_u32(m, "deepseek41.dspark.markov_rank"), 256u);
+    config_expect_u32("dspark.noise_token_id",
+                      required_u32(m, "deepseek41.dspark.noise_token_id"), 128799u);
+    config_expect_u32("dspark.expert_count",
+                      required_u32(m, "deepseek41.dspark.expert_count"), 128u);
+    config_expect_u32("dspark.expert_used_count",
+                      required_u32(m, "deepseek41.dspark.expert_used_count"), 3u);
+
+    config_expect_u32_array(m, "deepseek41.attention.compress_ratios",
+                            compress_ratios, 43);
+    config_expect_u32_array(m, "deepseek41.attention.kv_source_layers",
+                            kv_sources, 4);
+    config_expect_u32_array(m, "deepseek41.attention.index_source_layers",
+                            index_sources, 8);
+    config_expect_u32_array(m, "deepseek41.engram.layers", engram_layers, 2);
+    config_expect_u32_array(m, "deepseek41.engram.num_embeddings", engram_rows, 2);
+    config_expect_u32_array(m, "deepseek41.dspark.target_layers", dspark_targets, 3);
+    memcpy(g_ds4_compress_ratios, compress_ratios, sizeof(compress_ratios));
+
+    ds4_str scoring = {0};
+    if (!model_get_string(m, "deepseek41.expert_scoring_func", &scoring) ||
+        !ds4_streq(scoring, "sqrtsoftplus")) {
+        ds4_die("deepseek41.expert_scoring_func must be sqrtsoftplus");
+    }
+    ds4_str revision = {0};
+    if (!model_get_string(m, "general.source.revision", &revision) ||
+        !ds4_streq(revision, "df42c109f1defefcbfcedbe7d905718a12266e40")) {
+        ds4_die("unexpected DeepSeek V4.1 source revision");
+    }
 }
 
 static void config_validate_glm_dsa_model(const ds4_model *m) {
@@ -7056,6 +7376,10 @@ static void config_validate_model(const ds4_model *m) {
     g_ds4_flash_vision_exp = false;
     ds4_str arch = {0};
     if (model_get_string(m, "general.architecture", &arch)) {
+        if (ds4_streq(arch, "deepseek41")) {
+            config_validate_deepseek41_model(m);
+            return;
+        }
         if (ds4_streq(arch, "glm-dsa")) {
             config_validate_glm_dsa_model(m);
             return;
@@ -71046,6 +71370,46 @@ typedef struct {
     const char *name;
     uint64_t bytes;
 } ds4_test_fake_tensor;
+
+void ds4_test_deepseek41_profile(uint32_t out[16]) {
+    const ds4_shape *s = &DS4_SHAPE_V41_FLASH;
+    out[0] = s->n_layer;
+    out[1] = s->n_nextn_predict;
+    out[2] = s->n_embd;
+    out[3] = s->n_vocab;
+    out[4] = s->n_head;
+    out[5] = s->n_head_dim;
+    out[6] = s->n_lora_q;
+    out[7] = s->n_lora_o;
+    out[8] = s->n_expert;
+    out[9] = s->n_expert_used;
+    out[10] = s->n_ff_exp;
+    out[11] = s->n_indexer_head;
+    out[12] = s->n_indexer_top_k;
+    out[13] = s->n_candidate_topk_blocks;
+    out[14] = s->n_candidate_block_size;
+    out[15] = s->n_engram_compressed_vocab;
+}
+
+uint32_t ds4_test_deepseek41_compress_ratio(uint32_t layer) {
+    return ds4_v41_expected_compress_ratio(layer);
+}
+
+int32_t ds4_test_deepseek41_kv_source(uint32_t layer) {
+    return ds4_v41_kv_source_for_layer(layer);
+}
+
+int32_t ds4_test_deepseek41_index_source(uint32_t layer) {
+    return ds4_v41_index_source_for_layer(layer);
+}
+
+int ds4_test_deepseek41_owns_kv(uint32_t layer) {
+    return ds4_v41_layer_owns_kv(layer) ? 1 : 0;
+}
+
+int ds4_test_deepseek41_owns_index(uint32_t layer) {
+    return ds4_v41_layer_owns_index(layer) ? 1 : 0;
+}
 
 int ds4_test_tensor_to_entry(const char *name, int name_len) {
     ds4_tensor fake;

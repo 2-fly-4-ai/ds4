@@ -466,6 +466,12 @@ int ds4_sample_logits(const float *logits, int n_vocab, float temperature,
                       int top_k, float top_p, float min_p, uint64_t *rng);
 int ds4_session_sample(ds4_session *s, float temperature, int top_k, float top_p, float min_p, uint64_t *rng);
 #ifdef DS4_TEST_HOOKS
+void ds4_test_deepseek41_profile(uint32_t out[16]);
+uint32_t ds4_test_deepseek41_compress_ratio(uint32_t layer);
+int32_t ds4_test_deepseek41_kv_source(uint32_t layer);
+int32_t ds4_test_deepseek41_index_source(uint32_t layer);
+int ds4_test_deepseek41_owns_kv(uint32_t layer);
+int ds4_test_deepseek41_owns_index(uint32_t layer);
 int ds4_test_sample_logits(const float *logits, uint32_t n_vocab,
                            float temperature, int top_k,
                            float top_p, float min_p, uint64_t *rng,
