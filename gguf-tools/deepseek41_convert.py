@@ -101,6 +101,90 @@ def kv_string_array(key, values):
             + b"".join(pack_string(value) for value in values))
 
 
+def kv_u64_array(key, values):
+    return (pack_string(key) + struct.pack("<IIQ", GGUF_ARRAY, 10, len(values))
+            + struct.pack(f"<{len(values)}Q", *values))
+
+
+def _is_prime(value):
+    if value < 2:
+        return False
+    if value % 2 == 0:
+        return value == 2
+    divisor = 3
+    while divisor * divisor <= value:
+        if value % divisor == 0:
+            return False
+        divisor += 2
+    return True
+
+
+def build_engram_layout(config):
+    """Reproduce official engram.py's prime buckets and NumPy PCG64 multipliers."""
+    import numpy as np
+
+    text = config["text_config"]
+    layers = text["engram_layer_ids"]
+    max_ngram = text["engram_max_ngram_size"]
+    n_heads = text["engram_n_heads"]
+    seen, primes = set(), []
+    for _ in layers:
+        for _ in range(max_ngram - 1):
+            current = text["engram_vocab_size"] - 1
+            for _ in range(n_heads):
+                current += 1
+                while not _is_prime(current) or current in seen:
+                    current += 1
+                seen.add(current)
+                primes.append(current)
+    width = (max_ngram - 1) * n_heads
+    offsets = []
+    for layer in range(len(layers)):
+        running = 0
+        for prime in primes[layer * width:(layer + 1) * width]:
+            offsets.append(running)
+            running += prime
+        if running != text["engram_num_embeddings"][layer]:
+            fail(f"Engram bucket rows {running} do not match layer {layers[layer]} table")
+    max_long = np.iinfo(np.int64).max
+    bound = max(1, (max_long // text["engram_compressed_vocab_size"]) // 2)
+    multipliers = []
+    for layer in layers:
+        generator = np.random.default_rng(10007 * layer)
+        values = generator.integers(0, bound, size=max_ngram, dtype=np.int64)
+        multipliers.extend((values * 2 + 1).tolist())
+    return primes, offsets, multipliers
+
+
+def build_compressed_token_map(hf_dir, expected_size):
+    """Build the exact official NFKC/case/space-normalized tokenizer-id map."""
+    try:
+        from tokenizers import Regex, Tokenizer, normalizers
+    except ImportError as error:
+        fail("DeepSeek V4.1 conversion requires the 'tokenizers' Python package")
+    tokenizer = Tokenizer.from_file(os.path.join(hf_dir, "tokenizer.json"))
+    sentinel = "\ue000"
+    normalizer = normalizers.Sequence([
+        normalizers.NFKC(), normalizers.NFD(), normalizers.StripAccents(),
+        normalizers.Lowercase(),
+        normalizers.Replace(Regex(r"[ \t\r\n]+"), " "),
+        normalizers.Replace(Regex(r"^ $"), sentinel), normalizers.Strip(),
+        normalizers.Replace(sentinel, " "),
+    ])
+    key_to_id, result = {}, []
+    for token_id in range(tokenizer.get_vocab_size()):
+        text = tokenizer.decode([token_id], skip_special_tokens=False)
+        if "\ufffd" in text:
+            key = tokenizer.id_to_token(token_id)
+        else:
+            normalized = normalizer.normalize_str(text)
+            key = normalized if normalized else text
+        result.append(key_to_id.setdefault(key, len(key_to_id)))
+    if len(key_to_id) != expected_size:
+        fail(f"compressed tokenizer vocabulary {len(key_to_id)} != {expected_size}")
+    return result
+
+
 def load_tokenizer_template_records(path):
     records, template_tokens = [], None
     with open(path, "rb") as fp:
@@ -178,8 +262,11 @@ def tokenizer_records(hf_dir, template_path):
             if key == "tokenizer.ggml.tokens" else record for key, record in records]
 
 
-def main_metadata(config, revision):
+def main_metadata(config, revision, hf_dir):
     text, rope = config["text_config"], config["text_config"]["rope_scaling"]
+    token_map = build_compressed_token_map(
+        hf_dir, text["engram_compressed_vocab_size"])
+    primes, offsets, multipliers = build_engram_layout(config)
     return [
         kv_string("general.architecture", "deepseek41"),
         kv_string("general.name", "DeepSeek-V4.1-Flash"),
@@ -231,6 +318,10 @@ def main_metadata(config, revision):
         kv_u32("deepseek41.engram.pad_token_id", 2),
         kv_u32_array("deepseek41.engram.layers", text["engram_layer_ids"]),
         kv_u32_array("deepseek41.engram.num_embeddings", text["engram_num_embeddings"]),
+        kv_u32_array("deepseek41.engram.token_map", token_map),
+        kv_u32_array("deepseek41.engram.hash_primes", primes),
+        kv_u64_array("deepseek41.engram.hash_offsets", offsets),
+        kv_u64_array("deepseek41.engram.hash_multipliers", multipliers),
         kv_u32("deepseek41.dspark.block_size", text["dspark_block_size"]),
         kv_u32("deepseek41.dspark.markov_rank", 256), kv_u32("deepseek41.dspark.noise_token_id", 128799),
         kv_u32("deepseek41.dspark.expert_count", text["dspark_n_routed_experts"]),
@@ -465,7 +556,7 @@ def main():
     validate_config(config); db = SourceDB(args.hf)
     try:
         plan = [x for x in build_plan(db.tensors, args.quant) if x.artifact == args.artifact]
-        records = (main_metadata(config, args.source_revision) + tokenizer_records(args.hf, args.tokenizer_template)
+        records = (main_metadata(config, args.source_revision, args.hf) + tokenizer_records(args.hf, args.tokenizer_template)
                    if args.artifact == "main" else sidecar_metadata(args.artifact, args.source_revision))
         prepared = prepare_plan(plan); data_offset, data_bytes = output_layout(prepared, records)
         print(f"deepseek41-convert: artifact={args.artifact} quant={args.quant} tensors={len(plan)} bytes={data_offset+data_bytes} ({(data_offset+data_bytes)/(1<<30):.3f} GiB)")

@@ -8,7 +8,9 @@ import unittest
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from deepseek41_convert import decode_fp4_rows, decode_fp8_rows, load_v41_tokens, repack_mxfp4_rows
+from deepseek41_convert import (build_engram_layout, decode_fp4_rows,
+                                decode_fp8_rows, load_v41_tokens,
+                                repack_mxfp4_rows)
 from deepseek41_mxfp4 import decode_adjacent_block, decode_mxfp4_block
 from glm53_quantize import Quantizer
 
@@ -27,6 +29,26 @@ def fake_quantizer():
 
 
 class DeepSeek41ConverterTests(unittest.TestCase):
+    def test_engram_layout_matches_official_bucket_totals_and_rng(self):
+        config = {"text_config": {
+            "engram_layer_ids": [1, 14], "engram_max_ngram_size": 4,
+            "engram_n_heads": 8, "engram_vocab_size": 16000000,
+            "engram_num_embeddings": [384006168, 384016682],
+            "engram_compressed_vocab_size": 99092,
+        }}
+        primes, offsets, multipliers = build_engram_layout(config)
+        self.assertEqual(len(primes), 48)
+        self.assertEqual(len(offsets), 48)
+        self.assertEqual(primes[:3], [16000057, 16000079, 16000081])
+        self.assertEqual(primes[-3:], [16000877, 16000879, 16000889])
+        self.assertEqual(offsets[24], 0)
+        self.assertEqual(offsets[-1] + primes[-1], 384016682)
+        self.assertEqual(multipliers,
+                         [76632096046245, 4839876093313,
+                          35959672319349, 73987337458391,
+                          67716810739261, 51510806800915,
+                          30921347202721, 82619226485591])
+
     def test_native_fp4_repack_preserves_every_value(self):
         rng = np.random.default_rng(41)
         packed = rng.integers(0, 256, size=(3, 32), dtype=np.uint8)
