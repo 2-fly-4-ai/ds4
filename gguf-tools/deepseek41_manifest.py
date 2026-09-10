@@ -7,10 +7,13 @@ also the source of truth for the tensor families used by the mixed-quant plan.
 """
 
 import argparse
+import concurrent.futures
 import json
 import os
 import re
 import sys
+import urllib.parse
+import urllib.request
 
 from glm53_manifest import load_index, load_safetensors_header
 
@@ -73,6 +76,9 @@ EXPECTED_TEXT_CONFIG = {
     "dspark_n_routed_experts": 128,
     "dspark_num_experts_per_tok": 3,
 }
+
+DEFAULT_REPO = "deepseek-ai/DeepSeek-V4.1-Flash"
+DEFAULT_REVISION = "df42c109f1defefcbfcedbe7d905718a12266e40"
 
 
 def fail(message):
@@ -255,6 +261,49 @@ def tensor_role(name):
     return "other"
 
 
+def load_remote_safetensors_header(repo, revision, shard):
+    """Read only a remote shard's safetensors JSON header with HTTP ranges."""
+    quoted = "/".join(urllib.parse.quote(part, safe="") for part in repo.split("/"))
+    url = f"https://huggingface.co/{quoted}/resolve/{revision}/{urllib.parse.quote(shard)}"
+    request = urllib.request.Request(url, headers={"Range": "bytes=0-7"})
+    with urllib.request.urlopen(request, timeout=60) as response:
+        if response.status != 206:
+            fail(f"{shard}: range request returned HTTP {response.status}")
+        header_len = int.from_bytes(read_exact_response(response, 8, shard), "little")
+        resolved_url = response.geturl()
+    if header_len <= 0 or header_len > 64 << 20:
+        fail(f"{shard}: unreasonable safetensors header length {header_len}")
+    request = urllib.request.Request(
+        resolved_url, headers={"Range": f"bytes=8-{header_len + 7}"}
+    )
+    with urllib.request.urlopen(request, timeout=60) as response:
+        if response.status != 206:
+            fail(f"{shard}: header range returned HTTP {response.status}")
+        raw = read_exact_response(response, header_len, shard)
+    try:
+        document = json.loads(raw)
+    except json.JSONDecodeError as error:
+        fail(f"{shard}: invalid remote safetensors header: {error}")
+    document.pop("__metadata__", None)
+    result = {}
+    for name, entry in document.items():
+        start, end = entry["data_offsets"]
+        result[name] = {
+            "dtype": entry["dtype"],
+            "shape": entry["shape"],
+            "offset": 8 + header_len + start,
+            "nbytes": end - start,
+        }
+    return result
+
+
+def read_exact_response(response, length, label):
+    data = response.read(length)
+    if len(data) != length:
+        fail(f"{label}: short HTTP response ({len(data)} of {length} bytes)")
+    return data
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("hf_dir", help="downloaded deepseek-ai/DeepSeek-V4.1-Flash directory")
@@ -265,6 +314,15 @@ def parse_args():
     parser.add_argument(
         "--summary", action="store_true",
         help="print one byte-total row per tensor role instead of every tensor",
+    )
+    parser.add_argument(
+        "--fetch-missing-headers", action="store_true",
+        help="range-fetch headers for missing shards without downloading their payloads",
+    )
+    parser.add_argument("--repo", default=DEFAULT_REPO, help="Hugging Face repo for remote headers")
+    parser.add_argument(
+        "--revision", default=DEFAULT_REVISION,
+        help="immutable Hugging Face revision for remote headers",
     )
     return parser.parse_args()
 
@@ -281,17 +339,38 @@ def main():
     shard_names = sorted(set(weight_map.values()))
     tensors = {}
     missing_shards = []
+    remote_shards = []
     for shard_name in shard_names:
         path = os.path.join(args.hf_dir, shard_name)
         if not os.path.isfile(path):
-            missing_shards.append(shard_name)
+            if not args.fetch_missing_headers:
+                missing_shards.append(shard_name)
+                continue
+            remote_shards.append(shard_name)
             continue
-        for name, info in load_safetensors_header(path).items():
+        else:
+            header = load_safetensors_header(path)
+        for name, info in header.items():
             if weight_map.get(name) != shard_name:
                 fail(f"{shard_name}: {name} is assigned to {weight_map.get(name)!r}")
             if name in tensors:
                 fail(f"duplicate tensor in shard headers: {name}")
             tensors[name] = info
+
+    if remote_shards:
+        def fetch(shard_name):
+            return shard_name, load_remote_safetensors_header(
+                args.repo, args.revision, shard_name
+            )
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+            for shard_name, header in executor.map(fetch, remote_shards):
+                for name, info in header.items():
+                    if weight_map.get(name) != shard_name:
+                        fail(f"{shard_name}: {name} is assigned to {weight_map.get(name)!r}")
+                    if name in tensors:
+                        fail(f"duplicate tensor in shard headers: {name}")
+                    tensors[name] = info
 
     if missing_shards and not args.allow_missing_shards:
         fail(f"missing {len(missing_shards)} shards; first is {missing_shards[0]}")
