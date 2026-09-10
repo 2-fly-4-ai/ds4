@@ -107,6 +107,8 @@ static ds4_engine *test_open_engine(bool quality) {
     const char *mtp = getenv("DS4_TEST_MTP");
     ds4_engine_options opt = {
         .model_path = test_model_path(),
+        .engram_path = getenv("DS4_TEST_ENGRAM"),
+        .vision_path = getenv("DS4_TEST_VISION"),
         .ple_path = getenv("DS4_TEST_PLE"),
         .backend = test_model_backend(),
         .quality = quality,
@@ -8744,6 +8746,8 @@ static void test_print_help(const char *prog) {
     puts("      Show this help.");
     puts("\nEnvironment:");
     puts("  DS4_TEST_MODEL=FILE        Model path. Default: ds4flash.gguf");
+    puts("  DS4_TEST_ENGRAM=FILE       DeepSeek V4.1 Engram sidecar for model-backed tests.");
+    puts("  DS4_TEST_VISION=FILE       Optional matching vision sidecar for model-backed tests.");
     puts("  DS4_TEST_PLE=FILE          Optional external Qwen PLE table.");
     puts("  DS4_TEST_BACKEND=cpu       Run model tests on CPU instead of Metal/CUDA.");
     puts("  DS4_TEST_SSD_STREAMING=1   Run model tests through Metal SSD streaming.");
