@@ -1222,6 +1222,7 @@ typedef struct {
     float *comp_kv_cur;
     float *comp_sc_cur;
     float *comp_pooled;
+    float *comp_latent;
 
     bool *index_allowed;
     float *index_q;
@@ -6296,7 +6297,8 @@ static void weights_validate_layout(
         tensor_expect_dense_quant_layout(l->attn_output_a,  2, DS4_N_HEAD_DIM * (DS4_N_HEAD / DS4_N_OUT_GROUP), out_low_dim, 0);
         tensor_expect_dense_quant_layout(l->attn_output_b,  2, out_low_dim, DS4_N_EMBD, 0);
 
-        if (ratio != 0) {
+        if (ratio != 0 &&
+            (!ds4_model_is_deepseek41() || ds4_v41_layer_owns_kv(il))) {
             const uint32_t coff = ratio == 4 ? 2u : 1u;
             const uint64_t comp_width = (uint64_t)coff * DS4_N_HEAD_DIM;
             tensor_expect_layout(l->attn_compressor_ape,  DS4_TENSOR_F16, 2, comp_width, ratio, 0);
@@ -15182,7 +15184,9 @@ static void cpu_decode_scratch_init(ds4_cpu_decode_scratch *scratch, uint32_t ct
     memset(scratch, 0, sizeof(*scratch));
     if (ctx_size == 0) ctx_size = 1;
     const uint32_t raw_cap = ds4_default_raw_cap(ctx_size);
-    const uint32_t comp_cap = ctx_size / 4 + 2;
+    const uint32_t comp_cap = ds4_model_is_deepseek41()
+        ? ctx_size + 2
+        : ctx_size / 4 + 2;
     const uint32_t attn_score_cap = raw_cap + comp_cap;
     const uint64_t hc_dim = (uint64_t)DS4_N_HC * DS4_N_EMBD;
     const uint64_t q_dim = (uint64_t)DS4_N_HEAD * DS4_N_HEAD_DIM;
@@ -15229,6 +15233,7 @@ static void cpu_decode_scratch_init(ds4_cpu_decode_scratch *scratch, uint32_t ct
     scratch->comp_kv_cur = xmalloc((size_t)2u * DS4_N_HEAD_DIM * sizeof(float));
     scratch->comp_sc_cur = xmalloc((size_t)2u * DS4_N_HEAD_DIM * sizeof(float));
     scratch->comp_pooled = xmalloc((size_t)DS4_N_HEAD_DIM * sizeof(float));
+    scratch->comp_latent = xmalloc((size_t)DS4_N_HEAD_DIM * sizeof(float));
 
     scratch->index_allowed = xmalloc((size_t)comp_cap * sizeof(bool));
     scratch->index_q = xmalloc((size_t)DS4_N_INDEXER_HEAD * DS4_N_INDEXER_HEAD_DIM * sizeof(float));
@@ -15291,6 +15296,7 @@ static void cpu_decode_scratch_free(ds4_cpu_decode_scratch *scratch) {
     free(scratch->index_weights);
     free(scratch->index_q);
     free(scratch->index_allowed);
+    free(scratch->comp_latent);
     free(scratch->comp_pooled);
     free(scratch->comp_sc_cur);
     free(scratch->comp_kv_cur);
@@ -15345,7 +15351,7 @@ static void kv_cache_init(ds4_kv_cache *cache, uint32_t ctx_size, uint32_t raw_c
                 cache->layer[il].attn_state_score[i] = DS4_NEG_INF;
             }
 
-            if (ratio == 4) {
+            if (ratio == 4 || ds4_model_is_deepseek41()) {
                 const uint32_t index_width = coff * DS4_N_INDEXER_HEAD_DIM;
                 const uint32_t index_rows = coff * ratio;
                 cache->layer[il].index_comp_kv = xmalloc_zeroed((size_t)comp_cap * DS4_N_INDEXER_HEAD_DIM, sizeof(float));
@@ -15431,7 +15437,7 @@ static void kv_cache_finish_prefill_states(ds4_kv_cache *cache, uint32_t n_token
                                             DS4_N_HEAD_DIM,
                                             ratio,
                                             n_tokens);
-        if (ratio == 4) {
+        if (ratio == 4 || ds4_model_is_deepseek41()) {
             compressor_finish_prefill_state_cpu(layer->index_state_kv,
                                                 layer->index_state_score,
                                                 DS4_N_INDEXER_HEAD_DIM,
@@ -15680,6 +15686,90 @@ static bool compressor_decode_one_decode_scratch(
     }
 
     return true;
+}
+
+/* V4.1 compression is deliberately simpler than the V4 ratio-4/APE path:
+ * ratio 2 performs an FP32 projection and per-dimension softmax pool, while
+ * ratio 1 is just a BF16 projection plus RMSNorm.  The RoPE-free latent is
+ * returned separately because the index-key owner consumes it before the
+ * attention cache stores the rotated/quantized form. */
+static bool compressor_decode_v41_one_decode_scratch(
+        float                  * out_comp,
+        float                  * out_latent,
+        const ds4_model        * model,
+        const ds4_tensor       * wkv,
+        const ds4_tensor       * wgate,
+        const ds4_tensor       * norm,
+        const float            * x,
+        float                  * state_kv,
+        float                  * state_score,
+        uint32_t                 compress_ratio,
+        uint32_t                 il,
+        uint32_t                 pos,
+        ds4_cpu_decode_scratch * scratch) {
+    if (compress_ratio == 0 || !wkv || !norm) return false;
+
+    float *projected = scratch->comp_kv_cur;
+    float *pooled = scratch->comp_pooled;
+    if (compress_ratio == 1) {
+        matvec_any_decode_scratch(projected, model, wkv, x, scratch);
+        memcpy(pooled, projected, (size_t)DS4_N_HEAD_DIM * sizeof(pooled[0]));
+    } else {
+        if (compress_ratio != 2 || !wgate || !state_kv || !state_score) {
+            ds4_die("invalid DeepSeek-V4.1 compressor configuration");
+        }
+        float *scores = scratch->comp_sc_cur;
+        matvec_any_decode_scratch(projected, model, wkv, x, scratch);
+        matvec_any_decode_scratch(scores, model, wgate, x, scratch);
+        const uint32_t slot = pos & 1u;
+        memcpy(state_kv + (uint64_t)slot * DS4_N_HEAD_DIM,
+               projected, (size_t)DS4_N_HEAD_DIM * sizeof(projected[0]));
+        memcpy(state_score + (uint64_t)slot * DS4_N_HEAD_DIM,
+               scores, (size_t)DS4_N_HEAD_DIM * sizeof(scores[0]));
+        if ((pos & 1u) == 0) return false;
+        compressor_pool_decode_state(pooled, state_kv, state_score,
+                                     DS4_N_HEAD_DIM, 2);
+    }
+
+    double ss = 0.0;
+    for (uint32_t i = 0; i < DS4_N_HEAD_DIM; i++) {
+        ss += (double)pooled[i] * pooled[i];
+    }
+    const float inv_rms = 1.0f /
+        sqrtf((float)(ss / (double)DS4_N_HEAD_DIM) + DS4_RMS_EPS);
+    for (uint32_t i = 0; i < DS4_N_HEAD_DIM; i++) {
+        const float v = pooled[i] * inv_rms * tensor_1d_value(model, norm, i);
+        out_latent[i] = v;
+        out_comp[i] = v;
+    }
+
+    const uint32_t comp_pos = pos + 1u - compress_ratio;
+    rope_tail_layer_inplace(out_comp, 1, DS4_N_HEAD_DIM, DS4_N_ROT,
+                            comp_pos, il, false);
+    dsv4_fp8_kv_quantize_row_inplace_cpu(out_comp,
+                                         DS4_N_HEAD_DIM,
+                                         DS4_N_ROT);
+    return true;
+}
+
+static void index_key_v41_from_latent_decode_scratch(
+        float                   * out_key,
+        const ds4_model         * model,
+        const ds4_layer_weights * owner_layer,
+        const float             * latent,
+        uint32_t                  owner_il,
+        uint32_t                  comp_pos,
+        ds4_cpu_decode_scratch  * scratch) {
+    matvec_any_decode_scratch(out_key, model,
+                              owner_layer->indexer_attn_k,
+                              latent, scratch);
+    const float *norm = tensor_data(model, owner_layer->indexer_k_norm);
+    rms_norm_weight(out_key, out_key, norm,
+                    DS4_N_INDEXER_HEAD_DIM, DS4_RMS_EPS);
+    rope_tail_layer_inplace(out_key, 1, DS4_N_INDEXER_HEAD_DIM,
+                            DS4_N_ROT, comp_pos, owner_il, false);
+    dsv4_indexer_qat_row_inplace_cpu(out_key,
+                                     DS4_N_INDEXER_HEAD_DIM);
 }
 
 /* Attention over raw SWA rows plus optional compressed rows.  Ratio-4 layers
@@ -16516,6 +16606,7 @@ static void layer_forward_raw_swa_one(
         float                   * out_hc,
         const ds4_model         * model,
         const ds4_layer_weights * layer,
+        ds4_kv_cache            * all_cache,
         ds4_layer_cache         * cache,
         const float             * inp_hc,
         uint32_t                  il,
@@ -16526,6 +16617,14 @@ static void layer_forward_raw_swa_one(
         float                     steering_ffn_scale,
         ds4_cpu_decode_scratch  * scratch) {
     const uint32_t n_hc = DS4_N_HC;
+    ds4_layer_cache *shared_cache = cache;
+    int32_t shared_owner = -1;
+    if (ds4_model_is_deepseek41()) {
+        shared_owner = ds4_v41_kv_source_for_layer(il);
+        if (shared_owner >= 0) {
+            shared_cache = &all_cache->layer[shared_owner];
+        }
+    }
     const bool profile = getenv("DS4_DECODE_PROFILE_DETAIL") != NULL;
     const double t_start = profile ? now_sec() : 0.0;
     double t_hc = 0.0;
@@ -16592,7 +16691,34 @@ static void layer_forward_raw_swa_one(
     kv_cache_push_raw(cache, scratch->kv);
     if (profile) t_rope_cache = now_sec() - t0;
 
-    if (ratio != 0) {
+    if (ratio != 0 && ds4_model_is_deepseek41()) {
+        t0 = profile ? now_sec() : 0.0;
+        if (ds4_v41_layer_owns_kv(il) &&
+            compressor_decode_v41_one_decode_scratch(
+                scratch->comp, scratch->comp_latent,
+                model,
+                layer->attn_compressor_kv,
+                layer->attn_compressor_gate,
+                layer->attn_compressor_norm,
+                scratch->attn_norm,
+                cache->attn_state_kv,
+                cache->attn_state_score,
+                ratio, il, pos, scratch)) {
+            kv_cache_push_comp(cache->attn_comp_kv, &cache->n_comp,
+                               cache->comp_cap, DS4_N_HEAD_DIM,
+                               scratch->comp);
+            index_key_v41_from_latent_decode_scratch(
+                scratch->index_comp, model, layer,
+                scratch->comp_latent, il, pos + 1u - ratio,
+                scratch);
+            kv_cache_push_comp(cache->index_comp_kv,
+                               &cache->n_index_comp,
+                               cache->comp_cap,
+                               DS4_N_INDEXER_HEAD_DIM,
+                               scratch->index_comp);
+        }
+        if (profile) t_compress = now_sec() - t0;
+    } else if (ratio != 0) {
         t0 = profile ? now_sec() : 0.0;
         if (compressor_decode_one_decode_scratch(scratch->comp, model,
                                                  layer->attn_compressor_kv,
@@ -16632,7 +16758,19 @@ static void layer_forward_raw_swa_one(
             t_compress = now_sec() - t0;
         }
     }
-    if (ratio == 4) {
+    if (ds4_model_is_deepseek41() && ratio != 0) {
+        if (ds4_v41_layer_owns_index(il)) {
+            t0 = profile ? now_sec() : 0.0;
+            comp_allowed = indexer_allowed_decode_one_decode_scratch(
+                model, layer, scratch->attn_norm, scratch->qr_norm,
+                shared_cache->index_comp_kv,
+                shared_cache->n_index_comp,
+                il, pos, scratch);
+            if (profile) t_indexer = now_sec() - t0;
+        } else if (shared_cache->n_comp != 0) {
+            comp_allowed = scratch->index_allowed;
+        }
+    } else if (ratio == 4) {
         t0 = profile ? now_sec() : 0.0;
         comp_allowed = indexer_allowed_decode_one_decode_scratch(model, layer,
                                                                  scratch->attn_norm,
@@ -16648,7 +16786,8 @@ static void layer_forward_raw_swa_one(
     if (ratio != 0) {
         layer_attention_mixed_one_decode_scratch(scratch->heads, model, layer, scratch->q,
                                                  cache->raw_kv, cache->n_raw,
-                                                 cache->attn_comp_kv, cache->n_comp,
+                                                 shared_cache->attn_comp_kv,
+                                                 shared_cache->n_comp,
                                                  comp_allowed,
                                                  scratch);
     } else {
@@ -16727,7 +16866,8 @@ static void forward_token_raw_swa_cpu_decode_scratch(
         ? directional_steering_layer_count()
         : DS4_N_LAYER;
     for (uint32_t il = 0; il < n_backbone; il++) {
-        layer_forward_raw_swa_one(next, model, &weights->layer[il], &cache->layer[il],
+        layer_forward_raw_swa_one(next, model, &weights->layer[il], cache,
+                                  &cache->layer[il],
                                   cur, il, pos, token,
                                   steering_dirs,
                                   steering_attn_scale,
@@ -16900,6 +17040,7 @@ static void prefill_layer_major_cpu(
                 layer_forward_raw_swa_one(next + t * hc_dim,
                                           model,
                                           &weights->layer[il],
+                                          cache,
                                           &cache->layer[il],
                                           cur + t * hc_dim,
                                           il,
@@ -71915,6 +72056,22 @@ void ds4_test_deepseek41_hc_transition(
     hc_weighted_sum_one(collapsed, residual_hc, incoming_pre, n_embd, n_hc);
     hc_post_one(next_hc, sublayer_out, residual_hc,
                 current_post, current_comb, n_embd, n_hc);
+}
+
+void ds4_test_deepseek41_compressor_pool(
+        float       * out,
+        const float * values,
+        const float * scores,
+        uint32_t      head_dim,
+        uint32_t      ratio) {
+    const size_t n = (size_t)head_dim * ratio;
+    float *v = xmalloc(n * sizeof(v[0]));
+    float *s = xmalloc(n * sizeof(s[0]));
+    memcpy(v, values, n * sizeof(v[0]));
+    memcpy(s, scores, n * sizeof(s[0]));
+    compressor_pool_decode_state(out, v, s, head_dim, ratio);
+    free(s);
+    free(v);
 }
 
 int ds4_test_tensor_to_entry(const char *name, int name_len) {

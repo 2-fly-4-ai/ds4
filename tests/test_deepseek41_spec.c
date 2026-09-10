@@ -100,12 +100,28 @@ static void test_previous_pre_mix_hc_transition(void) {
     }
 }
 
+static void test_ratio2_per_dimension_softmax_pool(void) {
+    const float values[6] = {2, 10, -4, 8, 20, 6};
+    const float scores[6] = {0, 2, -1, 0, 0, 1};
+    float out[3] = {0};
+    float want[3];
+    for (int d = 0; d < 3; d++) {
+        const float m = scores[d] > scores[3 + d] ? scores[d] : scores[3 + d];
+        const float a = expf(scores[d] - m);
+        const float b = expf(scores[3 + d] - m);
+        want[d] = (a * values[d] + b * values[3 + d]) / (a + b);
+    }
+    ds4_test_deepseek41_compressor_pool(out, values, scores, 3, 2);
+    for (int i = 0; i < 3; i++) assert(fabsf(out[i] - want[i]) < 1e-6f);
+}
+
 int main(void) {
     test_profile();
     test_compress_ratios();
     test_shared_sources();
     test_reasoning_effort();
     test_previous_pre_mix_hc_transition();
+    test_ratio2_per_dimension_softmax_pool();
     puts("deepseek41 spec tests: ok");
     return 0;
 }

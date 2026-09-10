@@ -486,6 +486,9 @@ void ds4_test_deepseek41_hc_transition(float *collapsed, float *next_hc,
                                        const float *current_comb,
                                        const float *sublayer_out,
                                        uint32_t n_embd, uint32_t n_hc);
+void ds4_test_deepseek41_compressor_pool(float *out, const float *values,
+                                         const float *scores,
+                                         uint32_t head_dim, uint32_t ratio);
 int ds4_test_sample_logits(const float *logits, uint32_t n_vocab,
                            float temperature, int top_k,
                            float top_p, float min_p, uint64_t *rng,
