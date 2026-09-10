@@ -44402,6 +44402,12 @@ static uint32_t metal_graph_raw_cap_for_context(int ctx_size, uint32_t prefill_c
  * Long Flash prompts default to 4096-token chunks; PRO defaults to 8192. */
 static uint32_t metal_graph_prefill_cap_for_prompt(int prompt_len,
                                                    uint32_t prefill_chunk) {
+    /* V4.1 currently replays prefill through its exact token-state machine:
+     * Engram history, shared compressor ownership and candidate masks all
+     * advance once per token.  A wide batch workspace is therefore unused;
+     * keeping one row avoids reserving gigabytes of dead scratch in server
+     * sessions while preserving the full context/KV allocation. */
+    if (ds4_model_is_deepseek41()) return 1u;
     return ds4_prefill_cap_for_prompt(prompt_len, prefill_chunk);
 }
 
@@ -75136,6 +75142,7 @@ uint32_t ds4_engine_prefill_chunk(ds4_engine *e) {
  * Flash, 8192 for PRO, DS4_METAL_PREFILL_CHUNK honored). */
 uint32_t ds4_engine_prefill_quantum(ds4_engine *e) {
     if (!e) return 0;
+    if (ds4_model_is_deepseek41()) return 1u;
     return ds4_prefill_cap_for_prompt(INT32_MAX, e->prefill_chunk);
 }
 int ds4_engine_power(ds4_engine *e) {
@@ -75155,11 +75162,7 @@ const char *ds4_engine_model_name(ds4_engine *e) {
 
 int ds4_engine_layer_count(ds4_engine *e) {
     (void)e;
-    if (DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_GLM_DSA) {
-        if (DS4_N_LAYER <= DS4_N_NEXTN_PREDICT) return 0;
-        return (int)(DS4_N_LAYER - DS4_N_NEXTN_PREDICT);
-    }
-    return (int)DS4_N_LAYER;
+    return (int)ds4_model_executable_layer_count();
 }
 
 uint32_t ds4_engine_layer_compress_ratio(ds4_engine *e, uint32_t layer) {
