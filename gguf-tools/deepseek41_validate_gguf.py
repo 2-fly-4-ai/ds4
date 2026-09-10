@@ -154,13 +154,19 @@ def validate(path, hf_dir, artifact, quant, revision, verify_copy_payloads):
             if verify_copy_payloads:
                 for entry in plan:
                     item = entry.plan
-                    if item.mode != "copy" or len(item.sources) != 1:
+                    if item.mode not in ("copy", "copy_fp8_sidecar") or len(item.sources) != 1:
                         continue
                     fp.seek(data_offset + entry.offset)
-                    output = read_exact(fp, item.nbytes, item.target)
-                    source = db.read_range(item.sources[0], 0, item.nbytes)
-                    if output != source:
-                        fail(f"{item.target}: payload differs from source")
+                    # Engram tables are each ~92 GiB. Compare them in bounded
+                    # chunks so validation remains safe on the 64/128 GiB Macs
+                    # that need the SSD-streaming sidecar in the first place.
+                    chunk_bytes = 8 << 20
+                    for offset in range(0, item.nbytes, chunk_bytes):
+                        nbytes = min(chunk_bytes, item.nbytes - offset)
+                        output = read_exact(fp, nbytes, item.target)
+                        source = db.read_range(item.sources[0], offset, nbytes)
+                        if output != source:
+                            fail(f"{item.target}: payload differs from source at byte {offset}")
                     verified += item.nbytes
     finally:
         db.close()
