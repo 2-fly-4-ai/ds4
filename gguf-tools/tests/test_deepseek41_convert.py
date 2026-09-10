@@ -54,6 +54,10 @@ class DeepSeek41ConverterTests(unittest.TestCase):
             dense_qtype("layers.0.attn_norm.weight", bf16),
             ("F32", "bf16_to_f32"),
         )
+        self.assertEqual(
+            dense_qtype("norm.weight", bf16),
+            ("F32", "bf16_to_f32"),
+        )
 
     def test_vision_sidecar_metadata_carries_exact_runtime_contract(self):
         config = {

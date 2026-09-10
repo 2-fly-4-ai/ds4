@@ -81,7 +81,8 @@ def dense_qtype(name, info):
         # that to the vision sidecar changes both its ABI and arithmetic.
         if name.startswith("vision.") and name.endswith("norm.weight"):
             return "BF16", "copy"
-        if name.endswith(("_norm.weight", ".norm.weight")) or \
+        if name == "norm.weight" or \
+                name.endswith(("_norm.weight", ".norm.weight")) or \
                 ".ffn.gate.weight" in name:
             return "F32", "bf16_to_f32"
         return "BF16", "copy"

@@ -1060,6 +1060,18 @@ static uint32_t directional_steering_layer_count(void) {
     return DS4_N_LAYER - DS4_N_NEXTN_PREDICT;
 }
 
+/* Number of layers executed by the target backbone. GLM embeds its MTP
+ * stages after the target trunk, while DeepSeek V4.1 ships the corresponding
+ * DSpark stages in a sidecar. Neither set belongs in ordinary target decode,
+ * prefill, model-map readahead, or target-verifier loops. */
+static uint32_t ds4_model_executable_layer_count(void) {
+    if (DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_GLM_DSA ||
+        DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_DEEPSEEK41) {
+        return directional_steering_layer_count();
+    }
+    return DS4_N_LAYER;
+}
+
 static bool ds4_glm53_layer_is_kda(uint32_t il) {
     return ds4_model_is_glm53() &&
            il + DS4_N_NEXTN_PREDICT < DS4_N_LAYER &&
@@ -9343,7 +9355,8 @@ static bool weights_model_map_decode_static_supported(const ds4_weights *w) {
     if (DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_GLM_DSA) {
         return g_glm_streaming_runtime_static_map_enabled;
     }
-    for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
+    const uint32_t n_layers = ds4_model_executable_layer_count();
+    for (uint32_t il = 0; il < n_layers; il++) {
         const ds4_layer_weights *l = &w->layer[il];
         if (!l->ffn_gate_exps || !l->ffn_up_exps || !l->ffn_down_exps) continue;
         if (!weights_streaming_layer_experts_uniform(w, il)) {
@@ -9528,7 +9541,8 @@ static DS4_MAYBE_UNUSED bool weights_model_map_decode_static_spans(
     if (!w || !spans) return false;
     memset(spans, 0, sizeof(*spans));
     if (include_token) model_map_span_vec_include_one(spans, w->token_embd);
-    for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
+    const uint32_t n_layers = ds4_model_executable_layer_count();
+    for (uint32_t il = 0; il < n_layers; il++) {
         model_map_span_vec_include_layer_decode_static(spans, &w->layer[il]);
     }
     if (include_output) model_map_span_vec_include_output(spans, w);
@@ -9567,7 +9581,8 @@ static DS4_MAYBE_UNUSED bool weights_model_map_decode_runtime_spans(
     if (!w || !spans) return false;
     memset(spans, 0, sizeof(*spans));
     if (include_token) model_map_span_vec_include_one(spans, w->token_embd);
-    for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
+    const uint32_t n_layers = ds4_model_executable_layer_count();
+    for (uint32_t il = 0; il < n_layers; il++) {
         model_map_span_vec_include_layer_decode(spans, w, il);
     }
     if (include_output) model_map_span_vec_include_output(spans, w);
@@ -17431,7 +17446,7 @@ static void output_logits_one_decode_scratch(
         const float            * inp_hc,
         ds4_cpu_decode_scratch * scratch);
 
-/* CPU decode for one token through all 43 layers.  The caller owns scratch and
+/* CPU decode for one token through the executable target backbone. The caller owns scratch and
  * cache lifetimes so no per-token allocations are needed. */
 static void forward_token_raw_swa_cpu_decode_scratch(
         float             * logits,
@@ -17447,7 +17462,7 @@ static void forward_token_raw_swa_cpu_decode_scratch(
     float *cur = scratch->cur;
     float *next = scratch->next;
 
-    embed_token_f16(model, weights, token, scratch->plain);
+    embed_token_any(model, weights, token, scratch->plain);
     hc_from_plain_embedding(cur, scratch->plain, DS4_N_EMBD, DS4_N_HC);
 
     if (ds4_model_is_deepseek41()) {
@@ -17456,9 +17471,7 @@ static void forward_token_raw_swa_cpu_decode_scratch(
         deepseek41_engram_record_text_token(scratch, token, pos);
     }
 
-    const uint32_t n_backbone = ds4_model_is_deepseek41()
-        ? directional_steering_layer_count()
-        : DS4_N_LAYER;
+    const uint32_t n_backbone = ds4_model_executable_layer_count();
     for (uint32_t il = 0; il < n_backbone; il++) {
         if (ds4_model_is_deepseek41() &&
             deepseek41_engram_slot_for_layer(il) >= 0) {
@@ -17555,7 +17568,7 @@ static void prefill_layer_major_cpu(
     }
 
     for (uint64_t t = 0; t < n_tok; t++) {
-        embed_token_f16(model, weights, prompt->v[t], plain);
+        embed_token_any(model, weights, prompt->v[t], plain);
         hc_from_plain_embedding(cur + t * hc_dim, plain, DS4_N_EMBD, DS4_N_HC);
     }
 
@@ -17753,10 +17766,11 @@ static void forward_first_token_cpu(
     float *cur = xmalloc((size_t)DS4_N_HC * DS4_N_EMBD * sizeof(cur[0]));
     float *next = xmalloc((size_t)DS4_N_HC * DS4_N_EMBD * sizeof(next[0]));
 
-    embed_token_f16(model, weights, token, plain);
+    embed_token_any(model, weights, token, plain);
     hc_from_plain_embedding(cur, plain, DS4_N_EMBD, DS4_N_HC);
 
-    for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
+    const uint32_t n_layers = ds4_model_executable_layer_count();
+    for (uint32_t il = 0; il < n_layers; il++) {
         layer_forward_self_one(next, model, &weights->layer[il], cur, il, 0, token);
         float *tmp = cur;
         cur = next;
@@ -22065,6 +22079,45 @@ DS4_GPU_GRAPH_CLASS_P_ACCESSOR(batch_routed_down)
 DS4_GPU_GRAPH_CLASS_P_ACCESSOR(batch_routed_out)
 DS4_GPU_GRAPH_CLASS_P_ACCESSOR(batch_ffn_out)
 DS4_GPU_GRAPH_CLASS_P_ACCESSOR(directional_steering_dirs)
+
+/* Seed one HC row from either the legacy F16 token table or a quantized
+ * table. DeepSeek V4.1 uses Q8_0 embeddings in the compact main artifact, so
+ * treating that payload as F16 would silently corrupt every text token. */
+static bool metal_graph_embed_token_hc_any(
+        ds4_gpu_graph       *g,
+        ds4_gpu_tensor      *out_hc,
+        const ds4_model     *model,
+        const ds4_weights   *weights,
+        uint32_t             token) {
+    if (!g || !out_hc || !model || !weights || !weights->token_embd) {
+        return false;
+    }
+    const ds4_tensor *embd = weights->token_embd;
+    const uint32_t n_vocab = (uint32_t)embd->dim[1];
+    if (embd->type == DS4_TENSOR_F16) {
+        return ds4_gpu_embed_token_hc_tensor(out_hc,
+                                              model->map,
+                                              model->size,
+                                              embd->abs_offset,
+                                              n_vocab,
+                                              token,
+                                              DS4_N_EMBD,
+                                              DS4_N_HC) != 0;
+    }
+
+    ds4_gpu_tensor *row = metal_graph_flat_hc(g);
+    return row &&
+           ds4_gpu_embed_token_quant_tensor(row,
+                                             model->map,
+                                             model->size,
+                                             embd->abs_offset,
+                                             embd->type,
+                                             n_vocab,
+                                             token,
+                                             DS4_N_EMBD) != 0 &&
+           ds4_gpu_repeat_hc_tensor(out_hc, row,
+                                    DS4_N_EMBD, DS4_N_HC) != 0;
+}
 
 /* dispatch-loop helpers for multi-tier per-layer execution.
  *
@@ -33707,7 +33760,7 @@ static int metal_graph_decode_test(
     int selected[DS4_MAX_EXPERT_USED];
     float expert_weight[DS4_MAX_EXPERT_USED];
 
-    embed_token_f16(model, weights, token, plain);
+    embed_token_any(model, weights, token, plain);
     hc_from_plain_embedding(cpu_hc, plain, DS4_N_EMBD, DS4_N_HC);
     hc_pre_from_state_one(model,
                           layer->hc_attn_fn,
@@ -33767,14 +33820,8 @@ static int metal_graph_decode_test(
     g.quality = quality;
     g.materialize_ffn_out = true;
     if (ok) ok = ds4_gpu_begin_commands() != 0;
-    if (ok) ok = ds4_gpu_embed_token_hc_tensor(metal_graph_cur_hc(&g),
-                                                 model->map,
-                                                 model->size,
-                                                 weights->token_embd->abs_offset,
-                                                 (uint32_t)weights->token_embd->dim[1],
-                                                 (uint32_t)token,
-                                                     DS4_N_EMBD,
-                                                     DS4_N_HC) != 0;
+    if (ok) ok = metal_graph_embed_token_hc_any(
+        &g, metal_graph_cur_hc(&g), model, weights, (uint32_t)token);
     if (ok) ok = metal_graph_encode_decode_layer(&g,
                                                model,
                                                layer,
@@ -33931,20 +33978,15 @@ static int metal_graph_first_token_full_test(
         float *cpu_cur = xmalloc((size_t)hc_dim * sizeof(float));
         float *cpu_next = xmalloc((size_t)hc_dim * sizeof(float));
 
-        embed_token_f16(model, weights, token, plain);
+        embed_token_any(model, weights, token, plain);
         hc_from_plain_embedding(cpu_cur, plain, DS4_N_EMBD, DS4_N_HC);
         ok = ds4_gpu_begin_commands() != 0;
-        if (ok) ok = ds4_gpu_embed_token_hc_tensor(metal_graph_cur_hc(&g),
-                                                     model->map,
-                                                     model->size,
-                                                     weights->token_embd->abs_offset,
-                                                     (uint32_t)weights->token_embd->dim[1],
-                                                     (uint32_t)token,
-                                                     DS4_N_EMBD,
-                                                     DS4_N_HC) != 0;
+        if (ok) ok = metal_graph_embed_token_hc_any(
+            &g, metal_graph_cur_hc(&g), model, weights, (uint32_t)token);
         if (ok) ok = ds4_gpu_end_commands() != 0;
 
-        for (uint32_t il = 0; ok && il < DS4_N_LAYER; il++) {
+        const uint32_t n_layers = ds4_model_executable_layer_count();
+        for (uint32_t il = 0; ok && il < n_layers; il++) {
             if (teacher_force) {
                 ok = ds4_gpu_tensor_write(metal_graph_cur_hc(&g), 0, cpu_cur, hc_dim * sizeof(float)) != 0;
             }
@@ -33983,16 +34025,11 @@ static int metal_graph_first_token_full_test(
         free(plain);
     } else {
         if (ok) ok = ds4_gpu_begin_commands() != 0;
-        if (ok) ok = ds4_gpu_embed_token_hc_tensor(metal_graph_cur_hc(&g),
-                                                     model->map,
-                                                     model->size,
-                                                     weights->token_embd->abs_offset,
-                                                     (uint32_t)weights->token_embd->dim[1],
-                                                     (uint32_t)token,
-                                                     DS4_N_EMBD,
-                                                     DS4_N_HC) != 0;
+        if (ok) ok = metal_graph_embed_token_hc_any(
+            &g, metal_graph_cur_hc(&g), model, weights, (uint32_t)token);
 
-        for (uint32_t il = 0; ok && il < DS4_N_LAYER; il++) {
+        const uint32_t n_layers = ds4_model_executable_layer_count();
+        for (uint32_t il = 0; ok && il < n_layers; il++) {
             ok = metal_graph_encode_decode_layer(&g, model, &weights->layer[il],
                                                  il, 0, g.layer_raw_cache[il],
                                                  g.raw_cap, 0, 1, token);
@@ -34888,14 +34925,8 @@ static bool metal_graph_encode_token_raw_swa(
                                             DS4_N_EMBD,
                                             DS4_N_HC) != 0;
     } else {
-        ok = ds4_gpu_embed_token_hc_tensor(metal_graph_cur_hc(g),
-                                           model->map,
-                                           model->size,
-                                           weights->token_embd->abs_offset,
-                                           (uint32_t)weights->token_embd->dim[1],
-                                           (uint32_t)token,
-                                           DS4_N_EMBD,
-                                           DS4_N_HC) != 0;
+        ok = metal_graph_embed_token_hc_any(
+            g, metal_graph_cur_hc(g), model, weights, (uint32_t)token);
     }
 
     /*
@@ -34927,9 +34958,7 @@ static bool metal_graph_encode_token_raw_swa(
                                   (uint64_t)DS4_N_HC * sizeof(float)) != 0;
     }
 
-    const uint32_t n_backbone = ds4_model_is_deepseek41()
-        ? directional_steering_layer_count()
-        : DS4_N_LAYER;
+    const uint32_t n_backbone = ds4_model_executable_layer_count();
     for (uint32_t il = 0; ok && il < n_backbone; il++) {
         if (ds4_model_is_deepseek41()) {
             ok = metal_graph_v41_engram_apply_one(
@@ -35112,7 +35141,7 @@ static bool metal_graph_upload_prompt_embeddings_hc_cpu(
     float *plain = xmalloc((size_t)DS4_N_EMBD * sizeof(plain[0]));
 
     for (uint32_t t = 0; t < n_tokens; t++) {
-        embed_token_f16(model, weights, prompt->v[pos0 + t], plain);
+        embed_token_any(model, weights, prompt->v[pos0 + t], plain);
         float *dst = hc + (uint64_t)t * hc_dim;
         for (uint32_t h = 0; h < DS4_N_HC; h++) {
             memcpy(dst + (uint64_t)h * DS4_N_EMBD,
@@ -35203,7 +35232,7 @@ static bool metal_graph_upload_visual_prompt_embeddings_hc(
         const float *source =
             metal_graph_visual_embedding_row(g, pos0 + t);
         if (!source && token >= 0 && token < (int)DS4_N_VOCAB) {
-            embed_token_f16(model, weights, token, plain);
+            embed_token_any(model, weights, token, plain);
             source = plain;
         }
         if (!source) {
@@ -35227,7 +35256,7 @@ static bool metal_graph_upload_visual_prompt_embeddings_hc(
 }
 
 /* Seed the batched HC state from token ids: every HC stream starts as the same
- * 4096-wide embedding.  Long prefill chunks use the Metal get-rows/repeat
+ * model-width embedding. Long prefill chunks use the GPU get-rows/repeat
  * kernel so the CPU does not build and upload a large [token, HC, dim] tensor. */
 static bool metal_graph_upload_prompt_embeddings_hc(
         ds4_gpu_tensor   *out_hc,
@@ -35249,7 +35278,8 @@ static bool metal_graph_upload_prompt_embeddings_hc(
     }
 #endif
 
-    if (tokens && n_tokens >= gpu_min) {
+    if (tokens && n_tokens >= gpu_min &&
+        weights->token_embd->type == DS4_TENSOR_F16) {
         return ds4_gpu_embed_tokens_hc_tensor(out_hc,
                                                 tokens,
                                                 model->map,
@@ -38607,14 +38637,8 @@ static bool metal_graph_eval_token_raw_swa_streaming(
                 (uint64_t)DS4_N_HC * DS4_N_EMBD * sizeof(float)) != 0;
         }
     } else if (ok) {
-        ok = ds4_gpu_embed_token_hc_tensor(metal_graph_cur_hc(g),
-                                           model->map,
-                                           model->size,
-                                           weights->token_embd->abs_offset,
-                                           (uint32_t)weights->token_embd->dim[1],
-                                           (uint32_t)token,
-                                           DS4_N_EMBD,
-                                           DS4_N_HC) != 0;
+        ok = metal_graph_embed_token_hc_any(
+            g, metal_graph_cur_hc(g), model, weights, (uint32_t)token);
     }
     if (ok && ds4_model_is_deepseek41()) {
         const float identity_pre[DS4_MAX_HC] = {1.0f, 0.0f, 0.0f, 0.0f};
@@ -38623,8 +38647,7 @@ static bool metal_graph_eval_token_raw_swa_streaming(
                                   (uint64_t)DS4_N_HC * sizeof(float)) != 0;
     }
     if (batch_static_decode) {
-        const uint32_t n_backbone = ds4_model_is_deepseek41()
-            ? directional_steering_layer_count() : DS4_N_LAYER;
+        const uint32_t n_backbone = ds4_model_executable_layer_count();
         for (uint32_t il = 0; ok && il < n_backbone; il++) {
             if (ds4_model_is_deepseek41()) {
                 ok = metal_graph_v41_engram_apply_one(
@@ -38682,15 +38705,14 @@ static bool metal_graph_eval_token_raw_swa_streaming(
 
     double encode_s = 0.0;
     double execute_s = 0.0;
-    const uint32_t n_backbone = ds4_model_is_deepseek41()
-        ? directional_steering_layer_count() : DS4_N_LAYER;
+    const uint32_t n_backbone = ds4_model_executable_layer_count();
     for (uint32_t il = 0; ok && il < n_backbone; il++) {
         const double tl0 = profile ? now_sec() : 0.0;
         if (!static_decode_map && !metal_graph_stream_map_layer_decode(model, weights, il)) {
             ok = false;
             break;
         }
-        if (!static_decode_map && il + 1 < DS4_N_LAYER) {
+        if (!static_decode_map && il + 1 < n_backbone) {
             metal_graph_stream_readahead_layer_decode(model, weights, il + 1);
         } else if (!static_decode_map && logits) {
             metal_graph_stream_readahead_output(model, weights);
@@ -42523,9 +42545,11 @@ static void gpu_graph_report_prefill_display_progress(
         uint32_t                layer_done,
         int                     total) {
     if (!display_progress) return;
-    if (layer_done > (uint32_t)DS4_N_LAYER) layer_done = (uint32_t)DS4_N_LAYER;
-    uint64_t done = (uint64_t)n_tokens * layer_done / (uint32_t)DS4_N_LAYER;
-    if (layer_done == (uint32_t)DS4_N_LAYER) done = n_tokens;
+    const uint32_t n_layers = ds4_model_executable_layer_count();
+    if (n_layers == 0) return;
+    if (layer_done > n_layers) layer_done = n_layers;
+    uint64_t done = (uint64_t)n_tokens * layer_done / n_layers;
+    if (layer_done == n_layers) done = n_tokens;
     display_progress(display_progress_ud, "prefill_display",
                      (int)(start + (uint32_t)done), total);
 }
@@ -42543,7 +42567,8 @@ static bool metal_graph_build_prefill_stages(
     if (!g || !g->placement || !stages || !n_stages) return false;
     uint32_t ns = 0;
     int prev_tier = -1;
-    for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
+    const uint32_t n_layers = ds4_model_executable_layer_count();
+    for (uint32_t il = 0; il < n_layers; il++) {
         const int tier = g->placement[il + 1];
         if (tier < 0 || tier >= DS4_MAX_GPUS) return false;
         if (il == 0 || tier != prev_tier) {
@@ -42856,6 +42881,8 @@ static bool metal_graph_prefill_layer_major(
     if (n_tokens == 0 || n_tokens > g->prefill_cap) return false;
     if (start > (uint32_t)prompt->len) return false;
     if (n_tokens > (uint32_t)prompt->len - start) return false;
+    const uint32_t n_layers = ds4_model_executable_layer_count();
+    if (n_layers == 0) return false;
 
     g->prefill_host_tokens = (const int32_t *)(prompt->v + start);
     g->prefill_host_pos0 = start;
@@ -42948,7 +42975,7 @@ static bool metal_graph_prefill_layer_major(
                 metal_graph_batch_cur_hc(g), metal_graph_prefill_tokens(g),
                 model, weights, prompt, start, n_tokens);
         if (ok) ok = ds4_gpu_begin_commands() != 0;
-        for (uint32_t il = 0; ok && il < DS4_N_LAYER; il++) {
+        for (uint32_t il = 0; ok && il < n_layers; il++) {
             ok = metal_graph_encode_layer_batch(g,
                                                 model,
                                                 &weights->layer[il],
@@ -42963,7 +42990,7 @@ static bool metal_graph_prefill_layer_major(
                                                                   start,
                                                                   n_tokens);
             if (show_progress) {
-                fprintf(stderr, "ds4: gpu prefill layer %u/%u\r", il + 1, (uint32_t)DS4_N_LAYER);
+                fprintf(stderr, "ds4: gpu prefill layer %u/%u\r", il + 1, n_layers);
                 fflush(stderr);
             }
         }
@@ -43061,7 +43088,7 @@ static bool metal_graph_prefill_layer_major(
     rocm_graph_stream_layer_expert_load rocm_full_layer_load;
     memset(&rocm_full_layer_load, 0, sizeof(rocm_full_layer_load));
 #endif
-    if (g->ssd_streaming && DS4_N_LAYER > 0) {
+    if (g->ssd_streaming && n_layers > 0) {
         const bool layer_selected_addr =
             batch_selected_addr &&
             metal_graph_stream_prefill_batch_selected_addr_layer_supported(weights, 0);
@@ -43088,7 +43115,7 @@ static bool metal_graph_prefill_layer_major(
         }
     }
 #ifdef DS4_ROCM_BUILD
-    if (g->ssd_streaming && DS4_N_LAYER > 0 &&
+    if (g->ssd_streaming && n_layers > 0 &&
         !rocm_graph_stream_layer_expert_load_start_next(&rocm_full_layer_load,
                                                         g,
                                                         model,
@@ -43134,7 +43161,7 @@ static bool metal_graph_prefill_layer_major(
         return false;
     }
 
-    for (uint32_t il = 0; ok && il < DS4_N_LAYER; il++) {
+    for (uint32_t il = 0; ok && il < n_layers; il++) {
         double layer_elapsed = 0.0;
         const bool layer_selected_addr =
             batch_selected_addr &&
@@ -43199,7 +43226,7 @@ static bool metal_graph_prefill_layer_major(
             if (layer_prepare && layer_prepare_overlap) {
                 bool started_future = false;
                 for (uint32_t ahead = 1; ahead <= layer_prepare_ahead; ahead++) {
-                    if (il + ahead >= DS4_N_LAYER) break;
+                    if (il + ahead >= n_layers) break;
                     started_future = true;
                     const uint32_t future_il = il + ahead;
                     const bool future_selected_addr =
@@ -43226,7 +43253,7 @@ static bool metal_graph_prefill_layer_major(
                 if (!started_future && logits) {
                     metal_graph_stream_readahead_output(model, weights);
                 }
-            } else if (!layer_prepare && il + 1 < DS4_N_LAYER) {
+            } else if (!layer_prepare && il + 1 < n_layers) {
                 const bool next_selected_addr =
                     batch_selected_addr &&
                     metal_graph_stream_prefill_batch_selected_addr_layer_supported(
@@ -43397,7 +43424,7 @@ static bool metal_graph_prefill_layer_major(
             g->ssd_streaming &&
             layer_prepare &&
             !layer_prepare_overlap) {
-            if (il + 1 < DS4_N_LAYER) {
+            if (il + 1 < n_layers) {
                 const bool next_selected_addr =
                     batch_selected_addr &&
                     metal_graph_stream_prefill_batch_selected_addr_layer_supported(
@@ -43442,7 +43469,7 @@ static bool metal_graph_prefill_layer_major(
                                                   il + 1,
                                                   prompt->len);
         if (show_progress) {
-            fprintf(stderr, "ds4: gpu prefill layer %u/%u\r", il + 1, (uint32_t)DS4_N_LAYER);
+            fprintf(stderr, "ds4: gpu prefill layer %u/%u\r", il + 1, n_layers);
             fflush(stderr);
         }
     }
@@ -43461,7 +43488,7 @@ static bool metal_graph_prefill_layer_major(
         return false;
     }
 #ifdef __APPLE__
-    /* Zero-prefix masks are shared across the 43 per-layer command batches,
+    /* Zero-prefix masks are shared across the per-layer command batches,
      * then become dead weight. Release them before the output head and later
      * replay/decode chunks so the prefill win does not add residency pressure. */
     ds4_gpu_release_zero_prefix_prefill_mask_cache();
@@ -43844,6 +43871,10 @@ static bool metal_graph_verify_suffix_tops_impl(
         float                 *row_logits,
         ds4_verify_suffix_timing *timing) {
     if (timing) memset(timing, 0, sizeof(*timing));
+    /* V4.1's target state includes token-history Engram lookup plus HC-pre
+     * state for every verifier row. The legacy multi-row verifier carries
+     * neither, so failing closed is required for target correctness. */
+    if (ds4_model_is_deepseek41()) return false;
     if (n_tokens == 0 || n_tokens > g->prefill_cap || !g->spec_logits) return false;
     if (start > (uint32_t)prompt->len || n_tokens > (uint32_t)prompt->len - start) return false;
     const uint32_t top_rows = n_tokens > 1 ? n_tokens - 1 : 0;
@@ -44097,6 +44128,7 @@ static bool metal_graph_verify_decode2_exact(
         int                   *top1,
         float                 *logits0,
         float                 *logits1) {
+    if (ds4_model_is_deepseek41()) return false;
     if (!g || !top0 || (!top1 && !logits1) || g->raw_cap == 0) return false;
 
     const uint64_t hc_dim = (uint64_t)DS4_N_HC * DS4_N_EMBD;
@@ -63033,6 +63065,7 @@ static int generate_metal_graph_raw_swa(
             metal_graph_decode_cpu_router_applicable(&g, &weights->layer[il]);
     }
     const bool chain_ok =
+        !ds4_model_is_deepseek41() &&
         !ssd_streaming &&
         !quality &&
         !chain_cpu_router &&
@@ -64832,13 +64865,11 @@ static void ds4_session_glm_note_dense_cache(ds4_session *s,
 #endif
 
 static uint32_t ds4_model_normal_layer_count(void) {
-    if (DS4_MODEL_FAMILY != DS4_MODEL_FAMILY_GLM_DSA) {
-        return (uint32_t)DS4_N_LAYER;
-    }
-    if (DS4_N_LAYER <= DS4_N_NEXTN_PREDICT || DS4_N_LAYER > DS4_MAX_LAYER) {
+    const uint32_t n_layers = ds4_model_executable_layer_count();
+    if (n_layers == 0 || n_layers > DS4_MAX_LAYER) {
         return 0;
     }
-    return DS4_N_LAYER - DS4_N_NEXTN_PREDICT;
+    return n_layers;
 }
 
 static uint32_t session_cpu_raw_live_rows(const ds4_session *s) {
@@ -81016,7 +81047,7 @@ int ds4_session_eval(ds4_session *s, int token, char *err, size_t errlen) {
 bool ds4_session_chain_greedy_supported(const ds4_session *s) {
     if (!s || !s->engine || s->engine->backend != DS4_BACKEND_METAL) return false;
     if (!s->checkpoint_valid || s->checkpoint.len <= 0) return false;
-    if (ds4_session_is_cpu(s) || ds4_session_is_glm(s) ||
+    if (ds4_model_is_deepseek41() || ds4_session_is_cpu(s) || ds4_session_is_glm(s) ||
         ds4_session_is_qwen4(s) || ds4_session_is_qwen(s) || s->distributed) {
         return false;
     }
