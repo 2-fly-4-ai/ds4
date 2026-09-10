@@ -1021,6 +1021,47 @@ static void test_metal_v41_cache_quantization(void) {
         TEST_ASSERT(stats.mismatch_count == 0u);
     }
     ds4_gpu_tensor_free(tensor);
+
+    /* The V4.1 attention query is 32K wide.  Keep a full-width BF16 case so
+     * launch-shape changes cannot pass only the small cache-vector fixture. */
+    enum { LARGE_WIDTH = 32768 };
+    float *large_input = malloc((size_t)LARGE_WIDTH * sizeof(*large_input));
+    float *large_ref = malloc((size_t)LARGE_WIDTH * sizeof(*large_ref));
+    float *large_got = malloc((size_t)LARGE_WIDTH * sizeof(*large_got));
+    TEST_ASSERT(large_input != NULL && large_ref != NULL && large_got != NULL);
+    if (large_input && large_ref && large_got) {
+        for (uint32_t i = 0; i < LARGE_WIDTH; i++) {
+            uint32_t bits = 0x3f000000u + (i * 2654435761u);
+            bits &= 0x7f7fffffu;
+            memcpy(&large_input[i], &bits, sizeof(bits));
+        }
+        memcpy(large_ref, large_input,
+               (size_t)LARGE_WIDTH * sizeof(*large_ref));
+        test_v41_cache_ref(large_ref, 1, LARGE_WIDTH, 2u);
+        ds4_gpu_tensor *large = ds4_gpu_tensor_alloc(
+                (uint64_t)LARGE_WIDTH * sizeof(*large_input));
+        TEST_ASSERT(large != NULL);
+        if (large) {
+            TEST_ASSERT(ds4_gpu_tensor_write(
+                    large, 0, large_input,
+                    (uint64_t)LARGE_WIDTH * sizeof(*large_input)) != 0);
+            TEST_ASSERT(ds4_gpu_v41_round_bf16_tensor(
+                    large, 1, LARGE_WIDTH) != 0);
+            TEST_ASSERT(ds4_gpu_tensor_read(
+                    large, 0, large_got,
+                    (uint64_t)LARGE_WIDTH * sizeof(*large_got)) != 0);
+            const test_float_compare_stats stats =
+                test_compare_float_bits(large_ref, large_got, LARGE_WIDTH);
+            fprintf(stderr,
+                    "ds4-test: V4.1 BF16 full-query exact=%zu/%u max_ulp=%u\n",
+                    stats.mismatch_count, LARGE_WIDTH, stats.max_ulp);
+            TEST_ASSERT(stats.mismatch_count == 0u);
+            ds4_gpu_tensor_free(large);
+        }
+    }
+    free(large_input);
+    free(large_ref);
+    free(large_got);
 }
 
 static void test_metal_store_raw_kv_batch_wrap(void) {

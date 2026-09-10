@@ -24542,7 +24542,7 @@ static int ds4_gpu_v41_cache_quantize_tensor(
     [enc setBuffer:xbuf offset:ds4_gpu_tensor_offset(x) atIndex:1];
     [enc setThreadgroupMemoryLength:32u * sizeof(float) atIndex:0];
     [enc dispatchThreadgroups:MTLSizeMake(n_tok, 1, 1)
-         threadsPerThreadgroup:MTLSizeMake(32u, 1, 1)];
+         threadsPerThreadgroup:MTLSizeMake(mode == 2u ? 256u : 32u, 1, 1)];
     ds4_gpu_end_compute_encoder(cb, enc);
     return ds4_gpu_finish_command_buffer(
         cb, owned, mode == 0u ? "V4.1 window KV quantize" :

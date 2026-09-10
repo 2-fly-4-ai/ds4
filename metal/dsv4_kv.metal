@@ -129,14 +129,19 @@ kernel void kernel_v41_cache_quantize_f32(
         threadgroup float *scratch [[threadgroup(0)]],
         uint row [[threadgroup_position_in_grid]],
         uint tid [[thread_position_in_threadgroup]]) {
-    if (row >= args.n_rows || tid >= 32u) return;
+    if (row >= args.n_rows) return;
     device float *xr = x + (ulong)row * args.head_dim;
     if (args.mode == 2u) {
-        for (uint i = tid; i < args.head_dim; i += 32u) {
+        /* BF16 rounding is elementwise.  The old 32-thread launch made each
+         * lane walk 1024 values for a 32K V4.1 query row, leaving most of the
+         * M5 GPU idle.  Mode 2 uses a dedicated 256-thread launch; arithmetic
+         * and element order are unchanged because rows have no reductions. */
+        for (uint i = tid; i < args.head_dim; i += 256u) {
             xr[i] = v41_round_bf16(xr[i]);
         }
         return;
     }
+    if (tid >= 32u) return;
     const uint group_size = args.mode == 1u ? 16u : 32u;
 
     for (uint off = 0u; off < args.head_dim; off += group_size) {
