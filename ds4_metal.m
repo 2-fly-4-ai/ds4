@@ -26917,6 +26917,28 @@ int ds4_gpu_compressor_prefill_state_ratio4_tensor(
     }
 }
 
+int ds4_gpu_compressor_pool_tensor(
+        ds4_gpu_tensor       *out,
+        const ds4_gpu_tensor *state_kv,
+        const ds4_gpu_tensor *state_score,
+        uint32_t              head_dim,
+        uint32_t              ratio) {
+    if (!g_initialized && !ds4_gpu_init()) return 0;
+    if (!out || !state_kv || !state_score || head_dim == 0 || ratio == 0) {
+        return 0;
+    }
+    @autoreleasepool {
+        int owned = 0;
+        id<MTLCommandBuffer> cb = ds4_gpu_command_buffer(&owned);
+        int ok = cb && ds4_gpu_encode_compressor_pool(
+                            cb, out, state_kv, state_score,
+                            head_dim, ratio, true);
+        if (ok) ok = ds4_gpu_finish_command_buffer(
+                            cb, owned, "DeepSeek-V4.1 compressor pool");
+        return ok ? 1 : 0;
+    }
+}
+
 int ds4_gpu_compressor_update_tensor(
         const ds4_gpu_tensor *kv_cur,
         const ds4_gpu_tensor *sc_cur,

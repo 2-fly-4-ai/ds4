@@ -1320,6 +1320,35 @@ static void test_metal_q8_0_decode_pair_exact(void) {
 }
 
 #if defined(__APPLE__)
+static void test_metal_v41_compressor_pool(void) {
+    const uint32_t head_dim = 3;
+    const uint32_t ratio = 2;
+    const float values[6] = {2, 10, -4, 8, 20, 6};
+    const float scores[6] = {0, 2, -1, 0, 0, 1};
+    float got[3] = {0};
+    float want[3] = {0};
+    ds4_gpu_tensor *v = ds4_gpu_tensor_alloc(sizeof(values));
+    ds4_gpu_tensor *s = ds4_gpu_tensor_alloc(sizeof(scores));
+    ds4_gpu_tensor *out = ds4_gpu_tensor_alloc(sizeof(got));
+    TEST_ASSERT(v && s && out);
+    TEST_ASSERT(ds4_gpu_tensor_write(v, 0, values, sizeof(values)) != 0);
+    TEST_ASSERT(ds4_gpu_tensor_write(s, 0, scores, sizeof(scores)) != 0);
+    TEST_ASSERT(ds4_gpu_compressor_pool_tensor(out, v, s,
+                                               head_dim, ratio) != 0);
+    TEST_ASSERT(ds4_gpu_tensor_read(out, 0, got, sizeof(got)) != 0);
+    for (uint32_t d = 0; d < head_dim; d++) {
+        const float m = scores[d] > scores[head_dim + d]
+            ? scores[d] : scores[head_dim + d];
+        const float a = expf(scores[d] - m);
+        const float b = expf(scores[head_dim + d] - m);
+        want[d] = (a * values[d] + b * values[head_dim + d]) / (a + b);
+        TEST_ASSERT(fabsf(got[d] - want[d]) < 2e-5f);
+    }
+    ds4_gpu_tensor_free(out);
+    ds4_gpu_tensor_free(s);
+    ds4_gpu_tensor_free(v);
+}
+
 static void test_metal_f16_compressor_pair_state_store_exact_case(
         uint32_t width,
         uint32_t ratio,
@@ -6249,6 +6278,7 @@ static void test_metal_kernel_group(void) {
     test_dspark_cache_window_crop();
     test_metal_q8_0_decode_pair_exact();
 #if defined(__APPLE__)
+    test_metal_v41_compressor_pool();
     test_metal_batch_qkv_finalizer_exact();
     test_metal_f16_compressor_pair_state_store_exact();
     test_metal_comp_rows_update_exact();

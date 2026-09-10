@@ -325,6 +325,30 @@ extern "C" int ds4_gpu_compressor_update_tensor(
     }
     return ok;
 }
+extern "C" int ds4_gpu_compressor_pool_tensor(
+        ds4_gpu_tensor       *out,
+        const ds4_gpu_tensor *state_kv,
+        const ds4_gpu_tensor *state_score,
+        uint32_t              head_dim,
+        uint32_t              ratio) {
+    if (!out || !state_kv || !state_score || head_dim == 0 || ratio == 0 ||
+        out->bytes < (uint64_t)head_dim * sizeof(float)) {
+        return 0;
+    }
+    const uint32_t coff = ratio == 4u ? 2u : 1u;
+    const uint64_t state_bytes =
+        (uint64_t)coff * ratio * coff * head_dim * sizeof(float);
+    if (state_kv->bytes < state_bytes || state_score->bytes < state_bytes) {
+        return 0;
+    }
+    compressor_update_pool_kernel<<<(head_dim + 255) / 256, 256>>>(
+            (float *)out->ptr,
+            (const float *)state_kv->ptr,
+            (const float *)state_score->ptr,
+            head_dim,
+            ratio);
+    return cuda_ok(cudaGetLastError(), "compressor pool launch");
+}
 extern "C" int ds4_gpu_compressor_prefill_tensor(
         ds4_gpu_tensor       *comp_cache,
         ds4_gpu_tensor       *state_kv,

@@ -2174,6 +2174,16 @@ int ds4_gpu_compressor_update_tensor(
         bool                    decode_one_token,
         bool                    defer_finalize);
 
+/* Pool one already-populated compressor frontier without applying APE,
+ * normalization, RoPE, or cache quantization.  DeepSeek-V4.1 owns those
+ * stages separately because its index key consumes the unrotated latent. */
+int ds4_gpu_compressor_pool_tensor(
+        ds4_gpu_tensor       *out,
+        const ds4_gpu_tensor *state_kv,
+        const ds4_gpu_tensor *state_score,
+        uint32_t              head_dim,
+        uint32_t              ratio);
+
 int ds4_gpu_compressor_store_batch_tensor(
         const ds4_gpu_tensor *kv,
         const ds4_gpu_tensor *sc,

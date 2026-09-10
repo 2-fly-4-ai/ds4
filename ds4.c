@@ -15337,7 +15337,8 @@ static void kv_cache_init(ds4_kv_cache *cache, uint32_t ctx_size, uint32_t raw_c
         cache->layer[il].raw_kv = xmalloc_zeroed((size_t)raw_cap * DS4_N_HEAD_DIM, sizeof(float));
         cache->layer[il].compress_ratio = ratio;
 
-        if (ratio != 0) {
+        if (ratio != 0 &&
+            (!ds4_model_is_deepseek41() || ds4_v41_layer_owns_kv(il))) {
             const uint32_t coff = ratio == 4 ? 2u : 1u;
             const uint32_t comp_cap = ctx_size / ratio + 2;
             const uint32_t attn_width = coff * DS4_N_HEAD_DIM;
@@ -16439,7 +16440,7 @@ static void layer_attention_raw_swa_batch(
                 kv_cache_push_comp(cache->attn_comp_kv, &cache->n_comp, cache->comp_cap, DS4_N_HEAD_DIM, comp);
             }
 
-            if (ratio == 4) {
+            if (ratio == 4 || ds4_model_is_deepseek41()) {
                 float *index_comp = index_comp_scratch;
                 const bool have_index_comp = compressor_decode_one(index_comp, model,
                                                                    layer->indexer_compressor_kv,
@@ -21588,6 +21589,14 @@ static bool metal_graph_set_active_tier_decode(ds4_gpu_graph *g, int tier) {
                                           (uint64_t)DS4_N_HC * sizeof(float))) {
                 return false;
             }
+            ds4_gpu_tensor *src_sel = g->comp_selected_by_tier[g->active_tier];
+            ds4_gpu_tensor *dst_sel = g->comp_selected_by_tier[tier];
+            if (src_sel && dst_sel &&
+                !ds4_gpu_tensor_copy_xdev(
+                    dst_sel, src_sel,
+                    (uint64_t)DS4_N_INDEXER_TOP_K * sizeof(int32_t))) {
+                return false;
+            }
         }
     }
     g->active_tier = tier;
@@ -23455,7 +23464,8 @@ static bool metal_graph_alloc_raw_cap(
             layer_cache_ok = g->layer_raw_cache_tp[il] != NULL;
         }
         const uint32_t ratio = ds4_layer_compress_ratio(il);
-        if (layer_cache_ok && ratio != 0) {
+        if (layer_cache_ok && ratio != 0 &&
+            (!ds4_model_is_deepseek41() || ds4_v41_layer_owns_kv(il))) {
             layer_cache_ok = g->layer_attn_comp_cache[il] != NULL &&
                              (!g->cuda_tp_attn_cache_dup ||
                               g->layer_attn_comp_cache_tp[il] != NULL) &&
@@ -23468,7 +23478,9 @@ static bool metal_graph_alloc_raw_cap(
                               (g->spec_prefix1_attn_state_kv[il] != NULL &&
                                g->spec_prefix1_attn_state_score[il] != NULL));
         }
-        if (layer_cache_ok && ratio == 4) {
+        if (layer_cache_ok &&
+            (ratio == 4 ||
+             (ds4_model_is_deepseek41() && ds4_v41_layer_owns_kv(il)))) {
             layer_cache_ok = g->layer_index_comp_cache[il] != NULL &&
                              g->layer_index_state_kv[il] != NULL &&
                              g->layer_index_state_score[il] != NULL &&
@@ -27906,6 +27918,202 @@ typedef enum {
     METAL_DECODE_LAYER_FROM_ROUTER,
 } metal_decode_layer_phase;
 
+static bool metal_graph_decode_v41_compressed(
+        ds4_gpu_graph            *g,
+        const ds4_model          *model,
+        const ds4_layer_weights  *layer,
+        uint32_t                  il,
+        uint32_t                  pos,
+        uint64_t                  q_rank,
+        float                     freq_base,
+        float                     freq_scale,
+        float                     ext_factor,
+        float                     attn_factor,
+        ds4_gpu_tensor          **comp_cache_out,
+        uint32_t                 *n_comp_out,
+        ds4_gpu_tensor          **selected_out,
+        uint32_t                 *n_selected_out) {
+    const uint32_t ratio = ds4_layer_compress_ratio(il);
+    const int32_t owner_i = ds4_v41_kv_source_for_layer(il);
+    if (ratio == 0 || owner_i < 0) return false;
+    const uint32_t owner = (uint32_t)owner_i;
+    bool ok = true;
+
+    if (ds4_v41_layer_owns_kv(il)) {
+        const bool emit = ((pos + 1u) % ratio) == 0u;
+        if (!layer->attn_compressor_kv || !layer->attn_compressor_norm ||
+            (ratio > 1u && !layer->attn_compressor_gate) ||
+            !layer->indexer_attn_k || !layer->indexer_k_norm) {
+            fprintf(stderr, "ds4: DeepSeek-V4.1 layer %u is missing compressor/index-key weights\n", il);
+            return false;
+        }
+        if (emit && g->layer_n_comp[owner] >= g->layer_comp_cap[owner]) {
+            fprintf(stderr, "ds4: DeepSeek-V4.1 shared compressed cache is full at owner %u\n", owner);
+            return false;
+        }
+
+        ok = metal_graph_matmul_plain_tensor(
+                metal_graph_comp_kv_cur(g), model,
+                layer->attn_compressor_kv,
+                DS4_N_EMBD, DS4_N_HEAD_DIM,
+                metal_graph_attn_norm(g), 1);
+        if (ok && ratio == 1u) {
+            ok = ds4_gpu_rms_norm_weight_tensor(
+                    metal_graph_comp_sc_cur(g),
+                    metal_graph_comp_kv_cur(g),
+                    model->map, model->size,
+                    layer->attn_compressor_norm->abs_offset,
+                    DS4_N_HEAD_DIM, DS4_RMS_EPS) != 0;
+        } else if (ok) {
+            ok = metal_graph_matmul_plain_tensor(
+                    metal_graph_comp_sc_cur(g), model,
+                    layer->attn_compressor_gate,
+                    DS4_N_EMBD, DS4_N_HEAD_DIM,
+                    metal_graph_attn_norm(g), 1);
+            const uint32_t slot = pos % ratio;
+            ds4_gpu_tensor *kv_slot = ok ? ds4_gpu_tensor_view(
+                    g->layer_attn_state_kv[owner],
+                    (uint64_t)slot * DS4_N_HEAD_DIM * sizeof(float),
+                    (uint64_t)DS4_N_HEAD_DIM * sizeof(float)) : NULL;
+            ds4_gpu_tensor *sc_slot = ok ? ds4_gpu_tensor_view(
+                    g->layer_attn_state_score[owner],
+                    (uint64_t)slot * DS4_N_HEAD_DIM * sizeof(float),
+                    (uint64_t)DS4_N_HEAD_DIM * sizeof(float)) : NULL;
+            ok = ok && kv_slot && sc_slot &&
+                 ds4_gpu_tensor_copy(kv_slot, 0,
+                                     metal_graph_comp_kv_cur(g), 0,
+                                     (uint64_t)DS4_N_HEAD_DIM * sizeof(float)) != 0 &&
+                 ds4_gpu_tensor_copy(sc_slot, 0,
+                                     metal_graph_comp_sc_cur(g), 0,
+                                     (uint64_t)DS4_N_HEAD_DIM * sizeof(float)) != 0;
+            ds4_gpu_tensor_free(sc_slot);
+            ds4_gpu_tensor_free(kv_slot);
+            if (ok && emit) {
+                ok = ds4_gpu_compressor_pool_tensor(
+                        metal_graph_comp_kv_cur(g),
+                        g->layer_attn_state_kv[owner],
+                        g->layer_attn_state_score[owner],
+                        DS4_N_HEAD_DIM, ratio) != 0;
+                if (ok) {
+                    ok = ds4_gpu_rms_norm_weight_tensor(
+                            metal_graph_comp_sc_cur(g),
+                            metal_graph_comp_kv_cur(g),
+                            model->map, model->size,
+                            layer->attn_compressor_norm->abs_offset,
+                            DS4_N_HEAD_DIM, DS4_RMS_EPS) != 0;
+                }
+            }
+        }
+
+        if (ok && emit) {
+            const uint32_t row = g->layer_n_comp[owner];
+            const uint32_t comp_pos = pos + 1u - ratio;
+
+            /* Publish the index key from the RoPE-free normalized latent. */
+            ok = metal_graph_matmul_plain_tensor(
+                    metal_graph_index_comp_kv_cur(g), model,
+                    layer->indexer_attn_k,
+                    DS4_N_HEAD_DIM, DS4_N_INDEXER_HEAD_DIM,
+                    metal_graph_comp_sc_cur(g), 1);
+            if (ok) ok = ds4_gpu_rms_norm_weight_tensor(
+                    metal_graph_index_comp_sc_cur(g),
+                    metal_graph_index_comp_kv_cur(g),
+                    model->map, model->size,
+                    layer->indexer_k_norm->abs_offset,
+                    DS4_N_INDEXER_HEAD_DIM, DS4_RMS_EPS) != 0;
+            if (ok) ok = ds4_gpu_rope_tail_tensor(
+                    metal_graph_index_comp_sc_cur(g), 1, 1,
+                    DS4_N_INDEXER_HEAD_DIM, DS4_N_ROT,
+                    comp_pos, (uint32_t)DS4_ROPE_ORIG_CTX,
+                    false, freq_base, freq_scale, ext_factor, attn_factor,
+                    DS4_ROPE_YARN_BETA_FAST, DS4_ROPE_YARN_BETA_SLOW) != 0;
+            if (ok) ok = ds4_gpu_dsv4_indexer_qat_tensor(
+                    metal_graph_index_comp_sc_cur(g), 1,
+                    DS4_N_INDEXER_HEAD_DIM) != 0;
+            ds4_gpu_tensor *index_row = ok ? ds4_gpu_tensor_view(
+                    g->layer_index_comp_cache[owner],
+                    (uint64_t)row * DS4_N_INDEXER_HEAD_DIM * sizeof(float),
+                    (uint64_t)DS4_N_INDEXER_HEAD_DIM * sizeof(float)) : NULL;
+            ok = ok && index_row && ds4_gpu_tensor_copy(
+                    index_row, 0, metal_graph_index_comp_sc_cur(g), 0,
+                    (uint64_t)DS4_N_INDEXER_HEAD_DIM * sizeof(float)) != 0;
+            ds4_gpu_tensor_free(index_row);
+
+            /* Then rotate/quantize the same latent for shared attention. */
+            ds4_gpu_tensor *comp_row = ok ?
+                metal_graph_attn_comp_row_view(g, owner, row) : NULL;
+            ok = ok && comp_row && ds4_gpu_tensor_copy(
+                    comp_row, 0, metal_graph_comp_sc_cur(g), 0,
+                    (uint64_t)DS4_N_HEAD_DIM * sizeof(float)) != 0;
+            if (ok) ok = ds4_gpu_rope_tail_tensor(
+                    comp_row, 1, 1, DS4_N_HEAD_DIM, DS4_N_ROT,
+                    comp_pos, (uint32_t)DS4_ROPE_ORIG_CTX,
+                    false, freq_base, freq_scale, ext_factor, attn_factor,
+                    DS4_ROPE_YARN_BETA_FAST, DS4_ROPE_YARN_BETA_SLOW) != 0;
+            if (ok) ok = ds4_gpu_dsv4_fp8_kv_quantize_tensor(
+                    comp_row, 1, DS4_N_HEAD_DIM, DS4_N_ROT) != 0;
+            ds4_gpu_tensor_free(comp_row);
+            if (ok) ok = metal_graph_commit_attn_comp_stage(
+                    g, owner, row, 1);
+            if (ok) {
+                g->layer_n_comp[owner]++;
+                g->layer_n_index_comp[owner]++;
+            }
+        }
+    }
+
+    const uint32_t n_comp = g->layer_n_comp[owner];
+    ds4_gpu_tensor *selected = NULL;
+    uint32_t n_selected = 0;
+    if (ok && ds4_v41_layer_owns_index(il) &&
+        n_comp > DS4_N_INDEXER_TOP_K) {
+        const uint64_t q_dim =
+            (uint64_t)DS4_N_INDEXER_HEAD * DS4_N_INDEXER_HEAD_DIM;
+        ok = layer->indexer_attn_q_b && layer->indexer_proj &&
+             metal_graph_matmul_plain_tensor(
+                 metal_graph_indexer_q(g), model,
+                 layer->indexer_attn_q_b,
+                 q_rank, q_dim, metal_graph_qr_norm(g), 1);
+        if (ok) ok = ds4_gpu_rope_tail_tensor(
+                metal_graph_indexer_q(g), 1, DS4_N_INDEXER_HEAD,
+                DS4_N_INDEXER_HEAD_DIM, DS4_N_ROT, pos,
+                (uint32_t)DS4_ROPE_ORIG_CTX,
+                false, freq_base, freq_scale, ext_factor, attn_factor,
+                DS4_ROPE_YARN_BETA_FAST, DS4_ROPE_YARN_BETA_SLOW) != 0;
+        if (ok) ok = ds4_gpu_dsv4_indexer_qat_tensor(
+                metal_graph_indexer_q(g), DS4_N_INDEXER_HEAD,
+                DS4_N_INDEXER_HEAD_DIM) != 0;
+        if (ok) ok = metal_graph_matmul_plain_tensor(
+                metal_graph_indexer_weights(g), model,
+                layer->indexer_proj,
+                DS4_N_EMBD, DS4_N_INDEXER_HEAD,
+                metal_graph_attn_norm(g), 1);
+        const float scale = 1.0f /
+            sqrtf((float)(DS4_N_INDEXER_HEAD_DIM * DS4_N_INDEXER_HEAD));
+        if (ok) ok = ds4_gpu_indexer_score_one_tensor(
+                metal_graph_indexer_scores(g),
+                metal_graph_indexer_q(g),
+                metal_graph_indexer_weights(g),
+                g->layer_index_comp_cache[owner], n_comp,
+                DS4_N_INDEXER_HEAD, DS4_N_INDEXER_HEAD_DIM,
+                scale) != 0;
+        if (ok) ok = ds4_gpu_indexer_topk_tensor(
+                metal_graph_comp_selected(g),
+                metal_graph_indexer_scores(g), n_comp, 1,
+                DS4_N_INDEXER_TOP_K) != 0;
+    }
+    if (ok && n_comp > DS4_N_INDEXER_TOP_K) {
+        selected = metal_graph_comp_selected(g);
+        n_selected = DS4_N_INDEXER_TOP_K;
+    }
+
+    *comp_cache_out = g->layer_attn_comp_cache[owner];
+    *n_comp_out = n_comp;
+    *selected_out = selected;
+    *n_selected_out = n_selected;
+    return ok;
+}
+
 /* M5 ports default to the existing standard M1-M4 Metal path.  Rollbacks
  * dominate the benchmark force-enables on pre-M5 devices so the aggregate
  * switch is a reliable whole-bundle control. */
@@ -28697,7 +28905,12 @@ static bool metal_graph_encode_decode_layer_phase(
     uint32_t n_selected = 0;
     double decode_index_stage_t0 = 0.0;
     const bool decode_index_stage_profile = g->decode_index_stage_profile;
-    if (ok && compressed) {
+    if (ok && compressed && ds4_model_is_deepseek41()) {
+        ok = metal_graph_decode_v41_compressed(
+                g, model, layer, il, pos, q_rank,
+                freq_base, freq_scale, ext_factor, attn_factor,
+                &comp_cache, &n_comp, &comp_selected, &n_selected);
+    } else if (ok && compressed) {
         const uint32_t ratio = ds4_layer_compress_ratio(il);
         const uint32_t coff = ratio == 4 ? 2u : 1u;
         const uint32_t comp_width = coff * DS4_N_HEAD_DIM;
