@@ -347,12 +347,28 @@ def main_metadata(config, revision, hf_dir):
     ]
 
 
-def sidecar_metadata(artifact, revision):
-    return [kv_string("general.architecture", f"deepseek41-{artifact}"),
-            kv_string("general.name", f"DeepSeek-V4.1-Flash-{artifact}"),
-            kv_u32("general.alignment", GGUF_ALIGNMENT),
-            kv_string("general.source.revision", revision),
-            kv_string("deepseek41.sidecar.kind", artifact)]
+def sidecar_metadata(artifact, revision, config):
+    records = [kv_string("general.architecture", f"deepseek41-{artifact}"),
+               kv_string("general.name", f"DeepSeek-V4.1-Flash-{artifact}"),
+               kv_u32("general.alignment", GGUF_ALIGNMENT),
+               kv_string("general.source.revision", revision),
+               kv_string("deepseek41.sidecar.kind", artifact)]
+    if artifact == "vision":
+        vision = config["vision_config"]
+        records += [
+            kv_u32("deepseek41-vision.block_count", vision["num_hidden_layers"]),
+            kv_u32("deepseek41-vision.embedding_length", vision["hidden_size"]),
+            kv_u32("deepseek41-vision.feed_forward_length", vision["intermediate_size"]),
+            kv_u32("deepseek41-vision.attention.head_count", vision["num_attention_heads"]),
+            kv_u32("deepseek41-vision.projection_length", config["text_config"]["hidden_size"]),
+            kv_u32("deepseek41-vision.patch_size", vision["patch_size"]),
+            kv_u32("deepseek41-vision.downsample_ratio", vision["downsample_ratio"]),
+            kv_u32("deepseek41-vision.image.max_tokens", vision["max_image_tokens"]),
+            kv_u32("deepseek41-vision.image.min_pixels", vision["min_pixels"]),
+            kv_u32("deepseek41-vision.image_token_id", config["image_token_id"]),
+            kv_f32("deepseek41-vision.attention.layer_norm_rms_epsilon", 1.0e-6),
+        ]
+    return records
 
 
 def tensor_header(entry):
@@ -575,7 +591,7 @@ def main():
         plan = [x for x in build_plan(db.tensors, args.quant) if x.artifact == args.artifact]
         db.require_sources(plan)
         records = (main_metadata(config, args.source_revision, args.hf) + tokenizer_records(args.hf, args.tokenizer_template)
-                   if args.artifact == "main" else sidecar_metadata(args.artifact, args.source_revision))
+                   if args.artifact == "main" else sidecar_metadata(args.artifact, args.source_revision, config))
         prepared = prepare_plan(plan); data_offset, data_bytes = output_layout(prepared, records)
         print(f"deepseek41-convert: artifact={args.artifact} quant={args.quant} tensors={len(plan)} bytes={data_offset+data_bytes} ({(data_offset+data_bytes)/(1<<30):.3f} GiB)")
         if not args.dry_run: write_gguf(args, plan, records, db); print(f"deepseek41-convert: wrote {args.out}", file=sys.stderr)

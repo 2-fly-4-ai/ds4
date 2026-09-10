@@ -44,6 +44,14 @@ typedef struct {
     float *patches;
 } ds4_deepseek4_image_patches;
 
+typedef struct {
+    uint32_t padded_width;
+    uint32_t padded_height;
+    uint32_t llm_grid_width;
+    uint32_t llm_grid_height;
+    uint32_t token_count;
+} ds4_deepseek41_image_plan;
+
 typedef enum {
     DS4_DEEPSEEK4_IMAGE_START = 0,
     DS4_DEEPSEEK4_IMAGE_PAD = 1,
@@ -95,6 +103,20 @@ int ds4_image_preprocess_qwen4(
 void ds4_image_patches_free(ds4_image_patches *patches);
 
 int ds4_image_preprocess_deepseek4(
+        ds4_deepseek4_image_patches *out,
+        const ds4_image             *image,
+        char                        *error,
+        size_t                       error_cap);
+
+/* DeepSeek V4.1 uses the same 14x14 ViT and 3x3 aligner as V4 Vision-Exp,
+ * but a different official resize contract: 544^2 minimum pixels, a 1024
+ * language-token cap, and no width/height-ratio clamp. */
+int ds4_deepseek41_plan_image_grid(
+        ds4_deepseek41_image_plan *out,
+        uint32_t width,
+        uint32_t height);
+
+int ds4_image_preprocess_deepseek41(
         ds4_deepseek4_image_patches *out,
         const ds4_image             *image,
         char                        *error,

@@ -110,6 +110,9 @@ struct ds4_metal_args_dsv4_router_select_visual {
     uint32_t n_tokens;
     uint32_t has_bias;
     uint32_t hash_mode;
+    uint32_t n_expert;
+    uint32_t n_expert_used;
+    uint32_t sort_width;
 };
 
 struct ds4_metal_args_glm_router_select_one {
@@ -5265,27 +5268,36 @@ kernel void kernel_dsv4_router_select_visual_batch(
         threadgroup float *scratch [[threadgroup(0)]],
         uint tid [[thread_position_in_threadgroup]],
         uint row [[threadgroup_position_in_grid]]) {
-    if (tid >= 256u || row >= args.n_tokens) return;
+    if (tid >= args.sort_width || row >= args.n_tokens) return;
 
     const int32_t token = tokens[row];
     const bool image = token >= 0 && (uint32_t)token >= args.vocab_size;
-    device int32_t *out = selected + (uint64_t)row * 6u;
+    device int32_t *out = selected +
+        (uint64_t)row * (uint64_t)args.n_expert_used;
     if (args.hash_mode && !image) {
         const uint hash_row = token >= 0 && (uint32_t)token < args.hash_rows
             ? (uint32_t)token : 0u;
-        if (tid < 6u) out[tid] = hash[(uint64_t)hash_row * 6u + tid];
+        if (tid < args.n_expert_used) {
+            out[tid] = hash[(uint64_t)hash_row *
+                            (uint64_t)args.n_expert_used + tid];
+        }
         return;
     }
 
     threadgroup float *scores = scratch;
-    threadgroup int32_t *indices = (threadgroup int32_t *)(scratch + 256u);
-    const float p = probs[(uint64_t)row * 256u + tid];
-    scores[tid] = p + (image ? visual_bias[tid]
-                             : (args.has_bias ? bias[tid] : 0.0f));
+    threadgroup int32_t *indices =
+        (threadgroup int32_t *)(scratch + args.sort_width);
+    if (tid < args.n_expert) {
+        const float p = probs[(uint64_t)row * args.n_expert + tid];
+        scores[tid] = p + (image ? visual_bias[tid]
+                                 : (args.has_bias ? bias[tid] : 0.0f));
+    } else {
+        scores[tid] = -INFINITY;
+    }
     indices[tid] = (int32_t)tid;
     threadgroup_barrier(mem_flags::mem_threadgroup);
 
-    for (uint k = 2u; k <= 256u; k <<= 1u) {
+    for (uint k = 2u; k <= args.sort_width; k <<= 1u) {
         for (uint j = k >> 1u; j > 0u; j >>= 1u) {
             const uint other = tid ^ j;
             if (other > tid) {
@@ -5302,7 +5314,7 @@ kernel void kernel_dsv4_router_select_visual_batch(
             threadgroup_barrier(mem_flags::mem_threadgroup);
         }
     }
-    if (tid < 6u) out[tid] = indices[tid];
+    if (tid < args.n_expert_used) out[tid] = indices[tid];
 }
 
 // M3 decode specialization for the non-hash one-token router. Scores and ids

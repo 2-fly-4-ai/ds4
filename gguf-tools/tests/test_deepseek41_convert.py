@@ -10,8 +10,9 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from deepseek41_convert import (build_engram_layout, decode_fp4_rows,
                                 decode_fp8_rows, load_v41_tokens,
-                                repack_mxfp4_rows)
+                                repack_mxfp4_rows, sidecar_metadata)
 from deepseek41_mxfp4 import decode_adjacent_block, decode_mxfp4_block
+from deepseek41_plan import dense_qtype
 from glm53_quantize import Quantizer
 
 
@@ -29,6 +30,43 @@ def fake_quantizer():
 
 
 class DeepSeek41ConverterTests(unittest.TestCase):
+    def test_vision_rms_norms_preserve_bf16_runtime_abi(self):
+        bf16 = {"dtype": "BF16", "shape": [1024]}
+        self.assertEqual(
+            dense_qtype("vision.blocks.0.norm1.weight", bf16),
+            ("BF16", "copy"),
+        )
+        self.assertEqual(
+            dense_qtype("vision.norm.weight", bf16),
+            ("BF16", "copy"),
+        )
+        self.assertEqual(
+            dense_qtype("layers.0.attn_norm.weight", bf16),
+            ("F32", "bf16_to_f32"),
+        )
+
+    def test_vision_sidecar_metadata_carries_exact_runtime_contract(self):
+        config = {
+            "image_token_id": 129264,
+            "text_config": {"hidden_size": 4096},
+            "vision_config": {
+                "num_hidden_layers": 32,
+                "hidden_size": 1024,
+                "intermediate_size": 2816,
+                "num_attention_heads": 16,
+                "patch_size": 14,
+                "downsample_ratio": 3,
+                "max_image_tokens": 1024,
+                "min_pixels": 295936,
+            },
+        }
+        blob = b"".join(sidecar_metadata("vision", "revision", config))
+        for key in (b"deepseek41-vision.block_count",
+                    b"deepseek41-vision.image.max_tokens",
+                    b"deepseek41-vision.image.min_pixels",
+                    b"deepseek41-vision.image_token_id"):
+            self.assertIn(key, blob)
+
     def test_engram_layout_matches_official_bucket_totals_and_rng(self):
         config = {"text_config": {
             "engram_layer_ids": [1, 14], "engram_max_ngram_size": 4,

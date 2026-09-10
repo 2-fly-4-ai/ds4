@@ -1,6 +1,7 @@
 #include "ds4_image.h"
 
 #include <errno.h>
+#include <limits.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -443,6 +444,173 @@ static void ds4_resize_rgb_bicubic(
     }
 }
 
+typedef struct {
+    int ksize;
+    int *bounds;
+    int32_t *weights;
+} ds4_pillow_coeffs;
+
+static void ds4_pillow_coeffs_free(ds4_pillow_coeffs *coeffs) {
+    if (!coeffs) return;
+    free(coeffs->bounds);
+    free(coeffs->weights);
+    memset(coeffs, 0, sizeof(*coeffs));
+}
+
+/* Match Pillow's 8-bit BICUBIC path used by ImageOps.pad. Pillow performs
+ * separable filtering, normalizes each coefficient row, quantizes weights to
+ * 22-bit fixed point, and rounds/clips after both passes. Keeping this path
+ * separate avoids changing the established preprocessors for older models. */
+static int ds4_pillow_bicubic_coeffs(
+        uint32_t in_size,
+        uint32_t out_size,
+        ds4_pillow_coeffs *out) {
+    if (!out || in_size == 0u || out_size == 0u) return 0;
+    memset(out, 0, sizeof(*out));
+    const double scale = (double)in_size / out_size;
+    const double filter_scale = scale < 1.0 ? 1.0 : scale;
+    const double support = 2.0 * filter_scale;
+    if (support > (INT_MAX - 1) / 2.0) return 0;
+    const int ksize = (int)ceil(support) * 2 + 1;
+    if (ksize <= 0 ||
+        (size_t)ksize > SIZE_MAX /
+                ((size_t)out_size * sizeof(int32_t))) {
+        return 0;
+    }
+    int *bounds = malloc((size_t)out_size * 2u * sizeof(*bounds));
+    int32_t *weights = calloc((size_t)out_size * (size_t)ksize,
+                              sizeof(*weights));
+    double *row = malloc((size_t)ksize * sizeof(*row));
+    if (!bounds || !weights || !row) {
+        free(bounds); free(weights); free(row);
+        return 0;
+    }
+    const double inv_filter_scale = 1.0 / filter_scale;
+    for (uint32_t dst = 0; dst < out_size; dst++) {
+        const double center = ((double)dst + 0.5) * scale;
+        int first = (int)(center - support + 0.5);
+        int last = (int)(center + support + 0.5);
+        if (first < 0) first = 0;
+        if (last > (int)in_size) last = (int)in_size;
+        const int count = last - first;
+        double sum = 0.0;
+        for (int i = 0; i < count; i++) {
+            row[i] = ds4_cubic(
+                    ((double)(i + first) - center + 0.5) * inv_filter_scale,
+                    -0.5);
+            sum += row[i];
+        }
+        bounds[dst * 2u] = first;
+        bounds[dst * 2u + 1u] = count;
+        for (int i = 0; i < count; i++) {
+            const double normalized = sum != 0.0 ? row[i] / sum : row[i];
+            const double fixed = normalized * (double)(1u << 22u);
+            weights[(size_t)dst * ksize + (size_t)i] =
+                    (int32_t)(fixed < 0.0 ? fixed - 0.5 : fixed + 0.5);
+        }
+    }
+    free(row);
+    out->ksize = ksize;
+    out->bounds = bounds;
+    out->weights = weights;
+    return 1;
+}
+
+static uint8_t ds4_pillow_clip8(int32_t value) {
+    value >>= 22u;
+    if (value < 0) return 0u;
+    if (value > 255) return 255u;
+    return (uint8_t)value;
+}
+
+static int ds4_resize_rgb_bicubic_pillow(
+        const uint8_t *src,
+        uint32_t src_width,
+        uint32_t src_height,
+        float *dst,
+        uint32_t dst_width,
+        uint32_t dst_height,
+        uint32_t dst_stride) {
+    if (!src || !dst || !src_width || !src_height || !dst_width ||
+        !dst_height || dst_stride < dst_width) return 0;
+    ds4_pillow_coeffs horizontal = {0}, vertical = {0};
+    if (!ds4_pillow_bicubic_coeffs(src_width, dst_width, &horizontal) ||
+        !ds4_pillow_bicubic_coeffs(src_height, dst_height, &vertical)) {
+        ds4_pillow_coeffs_free(&horizontal);
+        ds4_pillow_coeffs_free(&vertical);
+        return 0;
+    }
+    if ((size_t)dst_width > SIZE_MAX / ((size_t)src_height * 3u) ||
+        (size_t)dst_width > SIZE_MAX / ((size_t)dst_height * 3u)) {
+        ds4_pillow_coeffs_free(&horizontal);
+        ds4_pillow_coeffs_free(&vertical);
+        return 0;
+    }
+    uint8_t *tmp = malloc((size_t)src_height * dst_width * 3u);
+    uint8_t *pixels = malloc((size_t)dst_height * dst_width * 3u);
+    if (!tmp || !pixels) {
+        free(tmp); free(pixels);
+        ds4_pillow_coeffs_free(&horizontal);
+        ds4_pillow_coeffs_free(&vertical);
+        return 0;
+    }
+    for (uint32_t y = 0; y < src_height; y++) {
+        for (uint32_t x = 0; x < dst_width; x++) {
+            const int first = horizontal.bounds[x * 2u];
+            const int count = horizontal.bounds[x * 2u + 1u];
+            const int32_t *weights = horizontal.weights +
+                    (size_t)x * horizontal.ksize;
+            int32_t sums[3] = {
+                1 << 21, 1 << 21, 1 << 21
+            };
+            for (int i = 0; i < count; i++) {
+                const uint8_t *pixel = src +
+                        ((size_t)y * src_width + (uint32_t)(first + i)) * 3u;
+                sums[0] += pixel[0] * weights[i];
+                sums[1] += pixel[1] * weights[i];
+                sums[2] += pixel[2] * weights[i];
+            }
+            uint8_t *pixel = tmp + ((size_t)y * dst_width + x) * 3u;
+            pixel[0] = ds4_pillow_clip8(sums[0]);
+            pixel[1] = ds4_pillow_clip8(sums[1]);
+            pixel[2] = ds4_pillow_clip8(sums[2]);
+        }
+    }
+    for (uint32_t y = 0; y < dst_height; y++) {
+        const int first = vertical.bounds[y * 2u];
+        const int count = vertical.bounds[y * 2u + 1u];
+        const int32_t *weights = vertical.weights +
+                (size_t)y * vertical.ksize;
+        for (uint32_t x = 0; x < dst_width; x++) {
+            int32_t sums[3] = {
+                1 << 21, 1 << 21, 1 << 21
+            };
+            for (int i = 0; i < count; i++) {
+                const uint8_t *pixel = tmp +
+                        ((size_t)(first + i) * dst_width + x) * 3u;
+                sums[0] += pixel[0] * weights[i];
+                sums[1] += pixel[1] * weights[i];
+                sums[2] += pixel[2] * weights[i];
+            }
+            uint8_t *pixel = pixels + ((size_t)y * dst_width + x) * 3u;
+            pixel[0] = ds4_pillow_clip8(sums[0]);
+            pixel[1] = ds4_pillow_clip8(sums[1]);
+            pixel[2] = ds4_pillow_clip8(sums[2]);
+        }
+    }
+    for (uint32_t y = 0; y < dst_height; y++) {
+        for (uint32_t x = 0; x < dst_width; x++) {
+            const uint8_t *source = pixels + ((size_t)y * dst_width + x) * 3u;
+            float *target = dst + ((size_t)y * dst_stride + x) * 3u;
+            target[0] = source[0]; target[1] = source[1]; target[2] = source[2];
+        }
+    }
+    free(tmp); free(pixels);
+    ds4_pillow_coeffs_free(&horizontal);
+    ds4_pillow_coeffs_free(&vertical);
+    return 1;
+}
+
 int ds4_image_preprocess_glm53(
         ds4_image_patches *out,
         const ds4_image *image,
@@ -846,6 +1014,208 @@ int ds4_image_preprocess_deepseek4(
         free(patches);
         ds4_image_error(error, error_cap,
                         "internal DeepSeek vision patch layout mismatch");
+        return 0;
+    }
+
+    out->content_width = content_width;
+    out->content_height = content_height;
+    out->padded_width = best_width;
+    out->padded_height = best_height;
+    out->grid_width = grid_width;
+    out->grid_height = grid_height;
+    out->llm_grid_width = llm_width;
+    out->llm_grid_height = llm_height;
+    out->patch_count = patch_count;
+    out->patches = patches;
+    return 1;
+}
+
+static uint32_t ds4_deepseek41_num_image_tokens(
+        uint32_t height,
+        uint32_t width,
+        uint32_t *llm_height,
+        uint32_t *llm_width) {
+    const uint32_t h = ((height / 14u) + 2u) / 3u;
+    const uint32_t w = ((width / 14u) + 2u) / 3u;
+    const uint64_t count = (uint64_t)h * (w + 1u) + 2u;
+    if (llm_height) *llm_height = h;
+    if (llm_width) *llm_width = w;
+    return count <= UINT32_MAX ? (uint32_t)count : UINT32_MAX;
+}
+
+static int ds4_deepseek41_solve_resize(
+        uint32_t height,
+        uint32_t width,
+        uint32_t max_tokens,
+        uint32_t *best_height,
+        uint32_t *best_width) {
+    const double ratio = (double)height / width;
+    const double max_w_float =
+        sqrt(((double)max_tokens - 2.0) / ratio + 0.25) - 0.5;
+    const double max_h_float = max_w_float * ratio;
+    const uint32_t cell = 42u;
+    if (max_w_float < 1.0) {
+        *best_height = ((max_tokens - 2u) / 2u) * cell;
+        *best_width = cell;
+    } else if (max_h_float < 1.0) {
+        *best_height = cell;
+        *best_width = (max_tokens - 3u) * cell;
+    } else {
+        const uint32_t max_w = (uint32_t)floor(max_w_float);
+        const uint32_t max_h = (uint32_t)floor(max_h_float);
+        if (max_w == 0u || max_h == 0u) return 0;
+        const double scale = fmin((double)max_w * cell / width,
+                                  (double)max_h * cell / height);
+        *best_height = (uint32_t)floor(height * scale / 14.0) * 14u;
+        *best_width = (uint32_t)floor(width * scale / 14.0) * 14u;
+    }
+    return *best_height != 0u && *best_width != 0u;
+}
+
+int ds4_deepseek41_plan_image_grid(
+        ds4_deepseek41_image_plan *out,
+        uint32_t width,
+        uint32_t height) {
+    if (!out) return 0;
+    memset(out, 0, sizeof(*out));
+    if (width == 0u || height == 0u) return 0;
+
+    uint32_t planned_width = width;
+    uint32_t planned_height = height;
+    const uint64_t planned_pixels = (uint64_t)width * height;
+    if (planned_pixels < 295936u) {
+        const double scale = sqrt(295936.0 / planned_pixels);
+        planned_width = (uint32_t)(width * scale);
+        planned_height = (uint32_t)(height * scale);
+        if (planned_width == 0u) planned_width = 1u;
+        if (planned_height == 0u) planned_height = 1u;
+    }
+    if (planned_width > UINT32_MAX - 13u ||
+        planned_height > UINT32_MAX - 13u) return 0;
+
+    uint32_t best_width = ds4_align_u32(planned_width, 14u);
+    uint32_t best_height = ds4_align_u32(planned_height, 14u);
+    uint32_t llm_height = 0u, llm_width = 0u;
+    uint32_t token_count = ds4_deepseek41_num_image_tokens(
+            best_height, best_width, &llm_height, &llm_width);
+    if (token_count > 1024u) {
+        if (!ds4_deepseek41_solve_resize(
+                planned_height, planned_width, 1024u,
+                &best_height, &best_width)) return 0;
+        token_count = ds4_deepseek41_num_image_tokens(
+                best_height, best_width, &llm_height, &llm_width);
+        if (token_count > 1024u) return 0;
+    }
+    out->padded_width = best_width;
+    out->padded_height = best_height;
+    out->llm_grid_width = llm_width;
+    out->llm_grid_height = llm_height;
+    out->token_count = token_count;
+    return 1;
+}
+
+static float ds4_round_bf16_image(float value) {
+    union { float f; uint32_t u; } bits = { .f = value };
+    bits.u += 0x7fffu + ((bits.u >> 16u) & 1u);
+    bits.u &= 0xffff0000u;
+    return bits.f;
+}
+
+int ds4_image_preprocess_deepseek41(
+        ds4_deepseek4_image_patches *out,
+        const ds4_image *image,
+        char *error,
+        size_t error_cap) {
+    if (!out) return 0;
+    memset(out, 0, sizeof(*out));
+    if (!image || !image->rgb || image->width == 0 || image->height == 0) {
+        ds4_image_error(error, error_cap,
+                        "invalid DeepSeek V4.1 image preprocessing input");
+        return 0;
+    }
+
+    ds4_deepseek41_image_plan plan = {0};
+    if (!ds4_deepseek41_plan_image_grid(
+            &plan, image->width, image->height)) {
+        ds4_image_error(error, error_cap,
+                        "unable to fit image within the 1024-token vision budget");
+        return 0;
+    }
+    const uint32_t best_width = plan.padded_width;
+    const uint32_t best_height = plan.padded_height;
+    const uint32_t llm_width = plan.llm_grid_width;
+    const uint32_t llm_height = plan.llm_grid_height;
+    if (best_width > DS4_IMAGE_MAX_DIMENSION ||
+        best_height > DS4_IMAGE_MAX_DIMENSION ||
+        (uint64_t)best_width * best_height > DS4_IMAGE_MAX_PIXELS) {
+        ds4_image_error(error, error_cap,
+                        "resized image exceeds the decoded image limits");
+        return 0;
+    }
+
+    const size_t canvas_values = (size_t)best_width * best_height * 3u;
+    float *canvas = malloc(canvas_values * sizeof(*canvas));
+    if (!canvas) {
+        ds4_image_error(error, error_cap, "unable to allocate resized image");
+        return 0;
+    }
+    for (size_t i = 0; i < canvas_values; i++) canvas[i] = 127.0f;
+
+    const double scale = fmin((double)best_width / image->width,
+                              (double)best_height / image->height);
+    uint32_t content_width = (uint32_t)lrint(image->width * scale);
+    uint32_t content_height = (uint32_t)lrint(image->height * scale);
+    if (content_width < 1u) content_width = 1u;
+    if (content_height < 1u) content_height = 1u;
+    if (content_width > best_width) content_width = best_width;
+    if (content_height > best_height) content_height = best_height;
+    const uint32_t offset_x =
+        (uint32_t)lrint((best_width - content_width) * 0.5);
+    const uint32_t offset_y =
+        (uint32_t)lrint((best_height - content_height) * 0.5);
+    float *resized = canvas + ((size_t)offset_y * best_width + offset_x) * 3u;
+    if (!ds4_resize_rgb_bicubic_pillow(
+            image->rgb, image->width, image->height,
+            resized, content_width, content_height, best_width)) {
+        free(canvas);
+        ds4_image_error(error, error_cap,
+                        "unable to resize DeepSeek V4.1 image");
+        return 0;
+    }
+    for (size_t i = 0; i < canvas_values; i++)
+        canvas[i] = ds4_round_bf16_image(canvas[i] / 127.5f - 1.0f);
+
+    const uint32_t grid_height = best_height / 14u;
+    const uint32_t grid_width = best_width / 14u;
+    const uint32_t patch_count = grid_height * grid_width;
+    const size_t patch_values = (size_t)patch_count * 3u * 14u * 14u;
+    float *patches = malloc(patch_values * sizeof(*patches));
+    if (!patches) {
+        free(canvas);
+        ds4_image_error(error, error_cap,
+                        "unable to allocate DeepSeek V4.1 vision patches");
+        return 0;
+    }
+    size_t index = 0;
+    for (uint32_t patch_y = 0; patch_y < grid_height; patch_y++) {
+        for (uint32_t patch_x = 0; patch_x < grid_width; patch_x++) {
+            for (uint32_t channel = 0; channel < 3u; channel++) {
+                for (uint32_t y = 0; y < 14u; y++) {
+                    for (uint32_t x = 0; x < 14u; x++) {
+                        const float *pixel = canvas +
+                            ((size_t)(patch_y * 14u + y) * best_width +
+                             patch_x * 14u + x) * 3u;
+                        patches[index++] = pixel[channel];
+                    }
+                }
+            }
+        }
+    }
+    free(canvas);
+    if (index != patch_values) {
+        free(patches);
+        ds4_image_error(error, error_cap,
+                        "internal DeepSeek V4.1 patch layout mismatch");
         return 0;
     }
 

@@ -6464,6 +6464,155 @@ static void test_metal_router_weights_batch_exact(void) {
     ds4_gpu_tensor_free(logits);
     free(model_raw);
 }
+
+/* V4.1 keeps its visual routing bias in the main model and expands the router
+ * from 256 to 384 experts. Compare the mixed-row kernel against the ordinary
+ * proven top-k path one row at a time, choosing the text or visual bias exactly
+ * as the model contract requires. The middle row uses the explicit-span GPU
+ * sentinel (vocab_size), while its real host token remains in-vocabulary. */
+static void test_metal_v41_visual_router_384_exact(void) {
+    const uint32_t n_expert = 384;
+    const uint32_t n_used = 6;
+    const uint32_t n_tokens = 3;
+    const uint32_t vocab_size = 129280;
+    const uint64_t bias_offset = 0;
+    const uint64_t visual_bias_offset = 2048;
+    const uint64_t page = (uint64_t)getpagesize();
+    const uint64_t logits_bytes =
+        (uint64_t)n_tokens * n_expert * sizeof(float);
+    const uint64_t route_bytes =
+        (uint64_t)n_tokens * n_used * sizeof(int32_t);
+    const uint64_t weight_bytes =
+        (uint64_t)n_tokens * n_used * sizeof(float);
+
+    void *model_raw = NULL;
+    TEST_ASSERT(posix_memalign(&model_raw, (size_t)page, (size_t)page) == 0);
+    ds4_gpu_tensor *logits = ds4_gpu_tensor_alloc(logits_bytes);
+    ds4_gpu_tensor *tokens = ds4_gpu_tensor_alloc(
+        (uint64_t)n_tokens * sizeof(int32_t));
+    ds4_gpu_tensor *mixed_selected = ds4_gpu_tensor_alloc(route_bytes);
+    ds4_gpu_tensor *mixed_weights = ds4_gpu_tensor_alloc(weight_bytes);
+    ds4_gpu_tensor *mixed_probs = ds4_gpu_tensor_alloc(logits_bytes);
+    ds4_gpu_tensor *ref_selected = ds4_gpu_tensor_alloc(route_bytes);
+    ds4_gpu_tensor *ref_weights = ds4_gpu_tensor_alloc(weight_bytes);
+    ds4_gpu_tensor *ref_probs = ds4_gpu_tensor_alloc(logits_bytes);
+    float *logits_host = malloc((size_t)logits_bytes);
+    int32_t *mixed_selected_host = malloc((size_t)route_bytes);
+    int32_t *ref_selected_host = malloc((size_t)route_bytes);
+    float *mixed_weights_host = malloc((size_t)weight_bytes);
+    float *ref_weights_host = malloc((size_t)weight_bytes);
+    const int32_t tokens_host[3] = { 17, (int32_t)vocab_size, 31 };
+    const bool allocated = model_raw && logits && tokens && mixed_selected &&
+        mixed_weights && mixed_probs && ref_selected && ref_weights &&
+        ref_probs && logits_host && mixed_selected_host && ref_selected_host &&
+        mixed_weights_host && ref_weights_host;
+    TEST_ASSERT(allocated);
+
+    if (allocated) {
+        memset(model_raw, 0, (size_t)page);
+        float *text_bias = (float *)((uint8_t *)model_raw + bias_offset);
+        float *visual_bias =
+            (float *)((uint8_t *)model_raw + visual_bias_offset);
+        for (uint32_t e = 0; e < n_expert; e++) {
+            text_bias[e] = (float)((int)((e * 37u) % 101u) - 50) / 37.0f;
+            visual_bias[e] =
+                (float)((int)((e * 71u + 19u) % 127u) - 63) / 29.0f;
+        }
+        for (uint32_t row = 0; row < n_tokens; row++) {
+            for (uint32_t e = 0; e < n_expert; e++) {
+                const int v =
+                    (int)((row * 977u + e * 53u + e * e * 7u) % 4093u) -
+                    2046;
+                logits_host[(size_t)row * n_expert + e] =
+                    (float)v / 257.0f + (float)e * 1.0e-6f;
+            }
+        }
+
+        TEST_ASSERT(ds4_gpu_set_model_map(model_raw, page) != 0);
+        TEST_ASSERT(ds4_gpu_tensor_write(
+            logits, 0, logits_host, logits_bytes) != 0);
+        TEST_ASSERT(ds4_gpu_tensor_write(
+            tokens, 0, tokens_host, sizeof(tokens_host)) != 0);
+        TEST_ASSERT(ds4_gpu_router_select_batch_visual_tensor(
+            mixed_selected, mixed_weights, mixed_probs,
+            model_raw, page, bias_offset, 0, 0, true, false,
+            model_raw, page, visual_bias_offset,
+            logits, tokens, vocab_size, n_expert, n_used, 1.5f,
+            n_tokens) != 0);
+
+        for (uint32_t row = 0; row < n_tokens; row++) {
+            ds4_gpu_tensor *row_logits = ds4_gpu_tensor_view(
+                logits, (uint64_t)row * n_expert * sizeof(float),
+                (uint64_t)n_expert * sizeof(float));
+            ds4_gpu_tensor *row_tokens = ds4_gpu_tensor_view(
+                tokens, (uint64_t)row * sizeof(int32_t), sizeof(int32_t));
+            ds4_gpu_tensor *row_selected = ds4_gpu_tensor_view(
+                ref_selected, (uint64_t)row * n_used * sizeof(int32_t),
+                (uint64_t)n_used * sizeof(int32_t));
+            ds4_gpu_tensor *row_weights = ds4_gpu_tensor_view(
+                ref_weights, (uint64_t)row * n_used * sizeof(float),
+                (uint64_t)n_used * sizeof(float));
+            ds4_gpu_tensor *row_probs = ds4_gpu_tensor_view(
+                ref_probs, (uint64_t)row * n_expert * sizeof(float),
+                (uint64_t)n_expert * sizeof(float));
+            TEST_ASSERT(row_logits && row_tokens && row_selected &&
+                        row_weights && row_probs);
+            const uint64_t selected_bias = row == 1u
+                ? visual_bias_offset : bias_offset;
+            TEST_ASSERT(ds4_gpu_router_select_batch_tensor(
+                row_selected, row_weights, row_probs,
+                model_raw, page, selected_bias, 0, 0, 1, 0,
+                true, false, row_logits, row_tokens,
+                n_expert, n_used, 1.5f, 1) != 0);
+            ds4_gpu_tensor_free(row_probs);
+            ds4_gpu_tensor_free(row_weights);
+            ds4_gpu_tensor_free(row_selected);
+            ds4_gpu_tensor_free(row_tokens);
+            ds4_gpu_tensor_free(row_logits);
+        }
+
+        TEST_ASSERT(ds4_gpu_tensor_read(
+            mixed_selected, 0, mixed_selected_host, route_bytes) != 0);
+        TEST_ASSERT(ds4_gpu_tensor_read(
+            ref_selected, 0, ref_selected_host, route_bytes) != 0);
+        TEST_ASSERT(ds4_gpu_tensor_read(
+            mixed_weights, 0, mixed_weights_host, weight_bytes) != 0);
+        TEST_ASSERT(ds4_gpu_tensor_read(
+            ref_weights, 0, ref_weights_host, weight_bytes) != 0);
+        size_t selected_mismatch = 0;
+        for (size_t i = 0; i < (size_t)n_tokens * n_used; i++) {
+            if (mixed_selected_host[i] != ref_selected_host[i])
+                selected_mismatch++;
+        }
+        const test_float_compare_stats weight_stats =
+            test_compare_float_bits(
+                mixed_weights_host, ref_weights_host,
+                (size_t)n_tokens * n_used);
+        fprintf(stderr,
+                "ds4-test: V4.1 visual router 384 exactness "
+                "selected=%zu/%u weights=%zu/%u max_weight_ulp=%u\n",
+                selected_mismatch, n_tokens * n_used,
+                weight_stats.mismatch_count, n_tokens * n_used,
+                weight_stats.max_ulp);
+        TEST_ASSERT(selected_mismatch == 0);
+        TEST_ASSERT(weight_stats.mismatch_count == 0);
+    }
+
+    free(ref_weights_host);
+    free(mixed_weights_host);
+    free(ref_selected_host);
+    free(mixed_selected_host);
+    free(logits_host);
+    ds4_gpu_tensor_free(ref_probs);
+    ds4_gpu_tensor_free(ref_weights);
+    ds4_gpu_tensor_free(ref_selected);
+    ds4_gpu_tensor_free(mixed_probs);
+    ds4_gpu_tensor_free(mixed_weights);
+    ds4_gpu_tensor_free(mixed_selected);
+    ds4_gpu_tensor_free(tokens);
+    ds4_gpu_tensor_free(logits);
+    free(model_raw);
+}
 #endif
 
 static void test_metal_kernel_group(void) {
@@ -6508,6 +6657,7 @@ static void test_metal_kernel_group(void) {
     test_metal_indexed_attention_dual_rb16_exact();
     test_metal_router_simd_finalize_exact();
     test_metal_router_weights_batch_exact();
+    test_metal_v41_visual_router_384_exact();
 #endif
 }
 

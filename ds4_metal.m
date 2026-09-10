@@ -6293,6 +6293,9 @@ typedef struct {
     uint32_t n_tokens;
     uint32_t has_bias;
     uint32_t hash_mode;
+    uint32_t n_expert;
+    uint32_t n_expert_used;
+    uint32_t sort_width;
 } ds4_gpu_dsv4_router_select_visual_args;
 
 typedef struct {
@@ -36055,13 +36058,21 @@ static int ds4_gpu_encode_router_select(
 
     if (mixed_visual) {
         if (!g_dsv4_router_select_visual_batch_pipeline ||
-            n_expert != 256u || n_expert_used != 6u) return 0;
+            n_expert > 512u || n_expert_used > n_expert) return 0;
+        uint32_t sort_width = 1u;
+        while (sort_width < n_expert) sort_width <<= 1u;
+        if (sort_width > 512u ||
+            g_dsv4_router_select_visual_batch_pipeline.maxTotalThreadsPerThreadgroup <
+                sort_width) return 0;
         ds4_gpu_dsv4_router_select_visual_args args = {
             .hash_rows = hash_rows,
             .vocab_size = vocab_size,
             .n_tokens = n_tokens,
             .has_bias = has_bias ? 1u : 0u,
             .hash_mode = hash_mode ? 1u : 0u,
+            .n_expert = n_expert,
+            .n_expert_used = n_expert_used,
+            .sort_width = sort_width,
         };
         const float zero_f32 = 0.0f;
         const int32_t zero_i32 = 0;
@@ -36077,9 +36088,9 @@ static int ds4_gpu_encode_router_select(
         [enc setBuffer:tokensbuf offset:tokens_off atIndex:5];
         [enc setBuffer:selectedbuf offset:selected_off atIndex:6];
         [enc setThreadgroupMemoryLength:
-                256u * (sizeof(float) + sizeof(int32_t)) atIndex:0];
+                (NSUInteger)sort_width * (sizeof(float) + sizeof(int32_t)) atIndex:0];
         [enc dispatchThreadgroups:MTLSizeMake(n_tokens, 1, 1)
-             threadsPerThreadgroup:MTLSizeMake(256, 1, 1)];
+             threadsPerThreadgroup:MTLSizeMake(sort_width, 1, 1)];
         ds4_gpu_end_compute_encoder(cb, enc);
         ok = 1;
     } else if (hash_mode) {
@@ -42245,8 +42256,9 @@ int ds4_gpu_router_select_batch_visual_tensor(
     if (!g_initialized && !ds4_gpu_init()) return 0;
     if (!selected || !weights || !probs || !logits || !tokens ||
         !model_map || !vision_map || vocab_size == 0 || n_tokens == 0 ||
-        n_expert != 256u || n_expert_used != 6u ||
-        fabsf(expert_weight_scale - 1.5f) > 1.0e-6f) return 0;
+        n_expert == 0u || n_expert > 512u ||
+        n_expert_used == 0u || n_expert_used > n_expert ||
+        !isfinite(expert_weight_scale) || expert_weight_scale <= 0.0f) return 0;
 
     @autoreleasepool {
         id<MTLBuffer> logitsbuf = ds4_gpu_tensor_buffer(logits);

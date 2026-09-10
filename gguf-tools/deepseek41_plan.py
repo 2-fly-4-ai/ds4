@@ -76,6 +76,11 @@ def dense_qtype(name, info):
     if info["dtype"] == "F32":
         return "F32", "copy"
     if info["dtype"] == "BF16":
+        # The shared DeepSeek ViT kernels consume RMS weights directly as
+        # BF16. Main-model norms are deliberately expanded to F32, but doing
+        # that to the vision sidecar changes both its ABI and arithmetic.
+        if name.startswith("vision.") and name.endswith("norm.weight"):
+            return "BF16", "copy"
         if name.endswith(("_norm.weight", ".norm.weight")) or \
                 ".ffn.gate.weight" in name:
             return "F32", "bf16_to_f32"

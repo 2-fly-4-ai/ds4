@@ -8176,6 +8176,117 @@ static void deepseek4_vision_weights_bind(
     }
 }
 
+static void deepseek41_vision_weights_bind(
+        ds4_deepseek4_vision_weights *w,
+        const ds4_model *m) {
+    static const char revision[] =
+        "df42c109f1defefcbfcedbe7d905718a12266e40";
+    ds4_str arch = {0}, source_revision = {0}, kind = {0};
+    if (!model_get_string(m, "general.architecture", &arch) ||
+        !ds4_streq(arch, "deepseek41-vision")) {
+        ds4_die("--vision file is not a DeepSeek V4.1 vision encoder GGUF");
+    }
+    if (!model_get_string(m, "general.source.revision", &source_revision) ||
+        !ds4_streq(source_revision, revision) ||
+        !model_get_string(m, "deepseek41.sidecar.kind", &kind) ||
+        !ds4_streq(kind, "vision")) {
+        ds4_die("DeepSeek V4.1 vision sidecar revision or kind is incompatible");
+    }
+    if (m->n_tensors != 266u) {
+        fprintf(stderr,
+                "ds4: DeepSeek V4.1 vision GGUF has %" PRIu64
+                " tensors, expected 266\n", m->n_tensors);
+        exit(1);
+    }
+    config_expect_u32("DeepSeek V4.1 vision block_count",
+                      required_u32(m, "deepseek41-vision.block_count"), 32u);
+    config_expect_u32("DeepSeek V4.1 vision embedding_length",
+                      required_u32(m, "deepseek41-vision.embedding_length"), 1024u);
+    config_expect_u32("DeepSeek V4.1 vision feed_forward_length",
+                      required_u32(m, "deepseek41-vision.feed_forward_length"), 2816u);
+    config_expect_u32("DeepSeek V4.1 vision head_count",
+                      required_u32(m, "deepseek41-vision.attention.head_count"), 16u);
+    config_expect_u32("DeepSeek V4.1 vision projection_length",
+                      required_u32(m, "deepseek41-vision.projection_length"), 4096u);
+    config_expect_u32("DeepSeek V4.1 vision patch_size",
+                      required_u32(m, "deepseek41-vision.patch_size"), 14u);
+    config_expect_u32("DeepSeek V4.1 vision downsample_ratio",
+                      required_u32(m, "deepseek41-vision.downsample_ratio"), 3u);
+    config_expect_u32("DeepSeek V4.1 vision max_tokens",
+                      required_u32(m, "deepseek41-vision.image.max_tokens"), 1024u);
+    config_expect_u32("DeepSeek V4.1 vision min_pixels",
+                      required_u32(m, "deepseek41-vision.image.min_pixels"), 295936u);
+    config_expect_u32("DeepSeek V4.1 vision image_token_id",
+                      required_u32(m, "deepseek41-vision.image_token_id"), 129264u);
+    config_expect_epsilon(
+            "DeepSeek V4.1 vision RMS epsilon",
+            required_f32(m,
+                "deepseek41-vision.attention.layer_norm_rms_epsilon"), 1.0e-6f);
+
+    static const uint64_t d1024[] = {1024u};
+    static const uint64_t d2816_1024[] = {2816u, 1024u};
+    static const uint64_t d588_1024[] = {588u, 1024u};
+    static const uint64_t d1024_1024[] = {1024u, 1024u};
+    static const uint64_t d1024_3072[] = {1024u, 3072u};
+    static const uint64_t d1024_5632[] = {1024u, 5632u};
+    static const uint64_t d3072[] = {3072u};
+    static const uint64_t d4096[] = {4096u};
+    static const uint64_t d4096_4096[] = {4096u, 4096u};
+    static const uint64_t d9216_4096[] = {9216u, 4096u};
+
+    memset(w, 0, sizeof(*w));
+#define DEEPSEEK41_VISION_OFFSET(field_, name_, type_, rank_, dims_) \
+    w->field_ = deepseek4_vision_required_offset( \
+            m, name_, type_, rank_, dims_)
+    DEEPSEEK41_VISION_OFFSET(patch_weight, "vision.patch_embed.proj.weight",
+                             DS4_TENSOR_BF16, 2, d588_1024);
+    DEEPSEEK41_VISION_OFFSET(patch_bias, "vision.patch_embed.proj.bias",
+                             DS4_TENSOR_BF16, 1, d1024);
+    DEEPSEEK41_VISION_OFFSET(post_norm, "vision.norm.weight",
+                             DS4_TENSOR_BF16, 1, d1024);
+    DEEPSEEK41_VISION_OFFSET(aligner_w1, "aligner.w1.weight",
+                             DS4_TENSOR_BF16, 2, d9216_4096);
+    DEEPSEEK41_VISION_OFFSET(aligner_w1_bias, "aligner.w1.bias",
+                             DS4_TENSOR_BF16, 1, d4096);
+    DEEPSEEK41_VISION_OFFSET(aligner_w2, "aligner.w2.weight",
+                             DS4_TENSOR_BF16, 2, d4096_4096);
+    DEEPSEEK41_VISION_OFFSET(aligner_w2_bias, "aligner.w2.bias",
+                             DS4_TENSOR_BF16, 1, d4096);
+    DEEPSEEK41_VISION_OFFSET(image_start, "image_start",
+                             DS4_TENSOR_BF16, 1, d4096);
+    DEEPSEEK41_VISION_OFFSET(image_newline, "image_newline",
+                             DS4_TENSOR_BF16, 1, d4096);
+    DEEPSEEK41_VISION_OFFSET(image_end, "image_end",
+                             DS4_TENSOR_BF16, 1, d4096);
+#undef DEEPSEEK41_VISION_OFFSET
+
+    for (uint32_t il = 0; il < DS4_DEEPSEEK4_VISION_LAYERS; il++) {
+        char name[128];
+#define DEEPSEEK41_VISION_LAYER_OFFSET(field_, suffix_, rank_, dims_) do { \
+            int n = snprintf(name, sizeof(name), \
+                    "vision.blocks.%u.%s", il, suffix_); \
+            if (n < 0 || (size_t)n >= sizeof(name)) \
+                ds4_die("DeepSeek V4.1 vision tensor name overflow"); \
+            w->layer[il].field_ = deepseek4_vision_required_offset( \
+                    m, name, DS4_TENSOR_BF16, rank_, dims_); \
+        } while (0)
+        DEEPSEEK41_VISION_LAYER_OFFSET(norm1, "norm1.weight", 1, d1024);
+        DEEPSEEK41_VISION_LAYER_OFFSET(qkv_weight, "attn.wqkv.weight", 2,
+                                       d1024_3072);
+        DEEPSEEK41_VISION_LAYER_OFFSET(qkv_bias, "attn.wqkv.bias", 1, d3072);
+        DEEPSEEK41_VISION_LAYER_OFFSET(attn_proj_weight, "attn.wo.weight", 2,
+                                       d1024_1024);
+        DEEPSEEK41_VISION_LAYER_OFFSET(attn_proj_bias, "attn.wo.bias", 1,
+                                       d1024);
+        DEEPSEEK41_VISION_LAYER_OFFSET(norm2, "norm2.weight", 1, d1024);
+        DEEPSEEK41_VISION_LAYER_OFFSET(mlp_w1, "mlp.w1.weight", 2,
+                                       d1024_5632);
+        DEEPSEEK41_VISION_LAYER_OFFSET(mlp_w2, "mlp.w2.weight", 2,
+                                       d2816_1024);
+#undef DEEPSEEK41_VISION_LAYER_OFFSET
+    }
+}
+
 /* Qwen3.8 vision: llama.cpp's Qwen3-VL mmproj (clip / qwen3vl_merger).
  * Matmul weights may be f32, f16 or q8_0; everything else is f32. */
 static uint64_t qwen4_vision_dense(const ds4_model *m, const char *name, uint64_t in_dim, uint64_t out_dim,
@@ -21742,6 +21853,8 @@ typedef struct {
     int32_t *v41_engram_tokens;
     float *v41_engram_host_embed;
     uint32_t v41_engram_token_cap;
+    const float *v41_visual_embedding;
+    bool v41_visual_token_active;
 
     /* Metal network tensor parallelism. These views alias engine-owned
      * transport slabs except tp_logits_half, whose view object is session-owned. */
@@ -30769,7 +30882,10 @@ static bool metal_graph_encode_decode_layer_phase(
     const uint64_t gate_expert_bytes DS4_MAYBE_UNUSED = expert_mid_dim * gate_row_bytes;
     const uint64_t down_row_bytes = routed_expert_row_bytes(layer->ffn_down_exps);
     const uint64_t down_expert_bytes DS4_MAYBE_UNUSED = routed_out_dim * down_row_bytes;
-    if (ok && metal_graph_decode_cpu_router_applicable(g, layer)) {
+    const bool v41_visual =
+        ds4_model_is_deepseek41() && g->v41_visual_token_active;
+    if (ok && metal_graph_decode_cpu_router_applicable(g, layer) &&
+        !v41_visual) {
         ok = metal_graph_decode_cpu_router(g, model, layer, il, (uint32_t)token);
     } else {
         if (ok && !metal_graph_tp_ablate("router")) {
@@ -30794,6 +30910,7 @@ static bool metal_graph_encode_decode_layer_phase(
 #if defined(__APPLE__)
             const bool fuse_router_project_select =
                 parallel_full_ffn_eligible &&
+                !v41_visual &&
                 layer->ffn_gate_tid2eid == NULL &&
                 getenv("DS4_METAL_DISABLE_M5_ROUTER_PROJECT_SELECT_FUSE") == NULL &&
                 ds4_gpu_device_is_m5_apple_silicon();
@@ -30870,9 +30987,14 @@ static bool metal_graph_encode_decode_layer_phase(
                                                            layer->ffn_gate_tid2eid != NULL,
                                                            metal_graph_router_logits(g)) != 0;
             } else {
+            const uint64_t router_bias_offset =
+                v41_visual && layer->ffn_exp_probs_b_vl ?
+                layer->ffn_exp_probs_b_vl->abs_offset :
+                (layer->ffn_exp_probs_b ?
+                 layer->ffn_exp_probs_b->abs_offset : 0);
             ok = ds4_gpu_router_select_tensor(metal_graph_router_selected(g), metal_graph_router_weights(g), metal_graph_router_probs(g),
                                                     model->map, model->size,
-                                                    layer->ffn_exp_probs_b ? layer->ffn_exp_probs_b->abs_offset : 0,
+                                                    router_bias_offset,
                                                     layer->ffn_gate_tid2eid ? layer->ffn_gate_tid2eid->abs_offset : 0,
                                                     layer->ffn_gate_tid2eid ? (uint32_t)layer->ffn_gate_tid2eid->dim[1] : 0,
                                                     (uint32_t)token,
@@ -30881,7 +31003,9 @@ static bool metal_graph_encode_decode_layer_phase(
                                                     DS4_EXPERT_WEIGHT_SCALE,
                                                     0,
                                                     0,
-                                                    layer->ffn_exp_probs_b != NULL,
+                                                    v41_visual ?
+                                                        layer->ffn_exp_probs_b_vl != NULL :
+                                                        layer->ffn_exp_probs_b != NULL,
                                                     layer->ffn_gate_tid2eid != NULL,
                                                     metal_graph_router_logits(g)) != 0;
             }
@@ -34619,12 +34743,18 @@ static bool metal_graph_dspark_capture_verified_suffix_layer(
     return ok;
 }
 
-static bool metal_graph_v41_engram_record_text_token(
+static bool metal_graph_v41_engram_record_token(
         ds4_gpu_graph *g,
         int            token,
-        uint32_t       pos) {
-    if (!g || !g->v41_engram_tokens ||
-        pos >= g->v41_engram_token_cap || token < 0 ||
+        uint32_t       pos,
+        bool           visual) {
+    if (!g || !g->v41_engram_tokens || pos >= g->v41_engram_token_cap)
+        return false;
+    if (visual) {
+        g->v41_engram_tokens[pos] = -1;
+        return true;
+    }
+    if (token < 0 ||
         (uint32_t)token >= DS4_N_VOCAB) return false;
     g->v41_engram_tokens[pos] =
         (int32_t)g_ds4_v41_engram_token_map[token];
@@ -34640,6 +34770,7 @@ static bool metal_graph_v41_engram_apply_one(
         uint32_t                pos) {
     const int slot = deepseek41_engram_slot_for_layer(il);
     if (slot < 0) return true;
+    if (g && g->v41_visual_token_active) return true;
     if (!g || !g->v41_engram_host_embed || !layer->engram_wkv ||
         layer->engram_wkv->type != DS4_TENSOR_Q8_0) return false;
     if (g->placement) {
@@ -34697,18 +34828,12 @@ static bool metal_graph_encode_token_raw_swa(
     const uint32_t raw_row = pos % g->raw_cap;
     const uint32_t n_raw = metal_graph_raw_span_for_batch(g, pos, 1);
     metal_graph_dspark_capture_begin(g);
-    if (ds4_model_is_deepseek41() &&
-        !metal_graph_v41_engram_record_text_token(g, token, pos)) {
-        fprintf(stderr,
-                "ds4: DeepSeek V4.1 Engram requires a host token id for streamed decode\n");
-        return false;
-    }
     if (ds4_model_is_deepseek41()) {
         /* A device-resident token cannot feed the host-side random Engram
          * lookup without a readback. V4.1 speculative/greedy-chain routing is
          * kept disabled until that state transition has an exact GPU hash. */
-        if (token_dev ||
-            !metal_graph_v41_engram_record_text_token(g, token, pos)) {
+        if (token_dev || !metal_graph_v41_engram_record_token(
+                g, token, pos, g->v41_visual_token_active)) {
             fprintf(stderr,
                     "ds4: DeepSeek V4.1 Engram requires a host token id for decode\n");
             return false;
@@ -34735,7 +34860,18 @@ static bool metal_graph_encode_token_raw_swa(
     }
 #endif
     bool ok;
-    if (token_dev) {
+    if (g->v41_visual_token_active) {
+        if (!g->v41_visual_embedding) return false;
+        float visual_hc[DS4_MAX_HC * DS4_N_EMBD];
+        for (uint32_t hc = 0; hc < DS4_N_HC; hc++) {
+            memcpy(visual_hc + (uint64_t)hc * DS4_N_EMBD,
+                   g->v41_visual_embedding,
+                   (size_t)DS4_N_EMBD * sizeof(float));
+        }
+        ok = ds4_gpu_tensor_write(
+            metal_graph_cur_hc(g), 0, visual_hc,
+            (uint64_t)DS4_N_HC * DS4_N_EMBD * sizeof(float)) != 0;
+    } else if (token_dev) {
         /* Greedy chain decode: the token id arrives GPU-resident (written by
          * the previous token's argmax), so the host never blocks on it.  The
          * batched embed path gathers the identical row through the same
@@ -35005,6 +35141,36 @@ static const float *metal_graph_visual_embedding_row(
     return NULL;
 }
 
+/* The old Vision-Exp model uses synthetic ids above the vocabulary and its
+ * visual router can therefore identify image rows directly from the token
+ * buffer. V4.1 intentionally uses the real token 129264 for every visual
+ * row, so preserve the actual host prompt but upload an out-of-vocabulary
+ * router sentinel for rows covered by an authoritative vision span. Nothing
+ * uses this GPU token buffer to recover V4.1 text: visual embeddings and
+ * Engram history are sourced from their explicit host-side spans/history. */
+static bool metal_graph_upload_prefill_route_tokens(
+        const ds4_gpu_graph *g,
+        ds4_gpu_tensor      *out_tokens,
+        const token_vec     *prompt,
+        uint32_t             pos0,
+        uint32_t             n_tokens) {
+    if (!g || !out_tokens || !prompt ||
+        pos0 > (uint32_t)prompt->len ||
+        n_tokens > (uint32_t)prompt->len - pos0) return false;
+
+    int32_t *tokens = xmalloc((size_t)n_tokens * sizeof(tokens[0]));
+    for (uint32_t i = 0; i < n_tokens; i++) {
+        tokens[i] = metal_graph_visual_embedding_row(g, pos0 + i)
+            ? (int32_t)DS4_N_VOCAB
+            : prompt->v[pos0 + i];
+    }
+    const bool ok = ds4_gpu_tensor_write(
+        out_tokens, 0, tokens,
+        (uint64_t)n_tokens * sizeof(tokens[0])) != 0;
+    free(tokens);
+    return ok;
+}
+
 /* DeepSeek image prompts use typed synthetic token ids for routing and
  * attention. Seed those rows from the vision encoder output instead of the
  * vocabulary table; regular rows retain the ordinary token embedding. */
@@ -35028,16 +35194,19 @@ static bool metal_graph_upload_visual_prompt_embeddings_hc(
     bool ok = true;
     for (uint32_t t = 0; t < n_tokens; t++) {
         const int token = prompt->v[pos0 + t];
-        const float *source = NULL;
-        if (token >= 0 && token < (int)DS4_N_VOCAB) {
+        /* The span is authoritative. DeepSeek V4.1 deliberately uses the
+         * real in-vocabulary image token (129264) at every visual position;
+         * deciding from token range would silently substitute its text-row
+         * embedding for the encoded image. */
+        const float *source =
+            metal_graph_visual_embedding_row(g, pos0 + t);
+        if (!source && token >= 0 && token < (int)DS4_N_VOCAB) {
             embed_token_f16(model, weights, token, plain);
             source = plain;
-        } else {
-            source = metal_graph_visual_embedding_row(g, pos0 + t);
-            if (!source) {
-                ok = false;
-                break;
-            }
+        }
+        if (!source) {
+            ok = false;
+            break;
         }
         float *dst = hc + (uint64_t)t * hc_dim;
         for (uint32_t h = 0; h < DS4_N_HC; h++) {
@@ -35435,7 +35604,8 @@ static const int32_t *metal_graph_visual_tokens_for_batch(
         n_tokens > g->prefill_host_count - off) return NULL;
     const int32_t *tokens = g->prefill_host_tokens + off;
     for (uint32_t i = 0; i < n_tokens; i++) {
-        if (tokens[i] >= (int32_t)DS4_N_VOCAB) return tokens;
+        if (tokens[i] >= (int32_t)DS4_N_VOCAB ||
+            metal_graph_visual_embedding_row(g, pos0 + i)) return tokens;
     }
     return NULL;
 }
@@ -37774,6 +37944,13 @@ static bool metal_graph_encode_layer_ffn_batch(
         ok = router_tokens != NULL;
     }
     if (ok && g->deepseek4_vision_weights && g->prefill_has_visual) {
+        const bool v41_visual = ds4_model_is_deepseek41();
+        const void *visual_bias_map = v41_visual ? model->map : g->vision_model_map;
+        const uint64_t visual_bias_size = v41_visual ? model->size : g->vision_model_size;
+        const uint64_t visual_bias_offset =
+            v41_visual && layer->ffn_exp_probs_b_vl
+                ? layer->ffn_exp_probs_b_vl->abs_offset
+                : g->deepseek4_vision_weights->visual_router_bias[il];
         ok = ds4_gpu_router_select_batch_visual_tensor(
                     metal_graph_batch_router_selected(g),
                     metal_graph_batch_router_weights(g),
@@ -37785,9 +37962,9 @@ static bool metal_graph_encode_layer_ffn_batch(
                     layer->ffn_gate_tid2eid ? (uint32_t)layer->ffn_gate_tid2eid->dim[1] : 0,
                     layer->ffn_exp_probs_b != NULL,
                     layer->ffn_gate_tid2eid != NULL,
-                    g->vision_model_map,
-                    g->vision_model_size,
-                    g->deepseek4_vision_weights->visual_router_bias[il],
+                    visual_bias_map,
+                    visual_bias_size,
+                    visual_bias_offset,
                     metal_graph_batch_router_logits(g),
                     router_tokens,
                     DS4_N_VOCAB,
@@ -38385,6 +38562,13 @@ static bool metal_graph_eval_token_raw_swa_streaming(
     const uint32_t raw_row = pos % g->raw_cap;
     const uint32_t n_raw = metal_graph_raw_span_for_batch(g, pos, 1);
     metal_graph_dspark_capture_begin(g);
+    if (ds4_model_is_deepseek41() &&
+        !metal_graph_v41_engram_record_token(
+            g, token, pos, g->v41_visual_token_active)) {
+        fprintf(stderr,
+                "ds4: DeepSeek V4.1 Engram requires a valid prompt token\n");
+        return false;
+    }
 
     const bool static_decode_map =
         metal_graph_stream_decode_static_map_enabled() &&
@@ -38407,7 +38591,18 @@ static bool metal_graph_eval_token_raw_swa_streaming(
         metal_graph_stream_readahead_layer_decode(model, weights, 0);
     }
     if (ok) ok = ds4_gpu_begin_commands() != 0;
-    if (ok) {
+    if (ok && g->v41_visual_token_active) {
+        if (!g->v41_visual_embedding) return false;
+        float visual_hc[DS4_MAX_HC * DS4_N_EMBD];
+        for (uint32_t hc = 0; hc < DS4_N_HC; hc++) {
+            memcpy(visual_hc + (uint64_t)hc * DS4_N_EMBD,
+                   g->v41_visual_embedding,
+                   (size_t)DS4_N_EMBD * sizeof(float));
+        }
+        ok = ds4_gpu_tensor_write(
+            metal_graph_cur_hc(g), 0, visual_hc,
+            (uint64_t)DS4_N_HC * DS4_N_EMBD * sizeof(float)) != 0;
+    } else if (ok) {
         ok = ds4_gpu_embed_token_hc_tensor(metal_graph_cur_hc(g),
                                            model->map,
                                            model->size,
@@ -38942,12 +39137,15 @@ static bool metal_graph_prefill_decode_streaming_range(
         const uint32_t pos = start + i;
         const bool last = i + 1u == n_tokens;
         float *token_logits = (last && logits) ? logits : NULL;
-        if (!metal_graph_eval_token_raw_swa(g,
-                                            model,
-                                            weights,
-                                            prompt->v[pos],
-                                            pos,
-                                            token_logits)) {
+        const float *visual = ds4_model_is_deepseek41() ?
+            metal_graph_visual_embedding_row(g, pos) : NULL;
+        g->v41_visual_embedding = visual;
+        g->v41_visual_token_active = visual != NULL;
+        const bool token_ok = metal_graph_eval_token_raw_swa(
+            g, model, weights, prompt->v[pos], pos, token_logits);
+        g->v41_visual_embedding = NULL;
+        g->v41_visual_token_active = false;
+        if (!token_ok) {
             if (ds4_gpu_synchronize() == 0) {
                 fprintf(stderr, "ds4: Metal synchronize after decode-style streaming prefill failure also failed\n");
             }
@@ -42661,7 +42859,8 @@ static bool metal_graph_prefill_layer_major(
     g->prefill_has_visual = false;
     if (g->deepseek4_vision_weights) {
         for (uint32_t i = 0; i < n_tokens; i++) {
-            if (prompt->v[start + i] >= (int)DS4_N_VOCAB) {
+            if (prompt->v[start + i] >= (int)DS4_N_VOCAB ||
+                metal_graph_visual_embedding_row(g, start + i)) {
                 g->prefill_has_visual = true;
                 break;
             }
@@ -42671,7 +42870,11 @@ static bool metal_graph_prefill_layer_major(
     if (display_progress)
         display_progress(display_progress_ud, "prefill_display", (int)start, prompt->len);
 
-    bool ok = metal_graph_upload_prompt_tokens(metal_graph_prefill_tokens(g), prompt, start, n_tokens);
+    bool ok = g->prefill_has_visual
+        ? metal_graph_upload_prefill_route_tokens(
+              g, metal_graph_prefill_tokens(g), prompt, start, n_tokens)
+        : metal_graph_upload_prompt_tokens(
+              metal_graph_prefill_tokens(g), prompt, start, n_tokens);
     if (!ok) return false;
 
 #ifdef DS4_ROCM_BUILD
@@ -45301,6 +45504,7 @@ typedef enum {
     DS4_VISION_NONE = 0,
     DS4_VISION_GLM53,
     DS4_VISION_DEEPSEEK4,
+    DS4_VISION_DEEPSEEK41,
     DS4_VISION_QWEN4,
 } ds4_vision_kind;
 
@@ -73630,10 +73834,12 @@ static int ds4_engine_open_internal(ds4_engine **out,
     if (opt->warm_weights) model_warm_weights(&e->model);
     config_validate_model(&e->model);
     if (opt->vision_path && opt->vision_path[0]) {
-        if (!ds4_model_is_glm53() && !g_ds4_flash_vision_exp && !ds4_model_is_qwen4()) {
+        if (!ds4_model_is_glm53() && !g_ds4_flash_vision_exp &&
+            !ds4_model_is_deepseek41() && !ds4_model_is_qwen4()) {
             fprintf(stderr,
-                    "ds4: --vision requires GLM-5.3, Qwen3.8-Flash-Next or the pinned "
-                    "DeepSeek V4 Flash Vision-Exp model\n");
+                    "ds4: --vision requires GLM-5.3, Qwen3.8-Flash-Next, "
+                    "DeepSeek V4.1 Flash, or the pinned DeepSeek V4 "
+                    "Flash Vision-Exp model\n");
             ds4_engine_close(e);
             *out = NULL;
             return 1;
@@ -73663,6 +73869,13 @@ static int ds4_engine_open_internal(ds4_engine **out,
             qwen4_vision_weights_bind(&e->qwen4_vision_weights, &e->vision_model);
             config_expect_u32("vision projection_dim", e->qwen4_vision_weights.n_out, DS4_N_EMBD);
             e->vision_kind = DS4_VISION_QWEN4;
+        } else if (ds4_model_is_deepseek41()) {
+            deepseek41_vision_weights_bind(
+                    &e->deepseek4_vision_weights, &e->vision_model);
+            e->vision_start_token = 129264;
+            e->vision_image_token = 129264;
+            e->vision_end_token = 129264;
+            e->vision_kind = DS4_VISION_DEEPSEEK41;
         } else {
             deepseek4_vision_weights_bind(
                     &e->deepseek4_vision_weights, &e->vision_model);
@@ -74790,7 +75003,7 @@ static int ds4_engine_open_internal(ds4_engine **out,
 #endif
             if (!e->vision_map_ready) {
                 fprintf(stderr,
-                        "ds4: %s failed to map the GLM-5.3 vision encoder\n",
+                        "ds4: %s failed to map the vision encoder\n",
                         ds4_backend_name(e->backend));
                 ds4_engine_close(e);
                 *out = NULL;
@@ -75142,6 +75355,92 @@ static int ds4_prompt_append_deepseek4_vision(
     ds4_deepseek4_image_layout_free(&layout);
     return 1;
 }
+
+static int ds4_prompt_append_deepseek41_vision(
+        ds4_engine *e,
+        ds4_tokens *tokens,
+        ds4_vision_span *span,
+        ds4_vision_embedding *embedding,
+        char *error,
+        size_t error_cap) {
+    if (embedding->layout != DS4_VISION_LAYOUT_DEEPSEEK4_NATURAL ||
+        embedding->grid_height == 0u || embedding->grid_width == 0u ||
+        embedding->token_count !=
+            embedding->grid_height * embedding->grid_width) {
+        if (error && error_cap)
+            snprintf(error, error_cap,
+                     "invalid DeepSeek V4.1 vision embedding layout");
+        return 0;
+    }
+    const uint64_t rows64 =
+        (uint64_t)embedding->grid_height *
+        (embedding->grid_width + 1u) + 2u;
+    if (rows64 > UINT32_MAX || rows64 > (uint64_t)(INT_MAX - tokens->len) ||
+        rows64 > SIZE_MAX / (4096u * sizeof(float))) {
+        if (error && error_cap)
+            snprintf(error, error_cap, "DeepSeek V4.1 vision prompt is too large");
+        return 0;
+    }
+    const uint32_t rows = (uint32_t)rows64;
+    float *block = malloc((size_t)rows * 4096u * sizeof(float));
+    if (!block) {
+        if (error && error_cap)
+            snprintf(error, error_cap,
+                     "unable to allocate DeepSeek V4.1 image block");
+        return 0;
+    }
+    const ds4_deepseek4_vision_weights *w = &e->deepseek4_vision_weights;
+    const uint16_t *start = ds4_deepseek4_vision_vector(e, w->image_start);
+    const uint16_t *newline = ds4_deepseek4_vision_vector(e, w->image_newline);
+    const uint16_t *end = ds4_deepseek4_vision_vector(e, w->image_end);
+    if (!start || !newline || !end) {
+        free(block);
+        if (error && error_cap)
+            snprintf(error, error_cap,
+                     "DeepSeek V4.1 vision sentinels are not mapped");
+        return 0;
+    }
+
+    uint32_t dst_row = 0, image_row = 0;
+    for (uint32_t d = 0; d < 4096u; d++)
+        block[d] = ds4_vision_bf16_to_f32(start[d]);
+    dst_row++;
+    for (uint32_t y = 0; y < embedding->grid_height; y++) {
+        for (uint32_t x = 0; x < embedding->grid_width; x++) {
+            memcpy(block + (uint64_t)dst_row++ * 4096u,
+                   embedding->data + (uint64_t)image_row++ * 4096u,
+                   4096u * sizeof(float));
+        }
+        float *dst = block + (uint64_t)dst_row++ * 4096u;
+        for (uint32_t d = 0; d < 4096u; d++)
+            dst[d] = ds4_vision_bf16_to_f32(newline[d]);
+    }
+    float *last = block + (uint64_t)dst_row++ * 4096u;
+    for (uint32_t d = 0; d < 4096u; d++)
+        last[d] = ds4_vision_bf16_to_f32(end[d]);
+    if (dst_row != rows || image_row != embedding->token_count) {
+        free(block);
+        if (error && error_cap)
+            snprintf(error, error_cap,
+                     "internal DeepSeek V4.1 image layout mismatch");
+        return 0;
+    }
+
+    const uint32_t token_start = (uint32_t)tokens->len;
+    for (uint32_t i = 0; i < rows; i++)
+        ds4_tokens_push(tokens, e->vision_image_token);
+    free(embedding->data);
+    embedding->data = block;
+    embedding->token_count = rows;
+    embedding->layout = 0;
+    embedding->grid_width = 0;
+    embedding->grid_height = 0;
+    memset(span, 0, sizeof(*span));
+    span->token_start = token_start;
+    span->embedding = *embedding;
+    memset(embedding, 0, sizeof(*embedding));
+    return 1;
+}
 #else
 static int ds4_prompt_append_deepseek4_vision(
         ds4_engine *e,
@@ -75159,6 +75458,16 @@ static int ds4_prompt_append_deepseek4_vision(
                  "DeepSeek vision requires a GPU backend");
     return 0;
 }
+static int ds4_prompt_append_deepseek41_vision(
+        ds4_engine *e,
+        ds4_tokens *tokens,
+        ds4_vision_span *span,
+        ds4_vision_embedding *embedding,
+        char *error,
+        size_t error_cap) {
+    return ds4_prompt_append_deepseek4_vision(
+        e, tokens, span, embedding, error, error_cap);
+}
 #endif
 
 int ds4_prompt_append_vision(
@@ -75175,6 +75484,10 @@ int ds4_prompt_append_vision(
     }
     if (e->vision_kind == DS4_VISION_DEEPSEEK4) {
         return ds4_prompt_append_deepseek4_vision(
+                e, tokens, span, embedding, error, error_cap);
+    }
+    if (e->vision_kind == DS4_VISION_DEEPSEEK41) {
+        return ds4_prompt_append_deepseek41_vision(
                 e, tokens, span, embedding, error, error_cap);
     }
     if ((uint64_t)tokens->len + embedding->token_count + 2u > INT_MAX) {
@@ -75247,7 +75560,8 @@ int ds4_chat_append_multimodal_message(
         return 1;
     }
     if ((DS4_MODEL_FAMILY != DS4_MODEL_FAMILY_GLM_DSA &&
-         e->vision_kind != DS4_VISION_DEEPSEEK4) || (!tool && !user)) {
+         e->vision_kind != DS4_VISION_DEEPSEEK4 &&
+         e->vision_kind != DS4_VISION_DEEPSEEK41) || (!tool && !user)) {
         if (error && error_cap)
             snprintf(error, error_cap,
                      "multimodal messages require a supported user or tool role");
@@ -75338,10 +75652,16 @@ static int ds4_engine_vision_encode_image(
     uint32_t grid_width = 0, grid_height = 0;
     uint32_t layout = 0;
     int ok = 0;
-    if (e->vision_kind == DS4_VISION_DEEPSEEK4) {
+    if (e->vision_kind == DS4_VISION_DEEPSEEK4 ||
+        e->vision_kind == DS4_VISION_DEEPSEEK41) {
         ds4_deepseek4_image_patches patches = {0};
-        if (!ds4_image_preprocess_deepseek4(
-                &patches, image, error, error_cap)) return 0;
+        const int preprocessed =
+            e->vision_kind == DS4_VISION_DEEPSEEK41 ?
+            ds4_image_preprocess_deepseek41(
+                &patches, image, error, error_cap) :
+            ds4_image_preprocess_deepseek4(
+                &patches, image, error, error_cap);
+        if (!preprocessed) return 0;
         token_count = patches.llm_grid_height * patches.llm_grid_width;
         embedding = malloc((size_t)token_count * 4096u * sizeof(float));
         if (embedding) {
@@ -75404,6 +75724,7 @@ static int ds4_engine_vision_encode_image(
         if (error && error_cap)
             snprintf(error, error_cap, "%s vision inference failed",
                      e->vision_kind == DS4_VISION_DEEPSEEK4 ? "DeepSeek V4" :
+                     e->vision_kind == DS4_VISION_DEEPSEEK41 ? "DeepSeek V4.1" :
                      e->vision_kind == DS4_VISION_QWEN4 ? "Qwen3.8" : "GLM-5.3");
         return 0;
     }
@@ -76082,7 +76403,8 @@ int ds4_session_create(ds4_session **out, ds4_engine *e, int ctx_size) {
     s->graph.ssd_streaming = e->ssd_streaming;
     s->graph.ssd_streaming_cold = e->ssd_streaming_cold;
     s->graph.streaming_preload_experts = e->ssd_streaming_preload_experts;
-    if (e->vision_kind == DS4_VISION_DEEPSEEK4) {
+    if (e->vision_kind == DS4_VISION_DEEPSEEK4 ||
+        e->vision_kind == DS4_VISION_DEEPSEEK41) {
         s->graph.vision_model_map = e->vision_model.map;
         s->graph.vision_model_size = e->vision_model.size;
         s->graph.deepseek4_vision_weights = &e->deepseek4_vision_weights;

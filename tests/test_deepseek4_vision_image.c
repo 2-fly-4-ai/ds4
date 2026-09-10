@@ -122,6 +122,41 @@ static int check_attention_bounds(void) {
     return memcmp(bounds, expected, sizeof(expected)) == 0;
 }
 
+static int check_deepseek41_plans(void) {
+    static const struct {
+        uint32_t width, height;
+        uint32_t padded_width, padded_height;
+        uint32_t llm_width, llm_height, tokens;
+    } cases[] = {
+        {1, 1, 546, 546, 13, 13, 184},
+        {17, 9, 756, 406, 18, 10, 192},
+        {9, 17, 406, 756, 10, 18, 200},
+        {640, 480, 644, 490, 16, 12, 206},
+        {1920, 1080, 1708, 966, 41, 23, 968},
+        {1080, 1920, 966, 1708, 23, 41, 986},
+        {4096, 4096, 1302, 1302, 31, 31, 994},
+        {8192, 1024, 3696, 462, 88, 11, 981},
+        {1024, 8192, 420, 3360, 10, 80, 882},
+        {10000, 100, 10010, 112, 239, 3, 722},
+        {100, 10000, 112, 10010, 3, 239, 958},
+    };
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        ds4_deepseek41_image_plan plan = {0};
+        if (!ds4_deepseek41_plan_image_grid(
+                &plan, cases[i].width, cases[i].height) ||
+            plan.padded_width != cases[i].padded_width ||
+            plan.padded_height != cases[i].padded_height ||
+            plan.llm_grid_width != cases[i].llm_width ||
+            plan.llm_grid_height != cases[i].llm_height ||
+            plan.token_count != cases[i].tokens) {
+            fprintf(stderr, "DeepSeek V4.1 plan differs for %ux%u\n",
+                    cases[i].width, cases[i].height);
+            return 0;
+        }
+    }
+    return 1;
+}
+
 int main(void) {
     static const uint8_t types_a[] = {
         1, 1, 1, 0, 2, 2, 2, 2, 2, 2, 3, 3, 4,
@@ -140,7 +175,8 @@ int main(void) {
         !check_layout(1, 1, 3, types_c, sizeof(types_c),
                       perm_c, sizeof(perm_c) / sizeof(perm_c[0])) ||
         !check_span_parser() ||
-        !check_attention_bounds()) {
+        !check_attention_bounds() ||
+        !check_deepseek41_plans()) {
         return 1;
     }
 
@@ -182,6 +218,48 @@ int main(void) {
              patches.patches[i] <= 1.00001f;
     }
     if (!ok) fprintf(stderr, "DeepSeek preprocessing dimensions or values differ\n");
+    ds4_deepseek4_image_patches_free(&patches);
+    memset(&patches, 0, sizeof(patches));
+    if (ok && !ds4_image_preprocess_deepseek41(
+            &patches, &image, error, sizeof(error))) {
+        fprintf(stderr, "V4.1 preprocess failed: %s\n", error);
+        ok = 0;
+    }
+    if (ok) {
+        ok = patches.padded_width == 756u &&
+             patches.padded_height == 406u &&
+             patches.content_width == 756u &&
+             patches.content_height == 400u &&
+             patches.grid_width == 54u &&
+             patches.grid_height == 29u &&
+             patches.llm_grid_width == 18u &&
+             patches.llm_grid_height == 10u &&
+             patches.patch_count == 1566u;
+        const size_t v41_values = (size_t)patches.patch_count * 588u;
+        for (size_t i = 0; ok && i < v41_values; i++) {
+            union { float f; uint32_t u; } bits = { .f = patches.patches[i] };
+            ok = isfinite(bits.f) && (bits.u & 0xffffu) == 0u;
+        }
+        static const struct { size_t index; uint32_t bits; } official[] = {
+            {0, 0xbb810000u}, {196, 0xbb810000u}, {392, 0xbb810000u},
+            {15343, 0xbe3d0000u}, {15539, 0xbf340000u}, {15735, 0xbf120000u},
+            {459913, 0xbdb90000u}, {460109, 0xbe1d0000u}, {460305, 0xbe5d0000u},
+            {904497, 0x3b810000u}, {904693, 0x3ecb0000u}, {904889, 0x3e0d0000u},
+        };
+        for (size_t i = 0; ok && i < sizeof(official) / sizeof(official[0]); i++) {
+            union { float f; uint32_t u; } bits = {
+                .f = patches.patches[official[i].index]
+            };
+            if (bits.u != official[i].bits) {
+                fprintf(stderr,
+                        "DeepSeek V4.1 official PIL sample %zu: %08x != %08x\n",
+                        official[i].index, bits.u, official[i].bits);
+                ok = 0;
+            }
+        }
+        if (!ok) fprintf(stderr,
+                         "DeepSeek V4.1 dimensions or BF16 input rounding differ\n");
+    }
     ds4_deepseek4_image_patches_free(&patches);
     free(image.rgb);
     return ok ? 0 : 1;

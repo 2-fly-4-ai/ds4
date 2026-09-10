@@ -104,17 +104,20 @@ __global__ static void router_select_visual_parallel_kernel(
         const int32_t *tokens,
         uint32_t       hash_rows,
         uint32_t       vocab_size,
+        uint32_t       n_expert,
+        uint32_t       n_expert_used,
+        float          expert_weight_scale,
         uint32_t       n_tokens,
         int            has_bias,
         int            hash_mode) {
     const uint32_t t = blockIdx.x;
     const uint32_t i = threadIdx.x;
-    if (t >= n_tokens || i >= 256u) return;
-    const float *log = logits + (uint64_t)t * 256u;
-    float *prob = probs + (uint64_t)t * 256u;
-    int32_t *sel = selected + (uint64_t)t * 6u;
-    float *w = weights + (uint64_t)t * 6u;
-    __shared__ float sprob[256];
+    if (t >= n_tokens || i >= n_expert) return;
+    const float *log = logits + (uint64_t)t * n_expert;
+    float *prob = probs + (uint64_t)t * n_expert;
+    int32_t *sel = selected + (uint64_t)t * n_expert_used;
+    float *w = weights + (uint64_t)t * n_expert_used;
+    __shared__ float sprob[512];
 
     const float p = ds4_precise_sqrtf(softplus_dev(log[i]));
     sprob[i] = p;
@@ -127,20 +130,21 @@ __global__ static void router_select_visual_parallel_kernel(
     if (hash_mode && !image) {
         const uint32_t row = token >= 0 && (uint32_t)token < hash_rows
             ? (uint32_t)token : 0u;
-        const int32_t *src = hash + (uint64_t)row * 6u;
-        for (uint32_t j = 0; j < 6u; j++) sel[j] = src[j];
+        const int32_t *src = hash + (uint64_t)row * n_expert_used;
+        for (uint32_t j = 0; j < n_expert_used; j++) sel[j] = src[j];
     } else {
-        for (uint32_t j = 0; j < 6u; j++) sel[j] = -1;
-        for (uint32_t e = 0; e < 256u; e++) {
+        for (uint32_t j = 0; j < n_expert_used; j++) sel[j] = -1;
+        for (uint32_t e = 0; e < n_expert; e++) {
             const float score = sprob[e] +
                 (image ? visual_bias[e] : (has_bias ? bias[e] : 0.0f));
-            for (uint32_t j = 0; j < 6u; j++) {
+            for (uint32_t j = 0; j < n_expert_used; j++) {
                 const int32_t old = sel[j];
                 const float old_score = old < 0 ? -INFINITY :
                     sprob[old] + (image ? visual_bias[old]
                                         : (has_bias ? bias[old] : 0.0f));
                 if (old < 0 || score > old_score) {
-                    for (uint32_t k = 5u; k > j; k--) sel[k] = sel[k - 1u];
+                    for (uint32_t k = n_expert_used - 1u; k > j; k--)
+                        sel[k] = sel[k - 1u];
                     sel[j] = (int32_t)e;
                     break;
                 }
@@ -149,14 +153,15 @@ __global__ static void router_select_visual_parallel_kernel(
     }
 
     float sum = 0.0f;
-    for (uint32_t j = 0; j < 6u; j++) {
+    for (uint32_t j = 0; j < n_expert_used; j++) {
         const int32_t e = sel[j];
-        const float v = e >= 0 && e < 256 ? sprob[e] : 0.0f;
+        const float v = e >= 0 && (uint32_t)e < n_expert ? sprob[e] : 0.0f;
         w[j] = v;
         sum += v;
     }
     sum = fmaxf(sum, 6.103515625e-5f);
-    for (uint32_t j = 0; j < 6u; j++) w[j] = w[j] / sum * 1.5f;
+    for (uint32_t j = 0; j < n_expert_used; j++)
+        w[j] = w[j] / sum * expert_weight_scale;
 }
 
 extern "C" int ds4_gpu_attention_visual_mixed_batch_heads_tensor(
@@ -281,26 +286,29 @@ extern "C" int ds4_gpu_router_select_batch_visual_tensor(
         float expert_weight_scale, uint32_t n_tokens) {
     if (!selected || !weights || !probs || !logits || !tokens ||
         !model_map || !vision_map || n_tokens == 0 || vocab_size == 0 ||
-        n_expert != 256u || n_expert_used != 6u ||
-        fabsf(expert_weight_scale - 1.5f) > 1.0e-6f ||
-        !cuda_tensor_has_elems2(logits, n_tokens, 256u, sizeof(float)) ||
-        !cuda_tensor_has_elems2(probs, n_tokens, 256u, sizeof(float)) ||
-        !cuda_tensor_has_elems2(selected, n_tokens, 6u, sizeof(int32_t)) ||
-        !cuda_tensor_has_elems2(weights, n_tokens, 6u, sizeof(float)) ||
+        n_expert == 0u || n_expert > 512u ||
+        n_expert_used == 0u || n_expert_used > n_expert ||
+        !isfinite(expert_weight_scale) || expert_weight_scale <= 0.0f ||
+        !cuda_tensor_has_elems2(logits, n_tokens, n_expert, sizeof(float)) ||
+        !cuda_tensor_has_elems2(probs, n_tokens, n_expert, sizeof(float)) ||
+        !cuda_tensor_has_elems2(selected, n_tokens, n_expert_used, sizeof(int32_t)) ||
+        !cuda_tensor_has_elems2(weights, n_tokens, n_expert_used, sizeof(float)) ||
         !cuda_tensor_has_i32(tokens, n_tokens)) return 0;
 
     const float *bias = NULL;
     const int32_t *hash = NULL;
     if (has_bias && !hash_mode) {
         if (!cuda_model_range_fits(model_size, bias_offset,
-                                   256u * sizeof(float))) return 0;
+                                   (uint64_t)n_expert * sizeof(float))) return 0;
         bias = (const float *)cuda_model_range_ptr(
-                model_map, bias_offset, 256u * sizeof(float), "router_bias");
+                model_map, bias_offset, (uint64_t)n_expert * sizeof(float),
+                "router_bias");
         if (!bias) return 0;
     }
     if (hash_mode) {
         if (hash_rows == 0u) return 0;
-        const uint64_t hash_bytes = (uint64_t)hash_rows * 6u * sizeof(int32_t);
+        const uint64_t hash_bytes =
+            (uint64_t)hash_rows * n_expert_used * sizeof(int32_t);
         if (!cuda_model_range_fits(model_size, hash_offset, hash_bytes))
             return 0;
         hash = (const int32_t *)cuda_model_range_ptr(
@@ -308,17 +316,18 @@ extern "C" int ds4_gpu_router_select_batch_visual_tensor(
         if (!hash) return 0;
     }
     if (!cuda_model_range_fits(vision_size, visual_bias_offset,
-                               256u * sizeof(float))) return 0;
+                               (uint64_t)n_expert * sizeof(float))) return 0;
     const float *visual_bias = (const float *)cuda_model_range_ptr(
-            vision_map, visual_bias_offset, 256u * sizeof(float),
+            vision_map, visual_bias_offset, (uint64_t)n_expert * sizeof(float),
             "visual_router_bias");
     if (!visual_bias) return 0;
 
-    router_select_visual_parallel_kernel<<<n_tokens, 256>>>(
+    router_select_visual_parallel_kernel<<<n_tokens, n_expert>>>(
             (int32_t *)selected->ptr, (float *)weights->ptr,
             (float *)probs->ptr, bias, visual_bias, hash,
             (const float *)logits->ptr, (const int32_t *)tokens->ptr,
-            hash_rows, vocab_size, n_tokens,
+            hash_rows, vocab_size, n_expert, n_expert_used,
+            expert_weight_scale, n_tokens,
             has_bias && !hash_mode, hash_mode);
     return cuda_ok(cudaGetLastError(), "visual router select launch");
 }
