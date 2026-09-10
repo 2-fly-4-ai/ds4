@@ -55,13 +55,28 @@ class SourceDB:
         self.hf_dir = hf_dir
         _, self.weight_map = load_index(os.path.join(hf_dir, "model.safetensors.index.json"))
         validate_index(self.weight_map)
-        self.tensors, missing = load_checkpoint_headers(hf_dir, self.weight_map)
-        if missing:
-            fail(f"checkpoint download is incomplete: {len(missing)} shards missing; first is {missing[0]}")
+        # Split artifacts are intentionally independent. Fetch only the tiny
+        # safetensors headers for absent shards so (for example) the main GGUF
+        # can be converted while the two enormous Engram-only shards are still
+        # downloading. require_sources() below still rejects a selected
+        # artifact if any payload it actually needs is absent.
+        self.tensors, missing = load_checkpoint_headers(
+            hf_dir, self.weight_map, fetch_missing_headers=True)
+        self.missing_shards = set(missing)
         if set(self.tensors) != set(self.weight_map):
             absent = sorted(set(self.weight_map) - set(self.tensors))
             fail(f"checkpoint headers are incomplete; first missing tensor is {absent[0]}")
         self._fds = {}
+
+    def require_sources(self, plan):
+        missing = sorted({
+            self.weight_map[source]
+            for entry in plan for source in entry.sources
+            if not os.path.isfile(os.path.join(self.hf_dir,
+                                               self.weight_map[source]))
+        })
+        if missing:
+            fail(f"selected artifact needs {len(missing)} missing shard(s); first is {missing[0]}")
 
     def info(self, name):
         try:
@@ -558,6 +573,7 @@ def main():
     validate_config(config); db = SourceDB(args.hf)
     try:
         plan = [x for x in build_plan(db.tensors, args.quant) if x.artifact == args.artifact]
+        db.require_sources(plan)
         records = (main_metadata(config, args.source_revision, args.hf) + tokenizer_records(args.hf, args.tokenizer_template)
                    if args.artifact == "main" else sidecar_metadata(args.artifact, args.source_revision))
         prepared = prepare_plan(plan); data_offset, data_bytes = output_layout(prepared, records)
