@@ -806,6 +806,10 @@ typedef struct {
     int cache_read_tokens;
     int cache_write_tokens;
     ds4_think_mode think_mode;
+    /* DeepSeek V4.1 exposes reasoning effort as an exact integer budget in
+     * [1,100]. Keep it separate from think_mode: the latter controls server
+     * behaviour, while this value must survive verbatim into the prompt. */
+    int v41_reasoning_effort_budget;
     bool has_tools;
     bool prompt_preserves_reasoning;
     /* For /v1/responses: emit reasoning_summary_* events / fields only when the
@@ -1028,14 +1032,69 @@ static bool parse_reasoning_effort_name(const char *s, ds4_think_mode *out) {
     return false;
 }
 
-static bool parse_reasoning_effort_value(const char **p, ds4_think_mode *out) {
+static int reasoning_effort_budget_for_mode(ds4_think_mode mode) {
+    switch (mode) {
+    case DS4_THINK_LOW: return 50;
+    case DS4_THINK_MEDIUM:
+    case DS4_THINK_HIGH: return 75;
+    case DS4_THINK_MAX: return 100;
+    case DS4_THINK_NONE: return 0;
+    }
+    return 0;
+}
+
+static bool parse_reasoning_effort_value_for_syntax(
+        const char **p, ds4_think_mode *out,
+        server_model_syntax syntax, int *v41_budget, bool *seen) {
     json_ws(p);
     if (json_lit(p, "null")) return true;
-    char *effort = NULL;
-    if (!json_string(p, &effort)) return false;
-    bool ok = parse_reasoning_effort_name(effort, out);
-    free(effort);
-    return ok;
+    if (**p == '"') {
+        char *effort = NULL;
+        if (!json_string(p, &effort)) return false;
+        bool ok = parse_reasoning_effort_name(effort, out);
+        free(effort);
+        if (!ok) return false;
+        if (v41_budget && syntax == SERVER_MODEL_SYNTAX_DEEPSEEK41)
+            *v41_budget = reasoning_effort_budget_for_mode(*out);
+        if (seen) *seen = true;
+        return true;
+    }
+    if (syntax != SERVER_MODEL_SYNTAX_DEEPSEEK41) return false;
+    double numeric = 0.0;
+    if (!json_number(p, &numeric) || numeric < 1.0 || numeric > 100.0)
+        return false;
+    int budget = (int)numeric;
+    if (numeric != (double)budget) return false;
+    if (v41_budget) *v41_budget = budget;
+    /* All positive budgets enable thinking. The coarse mode is only used by
+     * shared server control flow; the exact budget is rendered separately. */
+    *out = budget == 100 ? DS4_THINK_MAX :
+           budget <= 50 ? DS4_THINK_LOW : DS4_THINK_HIGH;
+    if (seen) *seen = true;
+    return true;
+}
+
+static DS4_SERVER_MAYBE_UNUSED bool parse_reasoning_effort_value(
+        const char **p, ds4_think_mode *out) {
+    return parse_reasoning_effort_value_for_syntax(
+        p, out, SERVER_MODEL_SYNTAX_DEEPSEEK, NULL, NULL);
+}
+
+static void request_set_thinking_mode(request *r, bool enabled,
+                                      ds4_think_mode effort,
+                                      int v41_budget, int ctx_size) {
+    ds4_think_mode requested = think_mode_from_enabled(enabled, effort);
+    if (r->model_syntax == SERVER_MODEL_SYNTAX_DEEPSEEK41) {
+        /* Unlike the legacy DeepSeek max prefix, V4.1's 1-100 effort is a
+         * model protocol value, not a context-size policy. Never rewrite it. */
+        r->think_mode = requested;
+        r->v41_reasoning_effort_budget =
+            ds4_think_mode_enabled(requested) ?
+            (v41_budget ? v41_budget : reasoning_effort_budget_for_mode(requested)) : 0;
+    } else {
+        r->think_mode = ds4_think_mode_for_context(requested, ctx_size);
+        r->v41_reasoning_effort_budget = 0;
+    }
 }
 
 static bool parse_thinking_control_value(const char **p, bool *thinking_enabled) {
@@ -1080,7 +1139,8 @@ static bool parse_thinking_control_value(const char **p, bool *thinking_enabled)
 /* chat_template_kwargs as the Qwen3.8 model card documents them: enable_thinking
  * and reasoning_effort are applied, other keys are ignored */
 static bool parse_chat_template_kwargs(const char **p, bool *thinking_enabled, bool *got_thinking,
-                                       ds4_think_mode *effort) {
+                                       ds4_think_mode *effort,
+                                       server_model_syntax syntax, int *v41_budget) {
     json_ws(p);
     if (json_lit(p, "null")) return true;
     if (**p != '{') return json_skip_value(p);
@@ -1101,7 +1161,10 @@ static bool parse_chat_template_kwargs(const char **p, bool *thinking_enabled, b
             ok = json_bool(p, thinking_enabled);
             if (ok) *got_thinking = true;
         } else if (!strcmp(key, "reasoning_effort")) {
-            ok = parse_reasoning_effort_value(p, effort);
+            bool effort_seen = false;
+            ok = parse_reasoning_effort_value_for_syntax(
+                p, effort, syntax, v41_budget, &effort_seen);
+            if (ok && effort_seen) *got_thinking = true;
         } else {
             ok = json_skip_value(p);
         }
@@ -1116,7 +1179,9 @@ static bool parse_chat_template_kwargs(const char **p, bool *thinking_enabled, b
     return true;
 }
 
-static bool parse_output_config_effort(const char **p, ds4_think_mode *effort) {
+static bool parse_output_config_effort(const char **p, ds4_think_mode *effort,
+                                       server_model_syntax syntax,
+                                       int *v41_budget, bool *effort_seen) {
     json_ws(p);
     if (json_lit(p, "null")) return true;
     if (**p != '{') return json_skip_value(p);
@@ -1132,7 +1197,8 @@ static bool parse_output_config_effort(const char **p, ds4_think_mode *effort) {
         }
         (*p)++;
         if (!strcmp(key, "effort")) {
-            if (!parse_reasoning_effort_value(p, effort)) {
+            if (!parse_reasoning_effort_value_for_syntax(
+                    p, effort, syntax, v41_budget, effort_seen)) {
                 free(key);
                 return false;
             }
@@ -3202,7 +3268,8 @@ static char *render_deepseek_chat_prompt_text(const chat_msgs *msgs, const char 
 static char *render_deepseek41_chat_prompt_text(const chat_msgs *msgs,
                                                 const char *tool_schemas,
                                                 const tool_schema_orders *tool_orders,
-                                                ds4_think_mode think_mode) {
+                                                ds4_think_mode think_mode,
+                                                int reasoning_effort_budget) {
     (void)tool_orders;
     const bool think = ds4_think_mode_enabled(think_mode);
     const bool tool_context = chat_history_uses_tool_context(msgs, tool_schemas);
@@ -3221,8 +3288,11 @@ static char *render_deepseek41_chat_prompt_text(const chat_msgs *msgs,
     if (synthetic_system) {
         buf_puts(&out, "<｜System｜>");
         if (think) {
-            const char *effort = ds4_deepseek41_reasoning_effort_text(think_mode);
-            if (effort) buf_puts(&out, effort);
+            int budget = reasoning_effort_budget ? reasoning_effort_budget :
+                         reasoning_effort_budget_for_mode(think_mode);
+            buf_printf(&out,
+                "Reasoning Effort: %d (range 1-100, the higher the value, the more thorough the reasoning)\n\n",
+                budget);
         }
         if (tool_schemas && tool_schemas[0] && !first_is_system)
             append_v41_tools_prompt_text(&out, tool_schemas);
@@ -3552,11 +3622,13 @@ static char *render_qwen_chat_prompt_text(const chat_msgs *msgs,
     return buf_take(&out);
 }
 
-static char *render_chat_prompt_text_for_syntax(server_model_syntax syntax,
+static char *render_chat_prompt_text_for_syntax_with_v41_budget(
+                                                server_model_syntax syntax,
                                                 const chat_msgs *msgs,
                                                 const char *tool_schemas,
                                                 const tool_schema_orders *tool_orders,
-                                                ds4_think_mode think_mode) {
+                                                ds4_think_mode think_mode,
+                                                int v41_reasoning_effort_budget) {
     if (syntax == SERVER_MODEL_SYNTAX_GLM) {
         return render_glm_chat_prompt_text(msgs, tool_schemas,
                                            tool_orders, think_mode);
@@ -3566,10 +3638,20 @@ static char *render_chat_prompt_text_for_syntax(server_model_syntax syntax,
     }
     if (syntax == SERVER_MODEL_SYNTAX_DEEPSEEK41) {
         return render_deepseek41_chat_prompt_text(msgs, tool_schemas,
-                                                  tool_orders, think_mode);
+                                                  tool_orders, think_mode,
+                                                  v41_reasoning_effort_budget);
     }
     return render_deepseek_chat_prompt_text(msgs, tool_schemas,
                                             tool_orders, think_mode);
+}
+
+static char *render_chat_prompt_text_for_syntax(server_model_syntax syntax,
+                                                const chat_msgs *msgs,
+                                                const char *tool_schemas,
+                                                const tool_schema_orders *tool_orders,
+                                                ds4_think_mode think_mode) {
+    return render_chat_prompt_text_for_syntax_with_v41_budget(
+        syntax, msgs, tool_schemas, tool_orders, think_mode, 0);
 }
 
 static DS4_SERVER_MAYBE_UNUSED char *render_chat_prompt_text(
@@ -3679,7 +3761,8 @@ done:
  * token prefix as the boundary.  That avoids BPE merges across the visible
  * replay/live-KV boundary. */
 static char *render_deepseek_live_tool_tail(const chat_msgs *msgs, int start,
-                                            ds4_think_mode think_mode) {
+                                            ds4_think_mode think_mode,
+                                            server_model_syntax syntax) {
     const bool think = ds4_think_mode_enabled(think_mode);
     buf out = {0};
     buf_puts(&out, "<｜end▁of▁sentence｜>");
@@ -3689,7 +3772,11 @@ static char *render_deepseek_live_tool_tail(const chat_msgs *msgs, int start,
     for (int i = start; msgs && i < msgs->len; i++) {
         const chat_msg *m = &msgs->v[i];
         if (role_is_system(m->role)) {
-            continue;
+            if (syntax != SERVER_MODEL_SYNTAX_DEEPSEEK41) continue;
+            buf_puts(&out, "<｜System｜>");
+            buf_puts(&out, m->content ? m->content : "");
+            pending_assistant = true;
+            pending_tool_result = false;
         } else if (!strcmp(m->role, "user")) {
             buf_puts(&out, "<｜User｜>");
             buf_puts(&out, m->content ? m->content : "");
@@ -3714,7 +3801,7 @@ static char *render_deepseek_live_tool_tail(const chat_msgs *msgs, int start,
                 }
             }
             buf_puts(&out, m->content ? m->content : "");
-            append_dsml_tool_calls_text(&out, &m->calls);
+            append_tool_calls_text_for_syntax(&out, syntax, &m->calls, NULL);
             buf_puts(&out, "<｜end▁of▁sentence｜>");
             pending_assistant = false;
             pending_tool_result = false;
@@ -3789,7 +3876,7 @@ static char *render_live_tool_tail_for_syntax(server_model_syntax syntax,
     if (syntax == SERVER_MODEL_SYNTAX_QWEN) {
         return render_qwen_live_tool_tail(msgs, start, tool_orders, think_mode);
     }
-    return render_deepseek_live_tool_tail(msgs, start, think_mode);
+    return render_deepseek_live_tool_tail(msgs, start, think_mode, syntax);
 }
 
 static DS4_SERVER_MAYBE_UNUSED char *render_live_tool_tail(
@@ -4031,6 +4118,7 @@ static bool parse_chat_request(ds4_engine *e, server *s, const char *body, int d
     bool got_thinking = false;
     bool thinking_enabled = true;
     ds4_think_mode reasoning_effort = DS4_THINK_HIGH;
+    int v41_reasoning_effort_budget = 0;
     chat_msgs msgs = {0};
     char *tool_schemas = NULL;
 
@@ -4145,12 +4233,18 @@ static bool parse_chat_request(ds4_engine *e, server *s, const char *body, int d
             }
             got_thinking = true;
         } else if (!strcmp(key, "reasoning_effort")) {
-            if (!parse_reasoning_effort_value(&p, &reasoning_effort)) {
+            bool effort_seen = false;
+            if (!parse_reasoning_effort_value_for_syntax(
+                    &p, &reasoning_effort, r->model_syntax,
+                    &v41_reasoning_effort_budget, &effort_seen)) {
                 free(key);
                 goto bad;
             }
+            if (effort_seen) got_thinking = true;
         } else if (!strcmp(key, "chat_template_kwargs")) {
-            if (!parse_chat_template_kwargs(&p, &thinking_enabled, &got_thinking, &reasoning_effort)) {
+            if (!parse_chat_template_kwargs(
+                    &p, &thinking_enabled, &got_thinking, &reasoning_effort,
+                    r->model_syntax, &v41_reasoning_effort_budget)) {
                 free(key);
                 goto bad;
             }
@@ -4191,16 +4285,16 @@ static bool parse_chat_request(ds4_engine *e, server *s, const char *body, int d
     r->has_tools = tool_schemas && tool_schemas[0] && !tool_choice_none;
     if (!got_thinking && model_alias_disables_thinking(r->model)) thinking_enabled = false;
     if (!got_thinking && model_alias_enables_thinking(r->model)) thinking_enabled = true;
-    r->think_mode = ds4_think_mode_for_context(
-        think_mode_from_enabled(thinking_enabled, reasoning_effort), ctx_size);
+    request_set_thinking_mode(r, thinking_enabled, reasoning_effort,
+                              v41_reasoning_effort_budget, ctx_size);
     kv_cache_restore_tool_memory_for_messages(s, &msgs);
     tool_memory_attach_to_messages(s, &msgs, &r->tool_replay);
     const char *active_tool_schemas = r->has_tools ? tool_schemas : NULL;
     r->prompt_preserves_reasoning =
         chat_history_uses_tool_context(&msgs, active_tool_schemas);
-    r->prompt_text = render_chat_prompt_text_for_syntax(
+    r->prompt_text = render_chat_prompt_text_for_syntax_with_v41_budget(
         r->model_syntax, &msgs, active_tool_schemas,
-        &r->tool_orders, r->think_mode);
+        &r->tool_orders, r->think_mode, r->v41_reasoning_effort_budget);
     if (!request_tokenize_multimodal_prompt(e, s, r, &msgs, err, errlen)) {
         chat_msgs_free(&msgs);
         free(tool_schemas);
@@ -4229,6 +4323,7 @@ static bool parse_anthropic_request(ds4_engine *e, server *s, const char *body, 
     bool got_thinking = false;
     bool thinking_enabled = true;
     ds4_think_mode reasoning_effort = DS4_THINK_HIGH;
+    int v41_reasoning_effort_budget = 0;
     chat_msgs msgs = {0};
     char *system = NULL;
     char *tool_schemas = NULL;
@@ -4364,15 +4459,23 @@ static bool parse_anthropic_request(ds4_engine *e, server *s, const char *body, 
             }
             got_thinking = true;
         } else if (!strcmp(key, "output_config")) {
-            if (!parse_output_config_effort(&p, &reasoning_effort)) {
+            bool effort_seen = false;
+            if (!parse_output_config_effort(
+                    &p, &reasoning_effort, r->model_syntax,
+                    &v41_reasoning_effort_budget, &effort_seen)) {
                 free(key);
                 goto bad;
             }
+            if (effort_seen) got_thinking = true;
         } else if (!strcmp(key, "reasoning_effort")) {
-            if (!parse_reasoning_effort_value(&p, &reasoning_effort)) {
+            bool effort_seen = false;
+            if (!parse_reasoning_effort_value_for_syntax(
+                    &p, &reasoning_effort, r->model_syntax,
+                    &v41_reasoning_effort_budget, &effort_seen)) {
                 free(key);
                 goto bad;
             }
+            if (effort_seen) got_thinking = true;
         } else if (!json_skip_value(&p)) {
             free(key);
             goto bad;
@@ -4401,8 +4504,8 @@ static bool parse_anthropic_request(ds4_engine *e, server *s, const char *body, 
     r->has_tools = tool_schemas && tool_schemas[0] && !tool_choice_none;
     if (!got_thinking && model_alias_disables_thinking(r->model)) thinking_enabled = false;
     if (!got_thinking && model_alias_enables_thinking(r->model)) thinking_enabled = true;
-    r->think_mode = ds4_think_mode_for_context(
-        think_mode_from_enabled(thinking_enabled, reasoning_effort), ctx_size);
+    request_set_thinking_mode(r, thinking_enabled, reasoning_effort,
+                              v41_reasoning_effort_budget, ctx_size);
     if (!anthropic_validate_tool_results(s, &msgs,
                                          &r->anthropic_requires_live_tool_state,
                                          err, errlen))
@@ -4419,9 +4522,9 @@ static bool parse_anthropic_request(ds4_engine *e, server *s, const char *body, 
     const char *active_tool_schemas = r->has_tools ? tool_schemas : NULL;
     r->prompt_preserves_reasoning =
         chat_history_uses_tool_context(&msgs, active_tool_schemas);
-    r->prompt_text = render_chat_prompt_text_for_syntax(
+    r->prompt_text = render_chat_prompt_text_for_syntax_with_v41_budget(
         r->model_syntax, &msgs, active_tool_schemas,
-        &r->tool_orders, r->think_mode);
+        &r->tool_orders, r->think_mode, r->v41_reasoning_effort_budget);
     if (!request_tokenize_multimodal_prompt(e, s, r, &msgs, err, errlen)) {
         chat_msgs_free(&msgs);
         free(system);
@@ -5123,6 +5226,8 @@ fail:
  * whether the wire emits summary deltas at all — per the spec, no reasoning
  * summary is surfaced unless the client opts in. */
 static bool parse_responses_reasoning(const char **p, ds4_think_mode *effort,
+                                      server_model_syntax syntax,
+                                      int *v41_budget,
                                       bool *summary_opted_in,
                                       bool *effort_seen) {
     json_ws(p);
@@ -5147,11 +5252,11 @@ static bool parse_responses_reasoning(const char **p, ds4_think_mode *effort,
             if (json_lit(p, "null")) {
                 /* nothing */
             } else {
-                if (!parse_reasoning_effort_value(p, effort)) {
+                if (!parse_reasoning_effort_value_for_syntax(
+                        p, effort, syntax, v41_budget, effort_seen)) {
                     free(key);
                     return false;
                 }
-                if (effort_seen) *effort_seen = true;
             }
         } else if (!strcmp(key, "summary")) {
             json_ws(p);
@@ -5200,6 +5305,7 @@ static bool parse_responses_request(ds4_engine *e, server *s, const char *body, 
     bool got_thinking = false;
     bool thinking_enabled = true;
     ds4_think_mode reasoning_effort = DS4_THINK_HIGH;
+    int v41_reasoning_effort_budget = 0;
     chat_msgs msgs = {0};
     buf loaded_tool_schemas = {0};
     char *instructions = NULL;
@@ -5330,6 +5436,8 @@ static bool parse_responses_request(ds4_engine *e, server *s, const char *body, 
         } else if (!strcmp(key, "reasoning")) {
             bool effort_seen = false;
             if (!parse_responses_reasoning(&p, &reasoning_effort,
+                                           r->model_syntax,
+                                           &v41_reasoning_effort_budget,
                                            &r->reasoning_summary_emit,
                                            &effort_seen)) {
                 free(key);
@@ -5418,8 +5526,8 @@ static bool parse_responses_request(ds4_engine *e, server *s, const char *body, 
     r->has_tools = active_tool_schemas && active_tool_schemas[0];
     if (!got_thinking && model_alias_disables_thinking(r->model)) thinking_enabled = false;
     if (!got_thinking && model_alias_enables_thinking(r->model)) thinking_enabled = true;
-    r->think_mode = ds4_think_mode_for_context(
-        think_mode_from_enabled(thinking_enabled, reasoning_effort), ctx_size);
+    request_set_thinking_mode(r, thinking_enabled, reasoning_effort,
+                              v41_reasoning_effort_budget, ctx_size);
     if (!responses_validate_tool_outputs(s, &msgs, r->think_mode,
                                          &r->responses_requires_live_tool_state,
                                          &r->responses_requires_live_reasoning,
@@ -5437,9 +5545,9 @@ static bool parse_responses_request(ds4_engine *e, server *s, const char *body, 
     r->prompt_preserves_reasoning =
         chat_history_uses_tool_context(&msgs, active_tool_schemas);
     responses_prepare_live_continuation(r, &msgs);
-    r->prompt_text = render_chat_prompt_text_for_syntax(
+    r->prompt_text = render_chat_prompt_text_for_syntax_with_v41_budget(
         r->model_syntax, &msgs, active_tool_schemas,
-        &r->tool_orders, r->think_mode);
+        &r->tool_orders, r->think_mode, r->v41_reasoning_effort_budget);
     if (!request_tokenize_multimodal_prompt(e, s, r, &msgs, err, errlen)) {
         chat_msgs_free(&msgs);
         buf_free(&combined_tool_schemas);
@@ -5504,6 +5612,7 @@ static bool parse_completion_request(ds4_engine *e, const char *body, int def_to
     bool got_thinking = false;
     bool thinking_enabled = true;
     ds4_think_mode reasoning_effort = DS4_THINK_HIGH;
+    int v41_reasoning_effort_budget = 0;
 
     json_ws(&p);
     if (*p != '{') goto bad;
@@ -5592,10 +5701,14 @@ static bool parse_completion_request(ds4_engine *e, const char *body, int def_to
             }
             got_thinking = true;
         } else if (!strcmp(key, "reasoning_effort")) {
-            if (!parse_reasoning_effort_value(&p, &reasoning_effort)) {
+            bool effort_seen = false;
+            if (!parse_reasoning_effort_value_for_syntax(
+                    &p, &reasoning_effort, r->model_syntax,
+                    &v41_reasoning_effort_budget, &effort_seen)) {
                 free(key);
                 goto bad;
             }
+            if (effort_seen) got_thinking = true;
         } else if (!strcmp(key, "think")) {
             if (!json_bool(&p, &thinking_enabled)) {
                 free(key);
@@ -5624,8 +5737,8 @@ static bool parse_completion_request(ds4_engine *e, const char *body, int def_to
     }
     if (!got_thinking && model_alias_disables_thinking(r->model)) thinking_enabled = false;
     if (!got_thinking && model_alias_enables_thinking(r->model)) thinking_enabled = true;
-    r->think_mode = ds4_think_mode_for_context(
-        think_mode_from_enabled(thinking_enabled, reasoning_effort), ctx_size);
+    request_set_thinking_mode(r, thinking_enabled, reasoning_effort,
+                              v41_reasoning_effort_budget, ctx_size);
     chat_msgs msgs = {0};
     chat_msg sys = {0};
     sys.role = xstrdup("system");
@@ -5636,8 +5749,9 @@ static bool parse_completion_request(ds4_engine *e, const char *body, int def_to
     user_msg.content = prompt;
     prompt = NULL;
     chat_msgs_push(&msgs, user_msg);
-    r->prompt_text = render_chat_prompt_text_for_syntax(
-        r->model_syntax, &msgs, NULL, NULL, r->think_mode);
+    r->prompt_text = render_chat_prompt_text_for_syntax_with_v41_budget(
+        r->model_syntax, &msgs, NULL, NULL, r->think_mode,
+        r->v41_reasoning_effort_budget);
     ds4_tokenize_rendered_chat(e, r->prompt_text, &r->prompt);
     chat_msgs_free(&msgs);
     free(prompt);
@@ -17903,6 +18017,13 @@ static void test_deepseek41_prompt_and_dsml_contract(void) {
         "<｜User｜>question<｜Assistant｜><think>"));
     free(thinking);
 
+    char *custom_effort = render_chat_prompt_text_for_syntax_with_v41_budget(
+        SERVER_MODEL_SYNTAX_DEEPSEEK41, &msgs, NULL, NULL,
+        DS4_THINK_HIGH, 88);
+    TEST_ASSERT(strstr(custom_effort,
+        "<｜System｜>Reasoning Effort: 88 (range 1-100, the higher the value, the more thorough the reasoning)\n\n") != NULL);
+    free(custom_effort);
+
     chat_msgs system_history = {0};
     chat_msg leading_system = {0};
     leading_system.role = xstrdup("system");
@@ -17960,6 +18081,26 @@ static void test_deepseek41_prompt_and_dsml_contract(void) {
     tool_calls_free(&parsed);
     buf_free(&rendered);
     tool_calls_free(&calls);
+
+    chat_msgs live = {0};
+    chat_msg tool = {0};
+    tool.role = xstrdup("tool");
+    tool.content = xstrdup("result");
+    chat_msgs_push(&live, tool);
+    chat_msg live_assistant = {0};
+    live_assistant.role = xstrdup("assistant");
+    live_assistant.content = xstrdup("");
+    tool_call live_call = {0};
+    live_call.name = xstrdup("lookup");
+    live_call.arguments = xstrdup("{\"query\":\"next\"}");
+    tool_calls_push(&live_assistant.calls, live_call);
+    chat_msgs_push(&live, live_assistant);
+    char *live_tail = render_live_tool_tail_for_syntax(
+        SERVER_MODEL_SYNTAX_DEEPSEEK41, &live, 0, NULL, DS4_THINK_HIGH);
+    TEST_ASSERT(strstr(live_tail, "<｜DSML｜ calls>") != NULL);
+    TEST_ASSERT(strstr(live_tail, "<｜DSML｜tool_calls>") == NULL);
+    free(live_tail);
+    chat_msgs_free(&live);
     chat_msgs_free(&msgs);
 }
 
@@ -17999,13 +18140,57 @@ static void test_api_thinking_controls_parse(void) {
 
     ds4_think_mode mode = DS4_THINK_HIGH;
     const char *anth_effort = "{\"effort\":\"max\",\"other\":true}";
-    TEST_ASSERT(parse_output_config_effort(&anth_effort, &mode));
+    TEST_ASSERT(parse_output_config_effort(
+        &anth_effort, &mode, SERVER_MODEL_SYNTAX_DEEPSEEK,
+        NULL, NULL));
     TEST_ASSERT(mode == DS4_THINK_MAX);
 
     const char *openai_effort = "\"xhigh\"";
     mode = DS4_THINK_HIGH;
     TEST_ASSERT(parse_reasoning_effort_value(&openai_effort, &mode));
     TEST_ASSERT(mode == DS4_THINK_HIGH);
+
+    int budget = 0;
+    bool seen = false;
+    const char *numeric = "88";
+    TEST_ASSERT(parse_reasoning_effort_value_for_syntax(
+        &numeric, &mode, SERVER_MODEL_SYNTAX_DEEPSEEK41,
+        &budget, &seen));
+    TEST_ASSERT(seen && budget == 88 && mode == DS4_THINK_HIGH && *numeric == '\0');
+    numeric = "1";
+    TEST_ASSERT(parse_reasoning_effort_value_for_syntax(
+        &numeric, &mode, SERVER_MODEL_SYNTAX_DEEPSEEK41,
+        &budget, &seen));
+    TEST_ASSERT(budget == 1 && mode == DS4_THINK_LOW);
+    numeric = "100";
+    TEST_ASSERT(parse_reasoning_effort_value_for_syntax(
+        &numeric, &mode, SERVER_MODEL_SYNTAX_DEEPSEEK41,
+        &budget, &seen));
+    TEST_ASSERT(budget == 100 && mode == DS4_THINK_MAX);
+    numeric = "0";
+    TEST_ASSERT(!parse_reasoning_effort_value_for_syntax(
+        &numeric, &mode, SERVER_MODEL_SYNTAX_DEEPSEEK41,
+        &budget, &seen));
+    numeric = "101";
+    TEST_ASSERT(!parse_reasoning_effort_value_for_syntax(
+        &numeric, &mode, SERVER_MODEL_SYNTAX_DEEPSEEK41,
+        &budget, &seen));
+    numeric = "1.5";
+    TEST_ASSERT(!parse_reasoning_effort_value_for_syntax(
+        &numeric, &mode, SERVER_MODEL_SYNTAX_DEEPSEEK41,
+        &budget, &seen));
+    numeric = "88";
+    TEST_ASSERT(!parse_reasoning_effort_value_for_syntax(
+        &numeric, &mode, SERVER_MODEL_SYNTAX_GLM,
+        &budget, &seen));
+
+    request r;
+    request_init(&r, REQ_CHAT, 32);
+    r.model_syntax = SERVER_MODEL_SYNTAX_DEEPSEEK41;
+    request_set_thinking_mode(&r, true, DS4_THINK_MAX, 100, 2048);
+    TEST_ASSERT(r.think_mode == DS4_THINK_MAX);
+    TEST_ASSERT(r.v41_reasoning_effort_budget == 100);
+    request_free(&r);
 }
 
 static void test_render_think_max_prompt_prefix(void) {
@@ -18180,10 +18365,14 @@ static void test_qwen_reasoning_effort_levels(void) {
     bool enabled = true, got = false;
     ds4_think_mode mode = DS4_THINK_HIGH;
     const char *kwargs = "{\"enable_thinking\": false, \"reasoning_effort\": \"low\", \"preserve_thinking\": true}";
-    TEST_ASSERT(parse_chat_template_kwargs(&kwargs, &enabled, &got, &mode));
+    TEST_ASSERT(parse_chat_template_kwargs(
+        &kwargs, &enabled, &got, &mode,
+        SERVER_MODEL_SYNTAX_QWEN, NULL));
     TEST_ASSERT(!enabled && got && mode == DS4_THINK_LOW);
     kwargs = "null";
-    TEST_ASSERT(parse_chat_template_kwargs(&kwargs, &enabled, &got, &mode));
+    TEST_ASSERT(parse_chat_template_kwargs(
+        &kwargs, &enabled, &got, &mode,
+        SERVER_MODEL_SYNTAX_QWEN, NULL));
     TEST_ASSERT(!enabled && mode == DS4_THINK_LOW);
 
     chat_msgs msgs = {0};
