@@ -132,6 +132,7 @@ typedef struct {
     const char *dflash_path;
     const char *vision_path;
     const char *ple_path; /* Optional CPU-mapped Qwen PLE GGUF sidecar. */
+    const char *engram_path; /* DeepSeek V4.1 CPU-mapped Engram table sidecar. */
     ds4_backend backend;
     int n_threads;
     int context_size;

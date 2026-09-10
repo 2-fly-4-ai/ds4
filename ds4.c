@@ -2434,6 +2434,7 @@ enum {
     DS4_TENSOR_Q6_K     = 14,
     DS4_TENSOR_Q8_K     = 15,
     DS4_TENSOR_IQ2_XXS  = 16,
+    DS4_TENSOR_I8       = 24,
     DS4_TENSOR_I32      = 26,
     DS4_TENSOR_BF16     = 30,
     DS4_TENSOR_Q4_64A   = 36,
@@ -2494,6 +2495,7 @@ typedef struct ds4_model {
     ds4_kv *kv;
     ds4_tensor *tensors;
     struct ds4_model *ple_model; /* CPU-only mapping; never a main-model offset. */
+    struct ds4_model *engram_model; /* V4.1 CPU-only FP8 lookup tables. */
 } ds4_model;
 
 static uint64_t scalar_value_size(uint32_t type) {
@@ -4788,6 +4790,9 @@ typedef struct {
     ds4_tensor *output_hc_up;
     ds4_tensor *ple_embd;
     bool ple_external;
+    ds4_tensor *engram_table[2];
+    ds4_tensor *engram_scale[2];
+    bool engram_external;
     ds4_layer_weights layer[DS4_MAX_LAYER];
 } ds4_weights;
 
@@ -8456,6 +8461,13 @@ static void weights_bind(
             model_find_tensor(m, "per_layer_token_embd.weight");
         if (m->ple_model) w->ple_embd = required_tensor(m->ple_model, "ple.weight");
         w->ple_external = m->ple_model != NULL;
+    }
+    if (ds4_model_is_deepseek41() && m->engram_model) {
+        w->engram_table[0] = required_tensor(m->engram_model, "engram.1.weight.fp8");
+        w->engram_scale[0] = required_tensor(m->engram_model, "engram.1.scale.e8m0");
+        w->engram_table[1] = required_tensor(m->engram_model, "engram.14.weight.fp8");
+        w->engram_scale[1] = required_tensor(m->engram_model, "engram.14.scale.e8m0");
+        w->engram_external = true;
     }
     weights_bind_output(w, m, require_output, optional_output);
 
@@ -43944,6 +43956,7 @@ struct ds4_engine {
     bool dflash_ready;
     ds4_model vision_model;
     ds4_model ple_model;
+    ds4_model engram_model;
     ds4_vocab vocab;
     ds4_weights weights;
     ds4_mtp_weights mtp_weights;
@@ -71956,6 +71969,7 @@ static int ds4_engine_open_internal(ds4_engine **out,
     e->mtp_model.fd = -1;
     e->vision_model.fd = -1;
     e->ple_model.fd = -1;
+    e->engram_model.fd = -1;
     e->backend = opt->backend;
     e->quality = opt->quality;
     e->glm_mtp = opt->glm_mtp;
@@ -72203,6 +72217,54 @@ static int ds4_engine_open_internal(ds4_engine **out,
         fprintf(stderr,
                 "ds4: PLE sidecar table: %s (ple.weight [%u, %" PRIu64 "], CPU-only)\n",
                 opt->ple_path, DS4_N_PLE_HEAD_DIM, ple_t->dim[1]);
+    }
+    if (opt->engram_path && opt->engram_path[0]) {
+        if (!ds4_model_is_deepseek41()) {
+            fprintf(stderr, "ds4: --engram is only supported for DeepSeek V4.1 models\n");
+            ds4_engine_close(e);
+            *out = NULL;
+            return 1;
+        }
+        /* The two Engram hash tables total about 189 GiB. They are random-row
+         * host lookups and must remain a private CPU mmap, outside Metal's
+         * residency set and outside the main model's file offsets. */
+        model_open(&e->engram_model, opt->engram_path, false, true);
+        ds4_str arch = {0};
+        ds4_str revision = {0};
+        ds4_str kind = {0};
+        if (!model_get_string(&e->engram_model, "general.architecture", &arch) ||
+            !ds4_streq(arch, "deepseek41-engram") ||
+            !model_get_string(&e->engram_model, "deepseek41.sidecar.kind", &kind) ||
+            !ds4_streq(kind, "engram") ||
+            !model_get_string(&e->engram_model, "general.source.revision", &revision) ||
+            !ds4_streq(revision, "df42c109f1defefcbfcedbe7d905718a12266e40")) {
+            fprintf(stderr, "ds4: --engram sidecar metadata or source revision is incompatible\n");
+            ds4_engine_close(e);
+            *out = NULL;
+            return 1;
+        }
+        static const uint32_t layers[2] = {1u, 14u};
+        static const uint64_t rows[2] = {384006168ull, 384016682ull};
+        for (uint32_t i = 0; i < 2u; i++) {
+            ds4_tensor *table = required_tensorf(
+                    &e->engram_model, "engram.%u.weight.fp8", layers[i]);
+            ds4_tensor *scale = required_tensorf(
+                    &e->engram_model, "engram.%u.scale.e8m0", layers[i]);
+            tensor_expect_layout(table, DS4_TENSOR_I8, 2,
+                                 DS4_N_ENGRAM_HEAD_DIM, rows[i], 0);
+            tensor_expect_layout(scale, DS4_TENSOR_I8, 2,
+                                 DS4_N_ENGRAM_HEAD, rows[i], 0);
+        }
+        e->model.engram_model = &e->engram_model;
+        fprintf(stderr,
+                "ds4: DeepSeek V4.1 Engram sidecar: %s (CPU-mapped, two FP8 tables)\n",
+                opt->engram_path);
+    } else if (ds4_model_is_deepseek41() && !opt->inspect_only) {
+        fprintf(stderr,
+                "ds4: DeepSeek V4.1 inference requires --engram FILE; use the matching pinned-revision sidecar\n");
+        ds4_engine_close(e);
+        *out = NULL;
+        return 1;
     }
     weights_bind(&e->weights,
                  &e->model,
@@ -74055,6 +74117,8 @@ void ds4_engine_close(ds4_engine *e) {
     if (e->vision_model.map) model_close(&e->vision_model);
     e->model.ple_model = NULL;
     if (e->ple_model.map) model_close(&e->ple_model);
+    e->model.engram_model = NULL;
+    if (e->engram_model.map) model_close(&e->engram_model);
     model_close(&e->model);
     if (e->dflash_model.map) model_close(&e->dflash_model);
 

@@ -755,6 +755,8 @@ static agent_config parse_options(int argc, char **argv) {
             c.engine.model_path = need_arg(&i, argc, argv, arg);
         } else if (!strcmp(arg, "--ple")) {
             c.engine.ple_path = need_arg(&i, argc, argv, arg);
+        } else if (!strcmp(arg, "--engram")) {
+            c.engine.engram_path = need_arg(&i, argc, argv, arg);
         } else if (!strcmp(arg, "--vision")) {
             c.engine.vision_path = need_arg(&i, argc, argv, arg);
         } else if (!strcmp(arg, "--mtp")) {
@@ -4480,7 +4482,19 @@ static char *agent_default_cache_dir(const agent_config *cfg) {
     agent_buf_puts(&b, home);
     if (b.len == 0 || b.ptr[b.len - 1] != '/') agent_buf_puts(&b, "/");
     agent_buf_puts(&b, ".ds4/kvcache");
-    if (cfg && cfg->engine.ple_path && cfg->engine.ple_path[0]) {
+    if (cfg && cfg->engine.engram_path && cfg->engine.engram_path[0]) {
+        /* V4.1 caches depend on the exact giant lookup table as well as the
+         * main weights. Keep them isolated from every other model recipe. */
+        agent_buf key = {0};
+        agent_cache_file_identity(&key, cfg->engine.model_path);
+        agent_cache_file_identity(&key, cfg->engine.engram_path);
+        agent_cache_file_identity(&key, cfg->engine.vision_path);
+        char sha[41];
+        ds4_kvstore_sha1_bytes_hex(key.ptr, key.len, sha);
+        agent_buf_puts(&b, "/v41-engram-");
+        agent_buf_puts(&b, sha);
+        free(key.ptr);
+    } else if (cfg && cfg->engine.ple_path && cfg->engine.ple_path[0]) {
         /* Legacy checkpoint tags do not identify a Qwen weight/PLE recipe.
          * Isolate new external-PLE configurations, leaving existing sessions
          * untouched. These local file identities are not portable weight hashes. */

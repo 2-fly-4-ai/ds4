@@ -25,6 +25,15 @@ int main(void) {
     AGENT_TEST_ASSERT(strstr(legacy, "/.ds4/kvcache") != NULL);
     AGENT_TEST_ASSERT(strstr(legacy, "qwen-ple-") == NULL);
     free(first); free(same); free(other_model); free(other_ple); free(legacy);
+    cfg.engine.model_path = "v41.gguf";
+    cfg.engine.engram_path = "engram.gguf";
+    char *v41 = agent_default_cache_dir(&cfg);
+    AGENT_TEST_ASSERT(strstr(v41, "/.ds4/kvcache/v41-engram-") != NULL);
+    cfg.engine.engram_path = "other-engram.gguf";
+    char *other_engram = agent_default_cache_dir(&cfg);
+    AGENT_TEST_ASSERT(strcmp(v41, other_engram) != 0);
+    free(v41); free(other_engram);
+    cfg.engine.engram_path = NULL;
     char temp_model[] = "/tmp/ds4-ple-cache-test-XXXXXX";
     int fd = mkstemp(temp_model);
     AGENT_TEST_ASSERT(fd >= 0);
