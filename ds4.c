@@ -4711,6 +4711,7 @@ typedef struct {
     ds4_tensor *ffn_down;
     ds4_tensor *ffn_gate_inp;
     ds4_tensor *ffn_exp_probs_b;
+    ds4_tensor *ffn_exp_probs_b_vl;
     ds4_tensor *ffn_gate_exps;
     ds4_tensor *ffn_up_exps;
     ds4_tensor *ffn_down_exps;
@@ -4721,6 +4722,10 @@ typedef struct {
     ds4_tensor *nextn_enorm;
     ds4_tensor *nextn_hnorm;
     ds4_tensor *nextn_shared_head_norm;
+    /* DeepSeek V4.1 Engram injection (the giant FP8 tables are sidecars). */
+    ds4_tensor *engram_q;
+    ds4_tensor *engram_k;
+    ds4_tensor *engram_wkv;
     /* Dense Qwen 3.8: full attention plus GDN linear-attention layers. */
     ds4_tensor *attn_gate;
     ds4_tensor *attn_qkv;
@@ -5010,6 +5015,24 @@ static void tensor_expect_dense_quant_layout(
                 (int)t->name.len,
                 t->name.ptr,
                 tensor_type_name(t->type));
+        exit(1);
+    }
+    tensor_expect_layout(t, t->type, ndim, d0, d1, d2);
+}
+
+static void tensor_expect_v41_dense_layout(
+        const ds4_tensor *t,
+        uint32_t          ndim,
+        uint64_t          d0,
+        uint64_t          d1,
+        uint64_t          d2) {
+    if (!t) ds4_die("missing DeepSeek V4.1 dense tensor");
+    if (t->type != DS4_TENSOR_F32 &&
+        t->type != DS4_TENSOR_BF16 &&
+        !tensor_type_is_glm_dense_quant(t->type)) {
+        fprintf(stderr,
+                "ds4: tensor %.*s has unsupported DeepSeek V4.1 dense type %s\n",
+                (int)t->name.len, t->name.ptr, tensor_type_name(t->type));
         exit(1);
     }
     tensor_expect_layout(t, t->type, ndim, d0, d1, d2);
@@ -5420,7 +5443,8 @@ static void tensor_expect_routed_expert(
 
 static bool weights_have_output_head(const ds4_weights *w) {
     if (DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_GLM_DSA ||
-        DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_QWEN) {
+        DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_QWEN ||
+        DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_DEEPSEEK41) {
         return w && w->output_norm && w->output;
     }
     if (ds4_model_is_qwen4()) {
@@ -5436,7 +5460,8 @@ static bool weights_have_output_head(const ds4_weights *w) {
 
 static bool weights_have_partial_output_head(const ds4_weights *w) {
     if (DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_GLM_DSA ||
-        DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_QWEN) {
+        DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_QWEN ||
+        DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_DEEPSEEK41) {
         return w && (w->output_norm || w->output);
     }
     if (ds4_model_is_qwen4()) {
@@ -5548,6 +5573,39 @@ static bool weights_qwen4_layer_has_required(const ds4_layer_weights *l, uint32_
     if (ds4_qwen4_layer_is_nextn(il) &&
         (!l->nextn_eh_proj || !l->nextn_enorm || !l->nextn_hnorm ||
          !l->nextn_hc_head_norm || !l->nextn_hc_head_down || !l->nextn_hc_head_up)) {
+        return false;
+    }
+    return true;
+}
+
+static bool weights_deepseek41_layer_has_required(
+        const ds4_layer_weights *l,
+        uint32_t                 il) {
+    if (!l || il >= 40u) return false;
+    if (!l->hc_attn_fn || !l->hc_attn_scale || !l->hc_attn_base ||
+        !l->attn_norm || !l->attn_q_a || !l->attn_q_a_norm ||
+        !l->attn_q_b || !l->attn_kv || !l->attn_kv_a_norm ||
+        !l->attn_sinks || !l->attn_output_a || !l->attn_output_b ||
+        !l->hc_ffn_fn || !l->hc_ffn_scale || !l->hc_ffn_base ||
+        !l->ffn_norm || !l->ffn_gate_inp || !l->ffn_exp_probs_b ||
+        !l->ffn_exp_probs_b_vl || !l->ffn_gate_exps || !l->ffn_up_exps ||
+        !l->ffn_down_exps || !l->ffn_gate_shexp || !l->ffn_up_shexp ||
+        !l->ffn_down_shexp) {
+        return false;
+    }
+    if (ds4_v41_layer_owns_kv(il) &&
+        (!l->attn_compressor_kv || !l->attn_compressor_norm ||
+         (ds4_layer_compress_ratio(il) > 1u && !l->attn_compressor_gate))) {
+        return false;
+    }
+    if (ds4_v41_layer_owns_index(il) &&
+        (!l->indexer_attn_q_b || !l->indexer_proj ||
+         (ds4_v41_layer_owns_kv(il) &&
+          (!l->indexer_attn_k || !l->indexer_k_norm)))) {
+        return false;
+    }
+    if ((il == 1u || il == 14u) &&
+        (!l->engram_q || !l->engram_k || !l->engram_wkv)) {
         return false;
     }
     return true;
@@ -5711,6 +5769,9 @@ static void weights_validate_qwen4_layout(
 
 static bool weights_layer_has_required(const ds4_layer_weights *l, uint32_t il) {
     if (!l) return false;
+    if (DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_DEEPSEEK41) {
+        return weights_deepseek41_layer_has_required(l, il);
+    }
     if (ds4_model_is_qwen4()) {
         return weights_qwen4_layer_has_required(l, il);
     }
@@ -6001,12 +6062,154 @@ static void weights_validate_qwen_layout(
 }
 
 
+static void weights_validate_deepseek41_layout(
+        const ds4_weights *w,
+        uint32_t           layer_start,
+        uint32_t           layer_end,
+        bool               require_token_embd,
+        bool               require_output) {
+    const uint64_t hc_dim = (uint64_t)DS4_N_HC * DS4_N_EMBD;
+    const uint64_t hc_mix_dim = 2u * DS4_N_HC +
+                                (uint64_t)DS4_N_HC * DS4_N_HC;
+    const uint64_t q_dim = (uint64_t)DS4_N_HEAD * DS4_N_HEAD_DIM;
+    const uint64_t out_low_dim = (uint64_t)DS4_N_OUT_GROUP * DS4_N_LORA_O;
+    const uint64_t index_q_dim =
+        (uint64_t)DS4_N_INDEXER_HEAD * DS4_N_INDEXER_HEAD_DIM;
+    const uint64_t engram_input =
+        (uint64_t)(DS4_N_ENGRAM_MAX_NGRAM - 1u) *
+        DS4_N_ENGRAM_HEAD * DS4_N_ENGRAM_HEAD_DIM;
+
+    if (!w || layer_start >= 40u || layer_end >= 40u || layer_end < layer_start) {
+        ds4_die("invalid DeepSeek V4.1 weight layout range");
+    }
+    if (require_token_embd && !w->token_embd) {
+        ds4_die("required DeepSeek V4.1 token embedding is missing");
+    }
+    if (w->token_embd) {
+        tensor_expect_v41_dense_layout(w->token_embd, 2,
+                                       DS4_N_EMBD, DS4_N_VOCAB, 0);
+    }
+    const bool have_output = weights_have_output_head(w);
+    if (require_output && !have_output) {
+        ds4_die("required DeepSeek V4.1 output head is missing");
+    }
+    if (weights_have_partial_output_head(w) && !have_output) {
+        ds4_die("partial DeepSeek V4.1 output head in GGUF");
+    }
+    if (have_output) {
+        tensor_expect_layout(w->output_norm, DS4_TENSOR_F32, 1,
+                             DS4_N_EMBD, 0, 0);
+        tensor_expect_v41_dense_layout(w->output, 2,
+                                       DS4_N_EMBD, DS4_N_VOCAB, 0);
+    }
+
+    for (uint32_t il = layer_start; il <= layer_end; il++) {
+        const ds4_layer_weights *l = &w->layer[il];
+        if (!weights_deepseek41_layer_has_required(l, il)) {
+            fprintf(stderr, "ds4: required DeepSeek V4.1 tensors for layer %u are missing\n", il);
+            exit(1);
+        }
+        tensor_expect_layout(l->hc_attn_fn, DS4_TENSOR_F32, 2,
+                             hc_dim, hc_mix_dim, 0);
+        tensor_expect_layout(l->hc_attn_scale, DS4_TENSOR_F32, 1, 3, 0, 0);
+        tensor_expect_layout(l->hc_attn_base, DS4_TENSOR_F32, 1,
+                             hc_mix_dim, 0, 0);
+        tensor_expect_layout(l->attn_norm, DS4_TENSOR_F32, 1,
+                             DS4_N_EMBD, 0, 0);
+        tensor_expect_v41_dense_layout(l->attn_q_a, 2,
+                                       DS4_N_EMBD, DS4_N_LORA_Q, 0);
+        tensor_expect_layout(l->attn_q_a_norm, DS4_TENSOR_F32, 1,
+                             DS4_N_LORA_Q, 0, 0);
+        tensor_expect_v41_dense_layout(l->attn_q_b, 2,
+                                       DS4_N_LORA_Q, q_dim, 0);
+        tensor_expect_v41_dense_layout(l->attn_kv, 2,
+                                       DS4_N_EMBD, DS4_N_HEAD_DIM, 0);
+        tensor_expect_layout(l->attn_kv_a_norm, DS4_TENSOR_F32, 1,
+                             DS4_N_HEAD_DIM, 0, 0);
+        tensor_expect_layout(l->attn_sinks, DS4_TENSOR_F32, 1,
+                             DS4_N_HEAD, 0, 0);
+        tensor_expect_v41_dense_layout(
+            l->attn_output_a, 2,
+            DS4_N_HEAD_DIM * (DS4_N_HEAD / DS4_N_OUT_GROUP),
+            out_low_dim, 0);
+        tensor_expect_v41_dense_layout(l->attn_output_b, 2,
+                                       out_low_dim, DS4_N_EMBD, 0);
+
+        if (ds4_v41_layer_owns_kv(il)) {
+            tensor_expect_v41_dense_layout(l->attn_compressor_kv, 2,
+                                           DS4_N_EMBD, DS4_N_HEAD_DIM, 0);
+            tensor_expect_layout(l->attn_compressor_norm, DS4_TENSOR_F32, 1,
+                                 DS4_N_HEAD_DIM, 0, 0);
+            if (ds4_layer_compress_ratio(il) > 1u) {
+                tensor_expect_v41_dense_layout(l->attn_compressor_gate, 2,
+                                               DS4_N_EMBD, DS4_N_HEAD_DIM, 0);
+            }
+        }
+        if (ds4_v41_layer_owns_index(il)) {
+            tensor_expect_v41_dense_layout(l->indexer_attn_q_b, 2,
+                                           DS4_N_LORA_Q, index_q_dim, 0);
+            tensor_expect_v41_dense_layout(l->indexer_proj, 2,
+                                           DS4_N_EMBD, DS4_N_INDEXER_HEAD, 0);
+            if (ds4_v41_layer_owns_kv(il)) {
+                tensor_expect_v41_dense_layout(l->indexer_attn_k, 2,
+                                               DS4_N_HEAD_DIM,
+                                               DS4_N_INDEXER_HEAD_DIM, 0);
+                tensor_expect_layout(l->indexer_k_norm, DS4_TENSOR_F32, 1,
+                                     DS4_N_INDEXER_HEAD_DIM, 0, 0);
+            }
+        }
+
+        tensor_expect_layout(l->hc_ffn_fn, DS4_TENSOR_F32, 2,
+                             hc_dim, hc_mix_dim, 0);
+        tensor_expect_layout(l->hc_ffn_scale, DS4_TENSOR_F32, 1, 3, 0, 0);
+        tensor_expect_layout(l->hc_ffn_base, DS4_TENSOR_F32, 1,
+                             hc_mix_dim, 0, 0);
+        tensor_expect_layout(l->ffn_norm, DS4_TENSOR_F32, 1,
+                             DS4_N_EMBD, 0, 0);
+        tensor_expect_layout(l->ffn_gate_inp, DS4_TENSOR_F32, 2,
+                             DS4_N_EMBD, DS4_N_EXPERT, 0);
+        tensor_expect_layout(l->ffn_exp_probs_b, DS4_TENSOR_F32, 1,
+                             DS4_N_EXPERT, 0, 0);
+        tensor_expect_layout(l->ffn_exp_probs_b_vl, DS4_TENSOR_F32, 1,
+                             DS4_N_EXPERT, 0, 0);
+        tensor_expect_routed_expert(l->ffn_gate_exps, 3,
+                                    DS4_N_EMBD, DS4_N_FF_EXP, DS4_N_EXPERT);
+        tensor_expect_routed_expert(l->ffn_up_exps, 3,
+                                    DS4_N_EMBD, DS4_N_FF_EXP, DS4_N_EXPERT);
+        tensor_expect_routed_expert(l->ffn_down_exps, 3,
+                                    DS4_N_FF_EXP, DS4_N_EMBD, DS4_N_EXPERT);
+        if (l->ffn_gate_exps->type != l->ffn_up_exps->type) {
+            ds4_die("DeepSeek V4.1 routed gate/up quant types differ");
+        }
+        tensor_expect_v41_dense_layout(l->ffn_gate_shexp, 2,
+                                       DS4_N_EMBD, DS4_N_FF_EXP, 0);
+        tensor_expect_v41_dense_layout(l->ffn_up_shexp, 2,
+                                       DS4_N_EMBD, DS4_N_FF_EXP, 0);
+        tensor_expect_v41_dense_layout(l->ffn_down_shexp, 2,
+                                       DS4_N_FF_EXP, DS4_N_EMBD, 0);
+        if (il == 1u || il == 14u) {
+            tensor_expect_layout(l->engram_q, DS4_TENSOR_BF16, 2,
+                                 DS4_N_EMBD, DS4_N_HC, 0);
+            tensor_expect_layout(l->engram_k, DS4_TENSOR_BF16, 2,
+                                 DS4_N_EMBD, DS4_N_HC, 0);
+            tensor_expect_v41_dense_layout(l->engram_wkv, 2,
+                                           engram_input,
+                                           (DS4_N_HC + 1u) * DS4_N_EMBD, 0);
+        }
+    }
+}
+
 static void weights_validate_layout(
         const ds4_weights *w,
         uint32_t           layer_start,
         uint32_t           layer_end,
         bool               require_token_embd,
         bool               require_output) {
+    if (DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_DEEPSEEK41) {
+        weights_validate_deepseek41_layout(w, layer_start, layer_end,
+                                           require_token_embd, require_output);
+        return;
+    }
     if (DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_QWEN) {
         weights_validate_qwen_layout(w, layer_start, layer_end, require_token_embd, require_output);
         return;
@@ -7862,7 +8065,8 @@ static void weights_bind_output(
         const ds4_model *m,
         bool             required,
         bool             optional) {
-    if (DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_QWEN) {
+    if (DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_QWEN ||
+        DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_DEEPSEEK41) {
         if (required) {
             w->output_norm = required_tensor(m, "output_norm.weight");
             w->output      = required_tensor(m, "output.weight");
@@ -7947,6 +8151,67 @@ static void weights_bind_qwen_layer(ds4_layer_weights *l, const ds4_model *m, ui
         exit(1);
     }
     l->qwen_linear_attn = true;
+}
+
+static void weights_bind_deepseek41_layer(
+        ds4_layer_weights *l,
+        const ds4_model   *m,
+        uint32_t           il) {
+    l->hc_attn_fn      = required_tensorf(m, "blk.%u.hc_attn_fn.weight", il);
+    l->hc_attn_scale   = required_tensorf(m, "blk.%u.hc_attn_scale.weight", il);
+    l->hc_attn_base    = required_tensorf(m, "blk.%u.hc_attn_base.weight", il);
+    l->attn_norm       = required_tensorf(m, "blk.%u.attn_norm.weight", il);
+    l->attn_q_a        = required_tensorf(m, "blk.%u.attn_q_a.weight", il);
+    l->attn_q_a_norm   = required_tensorf(m, "blk.%u.attn_q_a_norm.weight", il);
+    l->attn_q_b        = required_tensorf(m, "blk.%u.attn_q_b.weight", il);
+    l->attn_kv         = required_tensorf(m, "blk.%u.attn_kv.weight", il);
+    l->attn_kv_a_norm  = required_tensorf(m, "blk.%u.attn_kv_a_norm.weight", il);
+    l->attn_sinks      = required_tensorf(m, "blk.%u.attn_sinks.weight", il);
+    l->attn_output_a   = required_tensorf(m, "blk.%u.attn_output_a.weight", il);
+    l->attn_output_b   = required_tensorf(m, "blk.%u.attn_output_b.weight", il);
+
+    if (ds4_v41_layer_owns_kv(il)) {
+        l->attn_compressor_kv =
+            required_tensorf(m, "blk.%u.attn_compressor_kv.weight", il);
+        l->attn_compressor_norm =
+            required_tensorf(m, "blk.%u.attn_compressor_norm.weight", il);
+        if (ds4_layer_compress_ratio(il) > 1u) {
+            l->attn_compressor_gate =
+                required_tensorf(m, "blk.%u.attn_compressor_gate.weight", il);
+        }
+    }
+    if (ds4_v41_layer_owns_index(il)) {
+        l->indexer_attn_q_b =
+            required_tensorf(m, "blk.%u.indexer.attn_q_b.weight", il);
+        l->indexer_proj =
+            required_tensorf(m, "blk.%u.indexer.proj.weight", il);
+        if (ds4_v41_layer_owns_kv(il)) {
+            l->indexer_attn_k =
+                required_tensorf(m, "blk.%u.indexer.attn_k.weight", il);
+            l->indexer_k_norm =
+                required_tensorf(m, "blk.%u.indexer.k_norm.weight", il);
+        }
+    }
+
+    l->hc_ffn_fn       = required_tensorf(m, "blk.%u.hc_ffn_fn.weight", il);
+    l->hc_ffn_scale    = required_tensorf(m, "blk.%u.hc_ffn_scale.weight", il);
+    l->hc_ffn_base     = required_tensorf(m, "blk.%u.hc_ffn_base.weight", il);
+    l->ffn_norm        = required_tensorf(m, "blk.%u.ffn_norm.weight", il);
+    l->ffn_gate_inp    = required_tensorf(m, "blk.%u.ffn_gate_inp.weight", il);
+    l->ffn_exp_probs_b = required_tensorf(m, "blk.%u.exp_probs_b.bias", il);
+    l->ffn_exp_probs_b_vl =
+        required_tensorf(m, "blk.%u.exp_probs_b_vl.bias", il);
+    l->ffn_gate_exps   = required_tensorf(m, "blk.%u.ffn_gate_exps.weight", il);
+    l->ffn_up_exps     = required_tensorf(m, "blk.%u.ffn_up_exps.weight", il);
+    l->ffn_down_exps   = required_tensorf(m, "blk.%u.ffn_down_exps.weight", il);
+    l->ffn_gate_shexp  = required_tensorf(m, "blk.%u.ffn_gate_shexp.weight", il);
+    l->ffn_up_shexp    = required_tensorf(m, "blk.%u.ffn_up_shexp.weight", il);
+    l->ffn_down_shexp  = required_tensorf(m, "blk.%u.ffn_down_shexp.weight", il);
+    if (il == 1u || il == 14u) {
+        l->engram_q = required_tensorf(m, "blk.%u.engram.q.weight", il);
+        l->engram_k = required_tensorf(m, "blk.%u.engram.k.weight", il);
+        l->engram_wkv = required_tensorf(m, "blk.%u.engram.wkv.weight", il);
+    }
 }
 
 
@@ -8084,6 +8349,10 @@ static void weights_bind_qwen4_layer(ds4_layer_weights *l, const ds4_model *m, u
 }
 
 static void weights_bind_layer(ds4_layer_weights *l, const ds4_model *m, uint32_t il) {
+    if (DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_DEEPSEEK41) {
+        weights_bind_deepseek41_layer(l, m, il);
+        return;
+    }
     if (DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_QWEN) {
         weights_bind_qwen_layer(l, m, il);
         return;
@@ -8156,7 +8425,9 @@ static void weights_bind(
     memset(w, 0, sizeof(*w));
 
     uint32_t executable_layers = DS4_N_LAYER;
-    if ((DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_GLM_DSA || ds4_model_is_qwen4()) &&
+    if ((DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_GLM_DSA ||
+         DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_DEEPSEEK41 ||
+         ds4_model_is_qwen4()) &&
         DS4_N_LAYER > DS4_N_NEXTN_PREDICT) {
         executable_layers = DS4_N_LAYER - DS4_N_NEXTN_PREDICT;
     }
