@@ -34861,16 +34861,18 @@ static bool metal_graph_encode_token_raw_swa(
 #endif
     bool ok;
     if (g->v41_visual_token_active) {
-        if (!g->v41_visual_embedding) return false;
-        float visual_hc[DS4_MAX_HC * DS4_N_EMBD];
-        for (uint32_t hc = 0; hc < DS4_N_HC; hc++) {
-            memcpy(visual_hc + (uint64_t)hc * DS4_N_EMBD,
-                   g->v41_visual_embedding,
-                   (size_t)DS4_N_EMBD * sizeof(float));
+        ok = g->v41_visual_embedding != NULL;
+        if (ok) {
+            float visual_hc[DS4_MAX_HC * DS4_N_EMBD];
+            for (uint32_t hc = 0; hc < DS4_N_HC; hc++) {
+                memcpy(visual_hc + (uint64_t)hc * DS4_N_EMBD,
+                       g->v41_visual_embedding,
+                       (size_t)DS4_N_EMBD * sizeof(float));
+            }
+            ok = ds4_gpu_tensor_write(
+                metal_graph_cur_hc(g), 0, visual_hc,
+                (uint64_t)DS4_N_HC * DS4_N_EMBD * sizeof(float)) != 0;
         }
-        ok = ds4_gpu_tensor_write(
-            metal_graph_cur_hc(g), 0, visual_hc,
-            (uint64_t)DS4_N_HC * DS4_N_EMBD * sizeof(float)) != 0;
     } else if (token_dev) {
         /* Greedy chain decode: the token id arrives GPU-resident (written by
          * the previous token's argmax), so the host never blocks on it.  The
@@ -38592,16 +38594,18 @@ static bool metal_graph_eval_token_raw_swa_streaming(
     }
     if (ok) ok = ds4_gpu_begin_commands() != 0;
     if (ok && g->v41_visual_token_active) {
-        if (!g->v41_visual_embedding) return false;
-        float visual_hc[DS4_MAX_HC * DS4_N_EMBD];
-        for (uint32_t hc = 0; hc < DS4_N_HC; hc++) {
-            memcpy(visual_hc + (uint64_t)hc * DS4_N_EMBD,
-                   g->v41_visual_embedding,
-                   (size_t)DS4_N_EMBD * sizeof(float));
+        ok = g->v41_visual_embedding != NULL;
+        if (ok) {
+            float visual_hc[DS4_MAX_HC * DS4_N_EMBD];
+            for (uint32_t hc = 0; hc < DS4_N_HC; hc++) {
+                memcpy(visual_hc + (uint64_t)hc * DS4_N_EMBD,
+                       g->v41_visual_embedding,
+                       (size_t)DS4_N_EMBD * sizeof(float));
+            }
+            ok = ds4_gpu_tensor_write(
+                metal_graph_cur_hc(g), 0, visual_hc,
+                (uint64_t)DS4_N_HC * DS4_N_EMBD * sizeof(float)) != 0;
         }
-        ok = ds4_gpu_tensor_write(
-            metal_graph_cur_hc(g), 0, visual_hc,
-            (uint64_t)DS4_N_HC * DS4_N_EMBD * sizeof(float)) != 0;
     } else if (ok) {
         ok = ds4_gpu_embed_token_hc_tensor(metal_graph_cur_hc(g),
                                            model->map,
