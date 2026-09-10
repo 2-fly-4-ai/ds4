@@ -10,7 +10,8 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from deepseek41_convert import (build_engram_layout, decode_fp4_rows,
                                 decode_fp8_rows, load_v41_tokens,
-                                repack_mxfp4_rows, sidecar_metadata)
+                                ordered_parallel_map, repack_mxfp4_rows,
+                                sidecar_metadata)
 from deepseek41_mxfp4 import decode_adjacent_block, decode_mxfp4_block
 from deepseek41_plan import dense_qtype
 from glm53_quantize import Quantizer
@@ -30,6 +31,15 @@ def fake_quantizer():
 
 
 class DeepSeek41ConverterTests(unittest.TestCase):
+    def test_parallel_conversion_map_preserves_output_order(self):
+        values = list(range(37))
+        expected = [value * value - 3 * value for value in values]
+        function = lambda value: value * value - 3 * value
+        self.assertEqual(list(ordered_parallel_map(function, values, 1)),
+                         expected)
+        self.assertEqual(list(ordered_parallel_map(function, values, 8)),
+                         expected)
+
     def test_vision_rms_norms_preserve_bf16_runtime_abi(self):
         bf16 = {"dtype": "BF16", "shape": [1024]}
         self.assertEqual(

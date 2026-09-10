@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import dataclasses
 import hashlib
 import json
@@ -11,6 +12,7 @@ import os
 import shutil
 import struct
 import sys
+import threading
 import time
 
 from deepseek41_manifest import DEFAULT_REVISION, load_checkpoint_headers, validate_config, validate_index
@@ -67,6 +69,7 @@ class SourceDB:
             absent = sorted(set(self.weight_map) - set(self.tensors))
             fail(f"checkpoint headers are incomplete; first missing tensor is {absent[0]}")
         self._fds = {}
+        self._fd_lock = threading.Lock()
 
     def require_sources(self, plan):
         missing = sorted({
@@ -87,8 +90,12 @@ class SourceDB:
     def _fd(self, shard):
         fd = self._fds.get(shard)
         if fd is None:
-            fd = os.open(os.path.join(self.hf_dir, shard), os.O_RDONLY)
-            self._fds[shard] = fd
+            with self._fd_lock:
+                fd = self._fds.get(shard)
+                if fd is None:
+                    fd = os.open(
+                        os.path.join(self.hf_dir, shard), os.O_RDONLY)
+                    self._fds[shard] = fd
         return fd
 
     def read_range(self, name, byte_start, byte_count):
@@ -457,7 +464,17 @@ def repack_mxfp4_rows(db, weight_name, scale_name, row_start, row_count, np):
     return output.tobytes()
 
 
-def write_entry(fp, output, db, quantizer, chunk_rows):
+def ordered_parallel_map(function, values, jobs):
+    """Yield results in input order; parallelism cannot alter GGUF bytes."""
+    if jobs == 1:
+        for value in values:
+            yield function(value)
+        return
+    with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as executor:
+        yield from executor.map(function, values)
+
+
+def write_entry(fp, output, db, quantizer, chunk_rows, jobs=1):
     np, item, start = quantizer.np, output.plan, fp.tell()
     if item.mode in ("copy", "copy_fp8_sidecar"):
         for data in db.iter_read(item.sources[0]): fp.write(data)
@@ -472,32 +489,54 @@ def write_entry(fp, output, db, quantizer, chunk_rows):
     elif item.mode == "quantize":
         info = db.info(item.sources[0]); rows, columns = info["shape"]
         if info["dtype"] != "BF16": fail(f"{item.sources[0]}: expected BF16")
-        for row in range(0, rows, chunk_rows):
-            n = min(chunk_rows, rows - row)
+        chunks = [(row, min(chunk_rows, rows - row))
+                  for row in range(0, rows, chunk_rows)]
+        def encode_chunk(chunk):
+            row, n = chunk
             bits = np.frombuffer(db.read_range(item.sources[0], row * columns * 2, n * columns * 2), dtype="<u2").astype(np.uint32) << 16
-            fp.write(quantizer.encode(bits.view(np.float32).reshape(n, columns), output.qtype))
+            return quantizer.encode(
+                bits.view(np.float32).reshape(n, columns), output.qtype)
+        for data in ordered_parallel_map(encode_chunk, chunks, jobs):
+            fp.write(data)
     elif item.mode == "fp8_to_q8":
         rows = db.info(item.sources[0])["shape"][0]
-        for row in range(0, rows, chunk_rows):
-            n = min(chunk_rows, rows - row)
-            fp.write(quantizer.encode(decode_fp8_rows(db, *item.sources, row, n, quantizer), output.qtype))
+        chunks = [(row, min(chunk_rows, rows - row))
+                  for row in range(0, rows, chunk_rows)]
+        def encode_chunk(chunk):
+            row, n = chunk
+            return quantizer.encode(
+                decode_fp8_rows(db, *item.sources, row, n, quantizer),
+                output.qtype)
+        for data in ordered_parallel_map(encode_chunk, chunks, jobs):
+            fp.write(data)
     elif item.mode in ("repack_mxfp4", "fp4_to_q2"):
-        for source in range(0, len(item.sources), 2):
-            weight, scale = item.sources[source:source + 2]
+        source_pairs = [item.sources[source:source + 2]
+                        for source in range(0, len(item.sources), 2)]
+        def encode_source(pair):
+            weight, scale = pair
             rows, packed_columns = db.info(weight)["shape"]
+            encoded = bytearray()
             importance = None
             if item.mode == "fp4_to_q2" and output.qtype == QTYPE_IQ2_XXS:
                 importance = np.zeros(packed_columns * 2, dtype=np.float32)
                 for row in range(0, rows, chunk_rows):
                     n = min(chunk_rows, rows - row)
-                    values = decode_fp4_rows(db, weight, scale, row, n, np)
-                    importance += np.square(values, dtype=np.float32).sum(axis=0, dtype=np.float32)
+                    values = decode_fp4_rows(
+                        db, weight, scale, row, n, np)
+                    importance += np.square(values, dtype=np.float32).sum(
+                        axis=0, dtype=np.float32)
             for row in range(0, rows, chunk_rows):
                 n = min(chunk_rows, rows - row)
                 if item.mode == "repack_mxfp4":
-                    fp.write(repack_mxfp4_rows(db, weight, scale, row, n, np))
+                    encoded.extend(repack_mxfp4_rows(
+                        db, weight, scale, row, n, np))
                 else:
-                    fp.write(quantizer.encode(decode_fp4_rows(db, weight, scale, row, n, np), output.qtype, importance))
+                    encoded.extend(quantizer.encode(
+                        decode_fp4_rows(db, weight, scale, row, n, np),
+                        output.qtype, importance))
+            return bytes(encoded)
+        for data in ordered_parallel_map(encode_source, source_pairs, jobs):
+            fp.write(data)
     else:
         fail(f"{item.target}: unsupported mode {item.mode}")
     if fp.tell() - start != item.nbytes:
@@ -564,7 +603,9 @@ def write_gguf(args, plan, records, db):
         started = time.monotonic()
         for number, entry in enumerate(prepared[completed:], completed + 1):
             if fp.tell() != data_offset + entry.offset: fail("output offset mismatch")
-            tensor_started = time.monotonic(); write_entry(fp, entry, db, quantizer, args.rows_per_chunk)
+            tensor_started = time.monotonic()
+            write_entry(fp, entry, db, quantizer, args.rows_per_chunk,
+                        args.jobs)
             fp.write(bytes(align(entry.plan.nbytes) - entry.plan.nbytes)); fp.flush(); os.fsync(fp.fileno()); save_resume(journal, signature, number)
             print(f"[{number:4d}/{len(prepared):4d}] {entry.plan.target} {entry.plan.qtype} {entry.plan.nbytes/(1<<30):.3f} GiB {time.monotonic()-tensor_started:.1f}s total={(time.monotonic()-started)/60:.1f}m", file=sys.stderr, flush=True)
     os.replace(partial, args.out); os.unlink(journal)
@@ -576,8 +617,12 @@ def parse_args():
     parser.add_argument("--quant", choices=("native", "q2"), default="native"); parser.add_argument("--tokenizer-template")
     parser.add_argument("--out"); parser.add_argument("--source-revision", default=DEFAULT_REVISION); parser.add_argument("--quants-library")
     parser.add_argument("--rows-per-chunk", type=int, default=128); parser.add_argument("--dry-run", action="store_true"); parser.add_argument("--resume", action="store_true"); parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument(
+        "--jobs", type=int, default=1,
+        help="ordered conversion workers (output is byte-identical)")
     args = parser.parse_args()
     if not 1 <= args.rows_per_chunk <= 8192: parser.error("--rows-per-chunk must be 1..8192")
+    if not 1 <= args.jobs <= 64: parser.error("--jobs must be 1..64")
     if args.artifact == "main" and not args.tokenizer_template: parser.error("--tokenizer-template is required for main")
     if not args.dry_run and not args.out: parser.error("--out is required unless --dry-run")
     return args
