@@ -14,6 +14,79 @@ The important pieces are:
 - `quality-testing/`: prompts and scripts used to compare local GGUF variants
   against official DeepSeek V4 Flash continuations.
 
+## DeepSeek V4.1 Flash
+
+V4.1 is converted directly from the official checkpoint into four independent
+artifacts. The converter pins the checkpoint revision so a resumed job cannot
+silently mix shards from different releases. The Q2 recipe quantizes only the
+routed MoE experts (`IQ2_XXS` gate/up and `Q2_K` down); model-control,
+attention, shared-expert, output, and recurrent-state tensors retain the types
+selected by the source plan.
+
+Install the Python dependencies and build the local quantization library:
+
+```sh
+python3 -m pip install -U huggingface_hub hf_xet numpy tokenizers
+make -C gguf-tools
+```
+
+Download the exact source revision. Re-running `hf download` resumes it:
+
+```sh
+hf download deepseek-ai/DeepSeek-V4.1-Flash \
+  --revision df42c109f1defefcbfcedbe7d905718a12266e40 \
+  --local-dir gguf/hf/DeepSeek-V4.1-Flash
+```
+
+Validate the checkpoint topology and inspect exact output sizes before writing
+hundreds of gigabytes:
+
+```sh
+python3 gguf-tools/deepseek41_manifest.py \
+  gguf/hf/DeepSeek-V4.1-Flash
+python3 gguf-tools/deepseek41_plan.py \
+  gguf/hf/DeepSeek-V4.1-Flash --quant q2 --detailed
+```
+
+The main artifact needs tokenizer metadata from any known-good DeepSeek V4
+GGUF. Conversion is resumable and deterministic across worker counts:
+
+```sh
+python3 gguf-tools/deepseek41_convert.py \
+  --hf gguf/hf/DeepSeek-V4.1-Flash --artifact main --quant q2 \
+  --tokenizer-template gguf/DeepSeek-V4-Flash-IQ2XXS-w2Q2K-AProjQ8-SExpQ8-OutQ8-chat-v2-imatrix-0731.gguf \
+  --out gguf/DeepSeek-V4.1-Flash-IQ2XXS-w2Q2K.gguf \
+  --jobs 12 --resume
+python3 gguf-tools/deepseek41_convert.py \
+  --hf gguf/hf/DeepSeek-V4.1-Flash --artifact engram \
+  --out gguf/DeepSeek-V4.1-Flash-Engram.gguf --jobs 12 --resume
+python3 gguf-tools/deepseek41_convert.py \
+  --hf gguf/hf/DeepSeek-V4.1-Flash --artifact vision \
+  --out gguf/DeepSeek-V4.1-Flash-Vision-Encoder.gguf --jobs 12 --resume
+python3 gguf-tools/deepseek41_convert.py \
+  --hf gguf/hf/DeepSeek-V4.1-Flash --artifact dspark \
+  --out gguf/DeepSeek-V4.1-Flash-DSpark-support.gguf --jobs 12 --resume
+```
+
+Strictly validate tensor topology and every losslessly copied source payload:
+
+```sh
+python3 gguf-tools/deepseek41_validate_gguf.py --hf gguf/hf/DeepSeek-V4.1-Flash \
+  --gguf gguf/DeepSeek-V4.1-Flash-IQ2XXS-w2Q2K.gguf \
+  --artifact main --quant q2 --verify-copy-payloads
+python3 gguf-tools/deepseek41_validate_gguf.py --hf gguf/hf/DeepSeek-V4.1-Flash \
+  --gguf gguf/DeepSeek-V4.1-Flash-Engram.gguf \
+  --artifact engram --verify-copy-payloads
+python3 gguf-tools/deepseek41_validate_gguf.py --hf gguf/hf/DeepSeek-V4.1-Flash \
+  --gguf gguf/DeepSeek-V4.1-Flash-Vision-Encoder.gguf \
+  --artifact vision --verify-copy-payloads
+```
+
+The DSpark sidecar is converted for format completeness, but the runtime
+currently rejects V4.1 speculation because its verifier does not yet preserve
+Engram and compressed-attention state independently for every proposal row.
+Do not bypass that guard for benchmark numbers.
+
 ## Build
 
 ```sh

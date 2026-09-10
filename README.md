@@ -3,7 +3,8 @@
 </p>
 
 **DwarfStar** is a small native inference engine optimized first for
-**DeepSeek V4 Flash** (including the experimental vision model).
+**DeepSeek V4 Flash** (including the experimental vision model), with
+experimental support for the multimodal **DeepSeek V4.1 Flash** architecture.
 It also supports **GLM 5.2 and 5.3**, **GLM 5.3 Flash**, and,
 on very high-memory machines, **DeepSeek V4 PRO**. It is self-contained and
 deliberately narrow, not a general GGUF runner. Model loading, prompt rendering,
@@ -153,6 +154,49 @@ model-building work and can take a long time on the full DeepSeek weights.
 Flash and PRO GGUF generation are supported by the local tools. PRO conversion
 uses a compatible published PRO GGUF as its metadata, tensor-layout, and output
 type template.
+
+### DeepSeek V4.1 Flash (experimental)
+
+DeepSeek V4.1 Flash is a new architecture, not a replacement weight file for
+the V4 0731 graph. It has a 552B-parameter multimodal CED backbone, a separate
+196B-parameter Engram table, CSA2 compressed attention, a hierarchical sparse
+indexer, 5120-wide projected image embeddings, and reasoning effort controlled
+by an integer from 1 through 100. DwarfStar loads it from independently
+validated main, Engram, and vision GGUF artifacts.
+
+The published checkpoint is currently converted locally rather than downloaded
+as a prebuilt DwarfStar GGUF. See the exact pinned-revision commands in
+[gguf-tools/README.md](gguf-tools/README.md#deepseek-v41-flash). A complete Q2
+setup is about 151 GiB for the main model, 189 GiB for Engram, and 0.9 GiB for
+vision. Retaining both the official checkpoint and every converted artifact
+requires roughly 825 GB of free disk.
+
+On a 128 GB Mac, run the main model with SSD expert streaming:
+
+```sh
+./ds4-server --metal \
+  -m gguf/DeepSeek-V4.1-Flash-IQ2XXS-w2Q2K.gguf \
+  --engram gguf/DeepSeek-V4.1-Flash-Engram.gguf \
+  --vision gguf/DeepSeek-V4.1-Flash-Vision-Encoder.gguf \
+  --ssd-streaming --ctx 16384 --host 127.0.0.1 --port 8000
+```
+
+`start_deepseek41_server.command` runs the same safe configuration on macOS.
+Set `DS4_CTX`, `DS4_HOST`, or `DS4_PORT` before launching to override its
+defaults. The server advertises `deepseek-v4.1-flash`,
+`deepseek-v4.1-flash-chat`, and `deepseek-v4.1-flash-reasoner`. Use
+`"thinking": false` or the `-chat` alias for direct answers; a numeric
+`reasoning_effort` from 1 through 100 is passed to the official prompt format
+without rounding it to a coarse level.
+
+The current Metal implementation prioritizes exact recurrent state and uses a
+one-token prefill frontier. It is functional but substantially slower to ingest
+prompts than the mature V4 graph. Backward live-KV rewind is disabled because
+trimming token history alone cannot restore V4.1's compressor and indexer
+state; forward conversation and tool-result continuations still reuse their
+exact live prefix. The released DSpark artifact can be converted and inspected,
+but DwarfStar intentionally rejects `--dspark` for V4.1 until batched
+verification preserves Engram and compressed-attention state per proposal row.
 
 GLM 5.2 support is limited to the GGUF files tested by this branch:
 
