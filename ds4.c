@@ -22830,18 +22830,21 @@ static bool metal_graph_configure_dspark_capture(
 }
 
 static uint64_t metal_graph_kv_cache_bytes_for_context(uint32_t ctx_size, uint32_t raw_cap) {
-    uint64_t bytes = (uint64_t)DS4_N_LAYER *
+    uint64_t bytes = (uint64_t)ds4_model_executable_layer_count() *
                      raw_cap *
                      DS4_N_HEAD_DIM *
                      sizeof(float);
 
     for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
         const uint32_t ratio = ds4_layer_compress_ratio(il);
-        if (ratio == 0) continue;
+        if (ratio == 0 ||
+            (ds4_model_is_deepseek41() && !ds4_v41_layer_owns_kv(il))) {
+            continue;
+        }
         const uint64_t comp_cap = (uint64_t)(ctx_size / ratio + 2u);
         bytes += comp_cap * DS4_N_HEAD_DIM *
                  (DS4_GPU_ATTN_COMP_CACHE_F16 ? sizeof(uint16_t) : sizeof(float));
-        if (ratio == 4) {
+        if (ratio == 4 || ds4_model_is_deepseek41()) {
             bytes += comp_cap * DS4_N_INDEXER_HEAD_DIM * sizeof(float);
         }
     }
@@ -42540,13 +42543,16 @@ static bool metal_graph_reset_prefill_state(ds4_gpu_graph *g) {
     for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
         if (!g->layer_raw_cache[il]) continue;
         const uint32_t ratio = ds4_layer_compress_ratio(il);
-        if (ratio == 0) continue;
+        if (ratio == 0 ||
+            (ds4_model_is_deepseek41() && !ds4_v41_layer_owns_kv(il))) {
+            continue;
+        }
         const uint32_t coff = ratio == 4 ? 2u : 1u;
         const uint64_t attn_width = (uint64_t)coff * DS4_N_HEAD_DIM;
         const uint64_t attn_rows = (uint64_t)coff * ratio;
         if (!metal_tensor_fill_f32(g->layer_attn_state_kv[il], 0.0f, attn_width * attn_rows)) return false;
         if (!metal_tensor_fill_f32(g->layer_attn_state_score[il], DS4_NEG_INF, attn_width * attn_rows)) return false;
-        if (ratio == 4) {
+        if (ratio == 4 || ds4_model_is_deepseek41()) {
             const uint64_t index_width = (uint64_t)coff * DS4_N_INDEXER_HEAD_DIM;
             const uint64_t index_rows = (uint64_t)coff * ratio;
             if (!metal_tensor_fill_f32(g->layer_index_state_kv[il], 0.0f, index_width * index_rows)) return false;
@@ -45141,18 +45147,21 @@ ds4_context_memory ds4_context_memory_estimate_with_prefill_mode(
         m.comp_cap = ctx / min_ratio + 2u;
         if (m.comp_cap < 2u) m.comp_cap = 2u;
 
-        m.raw_bytes = (uint64_t)DS4_N_LAYER *
+        m.raw_bytes = (uint64_t)ds4_model_executable_layer_count() *
                       m.raw_cap *
                       DS4_N_HEAD_DIM *
                       sizeof(float);
         for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
             const uint32_t ratio = ds4_layer_compress_ratio(il);
-            if (ratio == 0) continue;
+            if (ratio == 0 ||
+                (ds4_model_is_deepseek41() && !ds4_v41_layer_owns_kv(il))) {
+                continue;
+            }
             const uint32_t layer_comp_cap = ctx / ratio + 2u;
             m.compressed_bytes += (uint64_t)layer_comp_cap *
                                   DS4_N_HEAD_DIM *
                                   (DS4_GPU_ATTN_COMP_CACHE_F16 ? sizeof(uint16_t) : sizeof(float));
-            if (ratio == 4) {
+            if (ratio == 4 || ds4_model_is_deepseek41()) {
                 m.compressed_bytes += (uint64_t)layer_comp_cap *
                                       DS4_N_INDEXER_HEAD_DIM *
                                       sizeof(float);
@@ -63374,10 +63383,10 @@ static size_t engine_per_layer_kv_bytes_planner(uint32_t il,
                                                 int ctx_size,
                                                 uint32_t prefill_chunk) {
     if (ctx_size <= 0) return 0;
-    if (il >= DS4_N_LAYER) return 0;
+    if (il >= ds4_model_executable_layer_count()) return 0;
     const uint32_t ctx = (uint32_t)ctx_size;
 
-    /* Raw KV cache: every layer gets a raw entry sized by raw_cap, the
+    /* Raw KV cache: every executable layer gets a raw entry sized by raw_cap, the
      * same value the GPU graph requests per layer at
      * metal_graph_alloc_kv_cache_tensor_on(. , raw_cap * DS4_N_HEAD_DIM *
      * sizeof(float)). raw_cap factors in raw_window padding + prefill_cap
@@ -63391,10 +63400,11 @@ static size_t engine_per_layer_kv_bytes_planner(uint32_t il,
      * unconditionally (over-estimates on Apple Metal F16 cache, which
      * is the desired conservative posture per spec criterion 8). */
     const uint32_t ratio = ds4_layer_compress_ratio(il);
-    if (ratio != 0) {
+    if (ratio != 0 &&
+        (!ds4_model_is_deepseek41() || ds4_v41_layer_owns_kv(il))) {
         const uint32_t layer_comp_cap = ctx / ratio + 2u;
         bytes += (size_t)layer_comp_cap * DS4_N_HEAD_DIM * sizeof(float);
-        if (ratio == 4) {
+        if (ratio == 4 || ds4_model_is_deepseek41()) {
             bytes += (size_t)layer_comp_cap * DS4_N_INDEXER_HEAD_DIM *
                      sizeof(float);
         }
