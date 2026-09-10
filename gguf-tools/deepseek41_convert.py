@@ -322,6 +322,8 @@ def main_metadata(config, revision, hf_dir):
         kv_u32_array("deepseek41.engram.hash_primes", primes),
         kv_u64_array("deepseek41.engram.hash_offsets", offsets),
         kv_u64_array("deepseek41.engram.hash_multipliers", multipliers),
+        kv_string("deepseek41.engram.hash_contract_sha256",
+                  "9a50b6f0ae6be53fa6aa7ea4c2c6c5e94b605b41241a00dbc2a1b5a4c2c81a18"),
         kv_u32("deepseek41.dspark.block_size", text["dspark_block_size"]),
         kv_u32("deepseek41.dspark.markov_rank", 256), kv_u32("deepseek41.dspark.noise_token_id", 128799),
         kv_u32("deepseek41.dspark.expert_count", text["dspark_n_routed_experts"]),

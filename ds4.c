@@ -914,6 +914,10 @@ static ds4_shape g_ds4_shape = {
 static bool g_ds4_flash_vision_exp = false;
 
 static uint32_t g_ds4_compress_ratios[DS4_MAX_LAYER] = {0};
+static uint32_t g_ds4_v41_engram_token_map[129280];
+static uint32_t g_ds4_v41_engram_hash_primes[48];
+static uint64_t g_ds4_v41_engram_hash_offsets[48];
+static uint64_t g_ds4_v41_engram_hash_multipliers[8];
 
 #define DS4_MODEL_SHAPE_NAME          (g_ds4_shape.name)
 #define DS4_MODEL_FAMILY              (g_ds4_shape.family)
@@ -6876,6 +6880,27 @@ static void config_expect_u32_array(
     }
 }
 
+static void config_read_fixed_array(
+        const ds4_model *m,
+        const char      *key,
+        uint32_t         element_type,
+        void            *out,
+        uint64_t         count,
+        uint64_t         element_bytes) {
+    ds4_array_ref arr = {0};
+    if (!model_get_array(m, key, &arr) || arr.type != element_type ||
+        arr.len != count || element_bytes == 0 ||
+        count > UINT64_MAX / element_bytes) {
+        fprintf(stderr, "ds4: invalid fixed metadata array: %s\n", key);
+        exit(1);
+    }
+    ds4_cursor c = cursor_at(m, arr.data_pos);
+    if (!cursor_read(&c, out, count * element_bytes)) {
+        fprintf(stderr, "ds4: truncated fixed metadata array: %s\n", key);
+        exit(1);
+    }
+}
+
 static void config_validate_fixed_shape(uint32_t n_layer) {
     config_expect_u32("block_count",                  n_layer,                 DS4_N_LAYER);
 }
@@ -7168,6 +7193,60 @@ static void config_validate_deepseek41_model(const ds4_model *m) {
     config_expect_u32_array(m, "deepseek41.engram.layers", engram_layers, 2);
     config_expect_u32_array(m, "deepseek41.engram.num_embeddings", engram_rows, 2);
     config_expect_u32_array(m, "deepseek41.dspark.target_layers", dspark_targets, 3);
+    config_read_fixed_array(m, "deepseek41.engram.token_map",
+                            GGUF_VALUE_UINT32,
+                            g_ds4_v41_engram_token_map,
+                            DS4_N_VOCAB, sizeof(uint32_t));
+    config_read_fixed_array(m, "deepseek41.engram.hash_primes",
+                            GGUF_VALUE_UINT32,
+                            g_ds4_v41_engram_hash_primes,
+                            48, sizeof(uint32_t));
+    config_read_fixed_array(m, "deepseek41.engram.hash_offsets",
+                            GGUF_VALUE_UINT64,
+                            g_ds4_v41_engram_hash_offsets,
+                            48, sizeof(uint64_t));
+    config_read_fixed_array(m, "deepseek41.engram.hash_multipliers",
+                            GGUF_VALUE_UINT64,
+                            g_ds4_v41_engram_hash_multipliers,
+                            8, sizeof(uint64_t));
+    for (uint32_t i = 0; i < DS4_N_VOCAB; i++) {
+        if (g_ds4_v41_engram_token_map[i] >= DS4_N_ENGRAM_COMPRESSED_VOCAB) {
+            ds4_die("DeepSeek V4.1 Engram token map contains an out-of-range id");
+        }
+    }
+    if (g_ds4_v41_engram_token_map[2] != 2u) {
+        ds4_die("DeepSeek V4.1 Engram pad-token mapping changed");
+    }
+    static const uint64_t expected_multipliers[8] = {
+        76632096046245ull, 4839876093313ull,
+        35959672319349ull, 73987337458391ull,
+        67716810739261ull, 51510806800915ull,
+        30921347202721ull, 82619226485591ull,
+    };
+    if (memcmp(g_ds4_v41_engram_hash_multipliers,
+               expected_multipliers, sizeof(expected_multipliers)) != 0) {
+        ds4_die("DeepSeek V4.1 Engram multiplier contract changed");
+    }
+    for (uint32_t layer = 0; layer < 2u; layer++) {
+        uint64_t running = 0;
+        for (uint32_t i = 0; i < 24u; i++) {
+            const uint32_t at = layer * 24u + i;
+            if (g_ds4_v41_engram_hash_offsets[at] != running) {
+                ds4_die("DeepSeek V4.1 Engram bucket offsets are inconsistent");
+            }
+            running += g_ds4_v41_engram_hash_primes[at];
+        }
+        if (running != engram_rows[layer]) {
+            ds4_die("DeepSeek V4.1 Engram buckets do not cover the table");
+        }
+    }
+    ds4_str hash_contract = {0};
+    if (!model_get_string(m, "deepseek41.engram.hash_contract_sha256",
+                          &hash_contract) ||
+        !ds4_streq(hash_contract,
+                   "9a50b6f0ae6be53fa6aa7ea4c2c6c5e94b605b41241a00dbc2a1b5a4c2c81a18")) {
+        ds4_die("unexpected DeepSeek V4.1 Engram hash contract");
+    }
     memcpy(g_ds4_compress_ratios, compress_ratios, sizeof(compress_ratios));
 
     ds4_str scoring = {0};
