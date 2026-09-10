@@ -14174,6 +14174,55 @@ __global__ static void v41_candidate_expand_mask_kernel(
         block_mask[(uint64_t)t * n_blocks + c / block_size];
 }
 
+static __device__ __forceinline__ float v41_bf16_to_f32(uint16_t bits) {
+    return __uint_as_float((uint32_t)bits << 16u);
+}
+
+/* DeepSeek-V4.1 Engram gate. One block owns one hyperconnection row so the
+ * three reductions use a fixed, power-of-two topology on every CUDA device. */
+__global__ static void v41_engram_inject_kernel(
+        float *hc, const float *kv,
+        const uint16_t *q_weight, const uint16_t *k_weight,
+        uint32_t n_embd, uint32_t n_hc, float eps) {
+    const uint32_t hci = blockIdx.x;
+    const uint32_t tid = threadIdx.x;
+    if (hci >= n_hc) return;
+    const uint64_t base = (uint64_t)hci * n_embd;
+    float h2 = 0.0f;
+    float k2 = 0.0f;
+    float dot = 0.0f;
+    for (uint32_t d = tid; d < n_embd; d += blockDim.x) {
+        const float hv = hc[base + d];
+        const float keyv = kv[base + d];
+        h2 += hv * hv;
+        k2 += keyv * keyv;
+        dot += hv * v41_bf16_to_f32(q_weight[base + d]) *
+               v41_bf16_to_f32(k_weight[base + d]) * keyv;
+    }
+    __shared__ float sums[3][256];
+    sums[0][tid] = h2;
+    sums[1][tid] = k2;
+    sums[2][tid] = dot;
+    __syncthreads();
+    for (uint32_t stride = blockDim.x >> 1u; stride != 0u; stride >>= 1u) {
+        if (tid < stride) {
+            sums[0][tid] += sums[0][tid + stride];
+            sums[1][tid] += sums[1][tid + stride];
+            sums[2][tid] += sums[2][tid + stride];
+        }
+        __syncthreads();
+    }
+    const float inv_h = rsqrtf(sums[0][0] / (float)n_embd + eps);
+    const float inv_k = rsqrtf(sums[1][0] / (float)n_embd + eps);
+    const float match = sums[2][0] * inv_h * inv_k * rsqrtf((float)n_embd);
+    const float signed_root = copysignf(sqrtf(fmaxf(fabsf(match), 1.0e-6f)), match);
+    const float gate = 1.0f / (1.0f + expf(-signed_root));
+    const float *value = kv + (uint64_t)n_hc * n_embd;
+    for (uint32_t d = tid; d < n_embd; d += blockDim.x) {
+        hc[base + d] += gate * value[d];
+    }
+}
+
 extern "C" int ds4_gpu_embed_token_hc_tensor(ds4_gpu_tensor *out_hc, const void *model_map, uint64_t model_size, uint64_t weight_offset, uint32_t n_vocab, uint32_t token, uint32_t n_embd, uint32_t n_hc) {
     (void)n_vocab;
     if (!out_hc || !model_map || weight_offset >= model_size) return 0;
@@ -14749,6 +14798,36 @@ extern "C" int ds4_gpu_v41_candidate_expand_mask_tensor(
         (float *)row_mask->ptr, (const float *)block_mask->ptr,
         n_comp, n_tokens, block_size);
     return cuda_ok(cudaGetLastError(), "V4.1 candidate row mask launch");
+}
+
+extern "C" int ds4_gpu_v41_engram_inject_tensor(
+        ds4_gpu_tensor       *hc,
+        const ds4_gpu_tensor *kv,
+        const void           *model_map,
+        uint64_t              model_size,
+        uint64_t              q_weight_offset,
+        uint64_t              k_weight_offset,
+        uint32_t              n_embd,
+        uint32_t              n_hc,
+        float                 eps) {
+    if (!hc || !kv || !model_map || n_embd == 0 || n_hc == 0) return 0;
+    const uint64_t hc_bytes = (uint64_t)n_hc * n_embd * sizeof(float);
+    const uint64_t kv_bytes = (uint64_t)(n_hc + 1u) * n_embd * sizeof(float);
+    const uint64_t weight_bytes = (uint64_t)n_hc * n_embd * sizeof(uint16_t);
+    if (hc->bytes < hc_bytes || kv->bytes < kv_bytes ||
+        q_weight_offset > model_size || weight_bytes > model_size - q_weight_offset ||
+        k_weight_offset > model_size || weight_bytes > model_size - k_weight_offset) return 0;
+    const int logical_tier = ds4_tensor_device_idx(hc);
+    if (logical_tier != ds4_tensor_device_idx(kv)) return 0;
+    const uint16_t *qw = (const uint16_t *)cuda_resolve_weight_ptr(
+        model_map, q_weight_offset, weight_bytes, logical_tier, "V4.1 Engram q weight");
+    const uint16_t *kw = (const uint16_t *)cuda_resolve_weight_ptr(
+        model_map, k_weight_offset, weight_bytes, logical_tier, "V4.1 Engram k weight");
+    if (!qw || !kw) return 0;
+    v41_engram_inject_kernel<<<n_hc, 256>>>(
+        (float *)hc->ptr, (const float *)kv->ptr, qw, kw,
+        n_embd, n_hc, eps);
+    return cuda_ok(cudaGetLastError(), "V4.1 Engram inject launch");
 }
 /* GLM opt-in: batched q8_0 matmuls with blocks > 32 may run as a
  * streaming dequant-to-f16 GEMM (exact-q8 native kernels only cover

@@ -18829,6 +18829,66 @@ int ds4_gpu_v41_candidate_expand_mask_tensor(
     }
 }
 
+int ds4_gpu_v41_engram_inject_tensor(
+        ds4_gpu_tensor       *hc,
+        const ds4_gpu_tensor *kv,
+        const void           *model_map,
+        uint64_t              model_size,
+        uint64_t              q_weight_offset,
+        uint64_t              k_weight_offset,
+        uint32_t              n_embd,
+        uint32_t              n_hc,
+        float                 eps) {
+    if (!g_initialized && !ds4_gpu_init()) return 0;
+    if (!hc || !kv || !model_map || n_embd == 0 || n_hc == 0 ||
+        n_hc > 256u) return 0;
+    const uint64_t hc_bytes = (uint64_t)n_hc * n_embd * sizeof(float);
+    const uint64_t kv_bytes = (uint64_t)(n_hc + 1u) * n_embd * sizeof(float);
+    const uint64_t weight_bytes = (uint64_t)n_hc * n_embd * sizeof(uint16_t);
+    if (ds4_gpu_tensor_bytes(hc) < hc_bytes ||
+        ds4_gpu_tensor_bytes(kv) < kv_bytes ||
+        q_weight_offset > model_size || weight_bytes > model_size - q_weight_offset ||
+        k_weight_offset > model_size || weight_bytes > model_size - k_weight_offset) return 0;
+
+    @autoreleasepool {
+        id<MTLComputePipelineState> pipeline =
+            ds4_gpu_get_pipeline("kernel_v41_engram_inject");
+        id<MTLBuffer> hcbuf = ds4_gpu_tensor_buffer(hc);
+        id<MTLBuffer> kvbuf = ds4_gpu_tensor_buffer(kv);
+        uint64_t q_inner = 0;
+        uint64_t k_inner = 0;
+        id<MTLBuffer> qbuf = ds4_gpu_wrap_model_range(
+            model_map, model_size, q_weight_offset, weight_bytes, &q_inner);
+        id<MTLBuffer> kbuf = ds4_gpu_wrap_model_range(
+            model_map, model_size, k_weight_offset, weight_bytes, &k_inner);
+        if (!pipeline || !hcbuf || !kvbuf || !qbuf || !kbuf) return 0;
+        NSUInteger nth = pipeline.maxTotalThreadsPerThreadgroup;
+        if (nth > 256u) nth = 256u;
+        /* The reduction kernel requires a power-of-two threadgroup. */
+        NSUInteger power2 = 1u;
+        while ((power2 << 1u) <= nth) power2 <<= 1u;
+        nth = power2;
+        if (nth == 0u) return 0;
+        int owned = 0;
+        id<MTLCommandBuffer> cb = ds4_gpu_command_buffer(&owned);
+        if (!cb) return 0;
+        id<MTLComputeCommandEncoder> enc = ds4_gpu_compute_encoder(cb);
+        [enc setComputePipelineState:pipeline];
+        [enc setBuffer:hcbuf offset:ds4_gpu_tensor_offset(hc) atIndex:0];
+        [enc setBuffer:kvbuf offset:ds4_gpu_tensor_offset(kv) atIndex:1];
+        [enc setBuffer:qbuf offset:(NSUInteger)q_inner atIndex:2];
+        [enc setBuffer:kbuf offset:(NSUInteger)k_inner atIndex:3];
+        [enc setBytes:&n_embd length:sizeof(n_embd) atIndex:4];
+        [enc setBytes:&n_hc length:sizeof(n_hc) atIndex:5];
+        [enc setBytes:&eps length:sizeof(eps) atIndex:6];
+        [enc dispatchThreadgroups:MTLSizeMake(n_hc, 1, 1)
+             threadsPerThreadgroup:MTLSizeMake(nth, 1, 1)];
+        ds4_gpu_end_compute_encoder(cb, enc);
+        return ds4_gpu_finish_command_buffer(cb, owned,
+                                              "V4.1 Engram inject");
+    }
+}
+
 static int ds4_gpu_matmul_q8_0_legacy_tensor(
         ds4_gpu_tensor       *out,
         const void             *model_map,

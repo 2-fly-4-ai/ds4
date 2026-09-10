@@ -726,6 +726,19 @@ int ds4_gpu_v41_candidate_expand_mask_tensor(
         uint32_t              n_tokens,
         uint32_t              block_size);
 
+/* DeepSeek-V4.1 Engram injection. kv contains n_hc key rows followed by one
+ * shared value row, all F32. q/k weights are BF16 model tensors. */
+int ds4_gpu_v41_engram_inject_tensor(
+        ds4_gpu_tensor       *hc,
+        const ds4_gpu_tensor *kv,
+        const void           *model_map,
+        uint64_t              model_size,
+        uint64_t              q_weight_offset,
+        uint64_t              k_weight_offset,
+        uint32_t              n_embd,
+        uint32_t              n_hc,
+        float                 eps);
+
 /* =========================================================================
  * Dense Projections, Norms, RoPE, and KV Rounding.
  * =========================================================================

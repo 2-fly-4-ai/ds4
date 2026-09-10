@@ -1256,6 +1256,13 @@ typedef struct {
     float *output_embd;
     float *output_norm;
 
+    /* DeepSeek V4.1 Engram host lookup state. The enormous FP8 table remains
+     * mmap-backed; only the 24 selected rows and their projected key/value are
+     * materialized for a token. */
+    int32_t *v41_engram_tokens;
+    float *v41_engram_embed;
+    float *v41_engram_kv;
+
     /* V4.1 consumes the pre-mix produced by the previous sublayer. */
     float v41_pre_mix[DS4_MAX_HC];
 } ds4_cpu_decode_scratch;
@@ -4286,6 +4293,85 @@ static inline float ds4_bf16_to_f32(uint16_t bits) {
     float f;
     memcpy(&f, &v, sizeof(f));
     return f;
+}
+
+static inline float ds4_f32_round_bf16(float value) {
+    uint32_t bits;
+    memcpy(&bits, &value, sizeof(bits));
+    /* Round-to-nearest-even, preserving NaNs instead of accidentally turning
+     * one into an infinity when the discarded payload rounds upward. */
+    if ((bits & 0x7f800000u) != 0x7f800000u) {
+        bits += 0x7fffu + ((bits >> 16) & 1u);
+    } else if ((bits & 0x007fffffu) != 0u) {
+        bits |= 0x00010000u;
+    }
+    return ds4_bf16_to_f32((uint16_t)(bits >> 16));
+}
+
+/* Hash one already-compressed four-token lookback into the 24 disjoint
+ * Engram buckets for one layer. PyTorch's int64 multiply/XOR wraps in two's
+ * complement and its remainder is normalized into [0, prime); express the
+ * wrap in uint64_t so C never invokes signed-overflow undefined behavior. */
+static void deepseek41_engram_hash_compressed(
+        uint64_t       out[24],
+        const int32_t  tokens[4],
+        const uint32_t primes[24],
+        const uint64_t offsets[24],
+        const uint64_t multipliers[4]) {
+    uint64_t rolling = (uint64_t)(int64_t)tokens[0] * multipliers[0];
+    for (uint32_t ngram = 0; ngram < 3u; ngram++) {
+        rolling ^= (uint64_t)(int64_t)tokens[ngram + 1u] *
+                   multipliers[ngram + 1u];
+        int64_t signed_rolling;
+        memcpy(&signed_rolling, &rolling, sizeof(signed_rolling));
+        for (uint32_t head = 0; head < 8u; head++) {
+            const uint32_t col = ngram * 8u + head;
+            const int64_t prime = (int64_t)primes[col];
+            int64_t bucket = signed_rolling % prime;
+            if (bucket < 0) bucket += prime;
+            out[col] = offsets[col] + (uint64_t)bucket;
+        }
+    }
+}
+
+/* CPU oracle for the trained Engram gate. Normalization is independent for
+ * each HC row; the value vector is shared by all rows. */
+static void deepseek41_engram_inject_reference(
+        float       * out_hc,
+        const float * inp_hc,
+        const float * key_hc,
+        const float * value,
+        const float * q_weight,
+        const float * k_weight,
+        uint32_t      n_embd,
+        uint32_t      n_hc,
+        float         eps) {
+    const float inv_sqrt_dim = 1.0f / sqrtf((float)n_embd);
+    for (uint32_t hc = 0; hc < n_hc; hc++) {
+        const float *h = inp_hc + (uint64_t)hc * n_embd;
+        const float *key = key_hc + (uint64_t)hc * n_embd;
+        const float *qw = q_weight + (uint64_t)hc * n_embd;
+        const float *kw = k_weight + (uint64_t)hc * n_embd;
+        float h2 = 0.0f;
+        float k2 = 0.0f;
+        float dot = 0.0f;
+        for (uint32_t d = 0; d < n_embd; d++) {
+            h2 += h[d] * h[d];
+            k2 += key[d] * key[d];
+            dot += h[d] * (qw[d] * kw[d]) * key[d];
+        }
+        const float rstd = 1.0f / sqrtf(h2 / (float)n_embd + eps) *
+                           (1.0f / sqrtf(k2 / (float)n_embd + eps));
+        dot *= rstd * inv_sqrt_dim;
+        const float signed_root = copysignf(sqrtf(fmaxf(fabsf(dot), 1.0e-6f)), dot);
+        const float gate = signed_root >= 0.0f
+            ? 1.0f / (1.0f + expf(-signed_root))
+            : expf(signed_root) / (1.0f + expf(signed_root));
+        float *out = out_hc + (uint64_t)hc * n_embd;
+        for (uint32_t d = 0; d < n_embd; d++) {
+            out[d] = h[d] + gate * value[d];
+        }
+    }
 }
 
 static float ds4_vec_dot_q4_64a_f32(int n, const block_q4_64a *x, const float *y) {
@@ -10806,6 +10892,160 @@ static void matvec_any(float *out, const ds4_model *m, const ds4_tensor *w, cons
     }
 }
 
+static int deepseek41_engram_slot_for_layer(uint32_t il) {
+    if (il == 1u) return 0;
+    if (il == 14u) return 1;
+    return -1;
+}
+
+static float deepseek41_engram_fp8_value(uint8_t code) {
+    if ((code & 0x7fu) == 0x7fu) {
+        ds4_die("DeepSeek V4.1 Engram table contains an E4M3 NaN");
+    }
+    return ds4_e4m3_to_f32_host(code);
+}
+
+static void deepseek41_engram_record_text_token(
+        ds4_cpu_decode_scratch *scratch,
+        int                     token,
+        uint32_t                pos) {
+    if (!scratch->v41_engram_tokens || pos >= scratch->ctx_size ||
+        token < 0 || (uint32_t)token >= DS4_N_VOCAB) {
+        ds4_die("DeepSeek V4.1 Engram token history is out of bounds");
+    }
+    scratch->v41_engram_tokens[pos] =
+        (int32_t)g_ds4_v41_engram_token_map[token];
+}
+
+static void deepseek41_engram_hash_history(
+        uint64_t                    out[24],
+        const int32_t              *history,
+        uint32_t                    pos,
+        uint32_t                    slot) {
+    int32_t tokens[4];
+    bool blocked = false;
+    for (uint32_t shift = 0; shift < 4u; shift++) {
+        int32_t source = -1;
+        if (!blocked && pos >= shift) {
+            source = history[pos - shift];
+        }
+        blocked = blocked || pos < shift || source < 0;
+        tokens[shift] = blocked ? 2 : source;
+    }
+    deepseek41_engram_hash_compressed(
+        out, tokens,
+        g_ds4_v41_engram_hash_primes + (uint64_t)slot * 24u,
+        g_ds4_v41_engram_hash_offsets + (uint64_t)slot * 24u,
+        g_ds4_v41_engram_hash_multipliers + (uint64_t)slot * 4u);
+}
+
+static void deepseek41_engram_hash_at_position(
+        uint64_t                    out[24],
+        const ds4_cpu_decode_scratch *scratch,
+        uint32_t                    pos,
+        uint32_t                    slot) {
+    deepseek41_engram_hash_history(out, scratch->v41_engram_tokens,
+                                   pos, slot);
+}
+
+static void deepseek41_engram_gather_one(
+        float             *out,
+        const ds4_model   *model,
+        const ds4_weights *weights,
+        const uint64_t     rows[24],
+        uint32_t           slot) {
+    if (!model->engram_model || !weights->engram_external ||
+        slot >= 2u || !weights->engram_table[slot] ||
+        !weights->engram_scale[slot]) {
+        ds4_die("DeepSeek V4.1 Engram sidecar is not bound");
+    }
+    const ds4_tensor *table_tensor = weights->engram_table[slot];
+    const ds4_tensor *scale_tensor = weights->engram_scale[slot];
+    const uint8_t *table = tensor_data(model->engram_model, table_tensor);
+    const uint8_t *scales = tensor_data(model->engram_model, scale_tensor);
+    for (uint32_t col = 0; col < 24u; col++) {
+        const uint64_t row = rows[col];
+        if (row >= table_tensor->dim[1] || row >= scale_tensor->dim[1]) {
+            ds4_die("DeepSeek V4.1 Engram hash row is out of bounds");
+        }
+        const uint8_t *row_data = table + row * DS4_N_ENGRAM_HEAD_DIM;
+        const uint8_t *row_scales = scales + row * DS4_N_ENGRAM_HEAD;
+        float *dst = out + (uint64_t)col * DS4_N_ENGRAM_HEAD_DIM;
+        for (uint32_t block = 0; block < DS4_N_ENGRAM_HEAD; block++) {
+            const float scale = ds4_e8m0_to_f32(row_scales[block]);
+            for (uint32_t d = 0; d < 32u; d++) {
+                const uint32_t at = block * 32u + d;
+                dst[at] = ds4_f32_round_bf16(
+                    deepseek41_engram_fp8_value(row_data[at]) * scale);
+            }
+        }
+    }
+}
+
+static void deepseek41_engram_inject_bf16_weights(
+        float             *hc,
+        const float       *key_hc,
+        const float       *value,
+        const ds4_model   *model,
+        const ds4_tensor  *q_weight_tensor,
+        const ds4_tensor  *k_weight_tensor) {
+    const uint16_t *q_weight = tensor_data(model, q_weight_tensor);
+    const uint16_t *k_weight = tensor_data(model, k_weight_tensor);
+    const float inv_sqrt_dim = 1.0f / sqrtf((float)DS4_N_EMBD);
+    for (uint32_t hci = 0; hci < DS4_N_HC; hci++) {
+        float *h = hc + (uint64_t)hci * DS4_N_EMBD;
+        const float *key = key_hc + (uint64_t)hci * DS4_N_EMBD;
+        const uint16_t *qw = q_weight + (uint64_t)hci * DS4_N_EMBD;
+        const uint16_t *kw = k_weight + (uint64_t)hci * DS4_N_EMBD;
+        float h2 = 0.0f;
+        float k2 = 0.0f;
+        float dot = 0.0f;
+        for (uint32_t d = 0; d < DS4_N_EMBD; d++) {
+            h2 += h[d] * h[d];
+            k2 += key[d] * key[d];
+            dot += h[d] * (ds4_bf16_to_f32(qw[d]) *
+                           ds4_bf16_to_f32(kw[d])) * key[d];
+        }
+        const float rstd = 1.0f / sqrtf(h2 / (float)DS4_N_EMBD + DS4_RMS_EPS) *
+                           (1.0f / sqrtf(k2 / (float)DS4_N_EMBD + DS4_RMS_EPS));
+        dot *= rstd * inv_sqrt_dim;
+        const float signed_root = copysignf(
+            sqrtf(fmaxf(fabsf(dot), 1.0e-6f)), dot);
+        const float gate = signed_root >= 0.0f
+            ? 1.0f / (1.0f + expf(-signed_root))
+            : expf(signed_root) / (1.0f + expf(signed_root));
+        for (uint32_t d = 0; d < DS4_N_EMBD; d++) {
+            h[d] += gate * value[d];
+        }
+    }
+}
+
+static void deepseek41_engram_apply_one(
+        float                   *hc,
+        const ds4_model         *model,
+        const ds4_weights       *weights,
+        const ds4_layer_weights *layer,
+        uint32_t                 il,
+        uint32_t                 pos,
+        ds4_cpu_decode_scratch  *scratch) {
+    const int slot = deepseek41_engram_slot_for_layer(il);
+    if (slot < 0) return;
+    uint64_t rows[24];
+    deepseek41_engram_hash_at_position(rows, scratch, pos, (uint32_t)slot);
+    deepseek41_engram_gather_one(scratch->v41_engram_embed,
+                                 model, weights, rows, (uint32_t)slot);
+    if (layer->engram_wkv->type != DS4_TENSOR_Q8_0) {
+        ds4_die("DeepSeek V4.1 Engram wkv must use the converter's Q8_0 layout");
+    }
+    matvec_q8_0_decode_scratch(scratch->v41_engram_kv,
+                               model, layer->engram_wkv,
+                               scratch->v41_engram_embed, scratch);
+    deepseek41_engram_inject_bf16_weights(
+        hc, scratch->v41_engram_kv,
+        scratch->v41_engram_kv + (uint64_t)DS4_N_HC * DS4_N_EMBD,
+        model, layer->engram_q, layer->engram_k);
+}
+
 
 static float tensor_1d_value(const ds4_model *m, const ds4_tensor *t, uint64_t i) {
     if (i >= t->elements) ds4_die("tensor scalar index is out of bounds");
@@ -15267,10 +15507,27 @@ static void cpu_decode_scratch_init(ds4_cpu_decode_scratch *scratch, uint32_t ct
     scratch->output_weights = xmalloc((size_t)DS4_N_HC * sizeof(float));
     scratch->output_embd = xmalloc((size_t)DS4_N_EMBD * sizeof(float));
     scratch->output_norm = xmalloc((size_t)DS4_N_EMBD * sizeof(float));
+    if (ds4_model_is_deepseek41()) {
+        const uint64_t engram_input =
+            (uint64_t)(DS4_N_ENGRAM_MAX_NGRAM - 1u) *
+            DS4_N_ENGRAM_HEAD * DS4_N_ENGRAM_HEAD_DIM;
+        scratch->v41_engram_tokens = xmalloc(
+            (size_t)ctx_size * sizeof(scratch->v41_engram_tokens[0]));
+        for (uint32_t i = 0; i < ctx_size; i++) {
+            scratch->v41_engram_tokens[i] = -1;
+        }
+        scratch->v41_engram_embed = xmalloc(
+            (size_t)engram_input * sizeof(float));
+        scratch->v41_engram_kv = xmalloc(
+            (size_t)(DS4_N_HC + 1u) * DS4_N_EMBD * sizeof(float));
+    }
 }
 
 static void cpu_decode_scratch_free(ds4_cpu_decode_scratch *scratch) {
     if (!scratch) return;
+    free(scratch->v41_engram_kv);
+    free(scratch->v41_engram_embed);
+    free(scratch->v41_engram_tokens);
     free(scratch->output_norm);
     free(scratch->output_embd);
     free(scratch->output_weights);
@@ -16944,12 +17201,19 @@ static void forward_token_raw_swa_cpu_decode_scratch(
     if (ds4_model_is_deepseek41()) {
         memset(scratch->v41_pre_mix, 0, sizeof(scratch->v41_pre_mix));
         scratch->v41_pre_mix[0] = 1.0f;
+        deepseek41_engram_record_text_token(scratch, token, pos);
     }
 
     const uint32_t n_backbone = ds4_model_is_deepseek41()
         ? directional_steering_layer_count()
         : DS4_N_LAYER;
     for (uint32_t il = 0; il < n_backbone; il++) {
+        if (ds4_model_is_deepseek41() &&
+            deepseek41_engram_slot_for_layer(il) >= 0) {
+            deepseek41_engram_apply_one(cur, model, weights,
+                                        &weights->layer[il], il, pos,
+                                        scratch);
+        }
         layer_forward_raw_swa_one(next, model, &weights->layer[il], cache,
                                   &cache->layer[il],
                                   cur, il, pos, token,
@@ -17002,6 +17266,23 @@ static void prefill_layer_major_cpu(
         const float       * steering_dirs,
         float               steering_attn_scale,
         float               steering_ffn_scale) {
+    /* The generic layer-major prefill still models the original DSV4 cache
+     * topology. Replay V4.1 through the exact single-token path until its
+     * batched path carries Engram and the new shared compressor state too. */
+    if (ds4_model_is_deepseek41()) {
+        if (!prompt || prompt->len <= 0) return;
+        ds4_cpu_decode_scratch scratch;
+        cpu_decode_scratch_init(&scratch, (uint32_t)prompt->len);
+        for (int t = 0; t < prompt->len; t++) {
+            forward_token_raw_swa_cpu_decode_scratch(
+                (t + 1 == prompt->len) ? logits : NULL,
+                model, weights, cache, prompt->v[t], (uint32_t)t,
+                steering_dirs, steering_attn_scale, steering_ffn_scale,
+                &scratch);
+        }
+        cpu_decode_scratch_free(&scratch);
+        return;
+    }
     const uint64_t hc_dim = (uint64_t)DS4_N_HC * DS4_N_EMBD;
     const uint64_t n_tok = (uint64_t)prompt->len;
     float *cur = xmalloc((size_t)n_tok * hc_dim * sizeof(cur[0]));
@@ -21038,6 +21319,8 @@ typedef struct {
     ds4_gpu_tensor *hc_post_by_tier[DS4_MAX_GPUS];  /* views of hc_split */
     ds4_gpu_tensor *hc_comb_by_tier[DS4_MAX_GPUS];  /* views of hc_split */
     ds4_gpu_tensor *v41_pre_mix_by_tier[DS4_MAX_GPUS];
+    ds4_gpu_tensor *v41_engram_embed_by_tier[DS4_MAX_GPUS];
+    ds4_gpu_tensor *v41_engram_kv_by_tier[DS4_MAX_GPUS];
     ds4_gpu_tensor *attn_cur_by_tier[DS4_MAX_GPUS];
     ds4_gpu_tensor *attn_norm_by_tier[DS4_MAX_GPUS];
     ds4_gpu_tensor *qr_by_tier[DS4_MAX_GPUS];
@@ -21315,6 +21598,9 @@ typedef struct {
     bool ssd_streaming_cold;
     bool streaming_static_decode_map_current;
     float *cpu_router_norm;
+    int32_t *v41_engram_tokens;
+    float *v41_engram_host_embed;
+    uint32_t v41_engram_token_cap;
 
     /* Metal network tensor parallelism. These views alias engine-owned
      * transport slabs except tp_logits_half, whose view object is session-owned. */
@@ -21444,6 +21730,8 @@ DS4_GPU_GRAPH_CLASS_P_ACCESSOR(hc_pre)
 DS4_GPU_GRAPH_CLASS_P_ACCESSOR(hc_post)
 DS4_GPU_GRAPH_CLASS_P_ACCESSOR(hc_comb)
 DS4_GPU_GRAPH_CLASS_P_ACCESSOR(v41_pre_mix)
+DS4_GPU_GRAPH_CLASS_P_ACCESSOR(v41_engram_embed)
+DS4_GPU_GRAPH_CLASS_P_ACCESSOR(v41_engram_kv)
 DS4_GPU_GRAPH_CLASS_P_ACCESSOR(attn_cur)
 DS4_GPU_GRAPH_CLASS_P_ACCESSOR(attn_norm)
 DS4_GPU_GRAPH_CLASS_P_ACCESSOR(qr)
@@ -21848,6 +22136,8 @@ static void metal_graph_free(ds4_gpu_graph *g) {
     /* Captured decode-island graphs bake this graph's buffer addresses
      * into their kernel nodes; retire them before the buffers go away. */
     ds4_gpu_decode_graphs_invalidate();
+    free(g->v41_engram_host_embed);
+    free(g->v41_engram_tokens);
     /* free every Class P slot across all DS4_MAX_GPUS tier
      * slots. Unallocated slots are NULL and ds4_gpu_tensor_free(NULL) is a
      * no-op. The hc_pre / hc_post / hc_comb views must be freed BEFORE
@@ -21977,6 +22267,8 @@ static void metal_graph_free(ds4_gpu_graph *g) {
         ds4_gpu_tensor_free(g->hc_post_by_tier[t]);
         ds4_gpu_tensor_free(g->hc_pre_by_tier[t]);
         ds4_gpu_tensor_free(g->hc_split_by_tier[t]);
+        ds4_gpu_tensor_free(g->v41_engram_kv_by_tier[t]);
+        ds4_gpu_tensor_free(g->v41_engram_embed_by_tier[t]);
         ds4_gpu_tensor_free(g->v41_pre_mix_by_tier[t]);
         ds4_gpu_tensor_free(g->hc_mix_by_tier[t]);
         ds4_gpu_tensor_free(g->flat_hc_by_tier[t]);
@@ -23122,6 +23414,19 @@ static bool metal_graph_alloc_raw_cap(
     g->raw_cap = raw_cap;
     g->raw_window = raw_window;
     g->prefill_cap = prefill_cap;
+    if (ds4_model_is_deepseek41()) {
+        const uint64_t engram_input =
+            (uint64_t)(DS4_N_ENGRAM_MAX_NGRAM - 1u) *
+            DS4_N_ENGRAM_HEAD * DS4_N_ENGRAM_HEAD_DIM;
+        g->v41_engram_token_cap = ctx_size;
+        g->v41_engram_tokens = xmalloc(
+            (size_t)ctx_size * sizeof(g->v41_engram_tokens[0]));
+        for (uint32_t i = 0; i < ctx_size; i++) {
+            g->v41_engram_tokens[i] = -1;
+        }
+        g->v41_engram_host_embed = xmalloc(
+            (size_t)engram_input * sizeof(float));
+    }
     uint32_t min_ratio = UINT32_MAX;
     for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
         if (!weights_layer_has_required(&weights->layer[il], il)) continue;
@@ -23242,6 +23547,16 @@ static bool metal_graph_alloc_raw_cap(
             g->v41_pre_mix_by_tier[t] =
                 ds4_gpu_tensor_alloc_ptr_on(t,
                     (uint64_t)DS4_N_HC * sizeof(float));
+            const uint64_t engram_input =
+                (uint64_t)(DS4_N_ENGRAM_MAX_NGRAM - 1u) *
+                DS4_N_ENGRAM_HEAD * DS4_N_ENGRAM_HEAD_DIM;
+            g->v41_engram_embed_by_tier[t] =
+                ds4_gpu_tensor_alloc_ptr_on(t,
+                    engram_input * sizeof(float));
+            g->v41_engram_kv_by_tier[t] =
+                ds4_gpu_tensor_alloc_ptr_on(t,
+                    (uint64_t)(DS4_N_HC + 1u) * DS4_N_EMBD *
+                    sizeof(float));
         }
         g->attn_cur_by_tier[t] = ds4_gpu_tensor_alloc_ptr_on(t, (uint64_t)DS4_N_EMBD * sizeof(float));
         g->attn_norm_by_tier[t] = ds4_gpu_tensor_alloc_ptr_on(t, (uint64_t)DS4_N_EMBD * sizeof(float));
@@ -23623,7 +23938,10 @@ static bool metal_graph_alloc_raw_cap(
         class_p_ok =
             g->cur_hc_by_tier[t] && g->flat_hc_by_tier[t] && g->hc_mix_by_tier[t] && g->hc_split_by_tier[t] &&
             g->hc_pre_by_tier[t] && g->hc_post_by_tier[t] && g->hc_comb_by_tier[t] &&
-            (!ds4_model_is_deepseek41() || g->v41_pre_mix_by_tier[t]) &&
+            (!ds4_model_is_deepseek41() ||
+             (g->v41_pre_mix_by_tier[t] &&
+              g->v41_engram_embed_by_tier[t] &&
+              g->v41_engram_kv_by_tier[t])) &&
             g->attn_cur_by_tier[t] && g->attn_norm_by_tier[t] && g->qr_by_tier[t] && g->qr_norm_by_tier[t] &&
             g->q_by_tier[t] && g->kv_raw_by_tier[t] && g->kv_by_tier[t] &&
             g->comp_kv_cur_by_tier[t] && g->comp_sc_cur_by_tier[t] &&
@@ -23685,6 +24003,8 @@ static bool metal_graph_alloc_raw_cap(
                     /* Class E — validate the emb_tier slot. */
                     metal_graph_prefill_tokens(g) &&
                     g->cpu_router_norm &&
+                    (!ds4_model_is_deepseek41() ||
+                     (g->v41_engram_tokens && g->v41_engram_host_embed)) &&
                     (!DS4_GPU_ATTN_COMP_CACHE_F16 || g->batch_q_half) &&
                     g->prefill_seed_router_selected;
     if (!ok) metal_graph_free(g);
@@ -34117,6 +34437,63 @@ static bool metal_graph_dspark_capture_verified_suffix_layer(
     return ok;
 }
 
+static bool metal_graph_v41_engram_record_text_token(
+        ds4_gpu_graph *g,
+        int            token,
+        uint32_t       pos) {
+    if (!g || !g->v41_engram_tokens ||
+        pos >= g->v41_engram_token_cap || token < 0 ||
+        (uint32_t)token >= DS4_N_VOCAB) return false;
+    g->v41_engram_tokens[pos] =
+        (int32_t)g_ds4_v41_engram_token_map[token];
+    return true;
+}
+
+static bool metal_graph_v41_engram_apply_one(
+        ds4_gpu_graph          *g,
+        const ds4_model        *model,
+        const ds4_weights      *weights,
+        const ds4_layer_weights *layer,
+        uint32_t                il,
+        uint32_t                pos) {
+    const int slot = deepseek41_engram_slot_for_layer(il);
+    if (slot < 0) return true;
+    if (!g || !g->v41_engram_host_embed || !layer->engram_wkv ||
+        layer->engram_wkv->type != DS4_TENSOR_Q8_0) return false;
+    if (g->placement) {
+        const int tier = g->placement[il + 1u];
+        if (!metal_graph_set_active_tier_decode(g, tier)) return false;
+    }
+
+    uint64_t rows[24];
+    deepseek41_engram_hash_history(rows, g->v41_engram_tokens,
+                                   pos, (uint32_t)slot);
+    deepseek41_engram_gather_one(g->v41_engram_host_embed,
+                                 model, weights, rows, (uint32_t)slot);
+    const uint64_t engram_input =
+        (uint64_t)(DS4_N_ENGRAM_MAX_NGRAM - 1u) *
+        DS4_N_ENGRAM_HEAD * DS4_N_ENGRAM_HEAD_DIM;
+    bool ok = ds4_gpu_tensor_write(
+        metal_graph_v41_engram_embed(g), 0,
+        g->v41_engram_host_embed,
+        engram_input * sizeof(float)) != 0;
+    if (ok) {
+        ok = metal_graph_matmul_plain_tensor(
+            metal_graph_v41_engram_kv(g), model, layer->engram_wkv,
+            engram_input, (uint64_t)(DS4_N_HC + 1u) * DS4_N_EMBD,
+            metal_graph_v41_engram_embed(g), 1);
+    }
+    if (ok) {
+        ok = ds4_gpu_v41_engram_inject_tensor(
+            metal_graph_cur_hc(g), metal_graph_v41_engram_kv(g),
+            model->map, model->size,
+            layer->engram_q->abs_offset,
+            layer->engram_k->abs_offset,
+            DS4_N_EMBD, DS4_N_HC, DS4_RMS_EPS) != 0;
+    }
+    return ok;
+}
+
 /* Encode a full single-token decode step on Metal.  This is the generation
  * hot path: update caches, run all layers, then produce logits. */
 static bool metal_graph_encode_token_raw_swa(
@@ -34138,6 +34515,23 @@ static bool metal_graph_encode_token_raw_swa(
     const uint32_t raw_row = pos % g->raw_cap;
     const uint32_t n_raw = metal_graph_raw_span_for_batch(g, pos, 1);
     metal_graph_dspark_capture_begin(g);
+    if (ds4_model_is_deepseek41() &&
+        !metal_graph_v41_engram_record_text_token(g, token, pos)) {
+        fprintf(stderr,
+                "ds4: DeepSeek V4.1 Engram requires a host token id for streamed decode\n");
+        return false;
+    }
+    if (ds4_model_is_deepseek41()) {
+        /* A device-resident token cannot feed the host-side random Engram
+         * lookup without a readback. V4.1 speculative/greedy-chain routing is
+         * kept disabled until that state transition has an exact GPU hash. */
+        if (token_dev ||
+            !metal_graph_v41_engram_record_text_token(g, token, pos)) {
+            fprintf(stderr,
+                    "ds4: DeepSeek V4.1 Engram requires a host token id for decode\n");
+            return false;
+        }
+    }
 
     /* write the embedded token on the embedding tier. Single-
      * tier: emb_tier == 0 == active_tier; no-op. Multi-tier: switch to
@@ -34217,6 +34611,11 @@ static bool metal_graph_encode_token_raw_swa(
         ? directional_steering_layer_count()
         : DS4_N_LAYER;
     for (uint32_t il = 0; ok && il < n_backbone; il++) {
+        if (ds4_model_is_deepseek41()) {
+            ok = metal_graph_v41_engram_apply_one(
+                g, model, weights, &weights->layer[il], il, pos);
+        }
+        if (!ok) break;
         ok = metal_graph_encode_decode_layer(g,
                                              model,
                                              &weights->layer[il],
@@ -37836,8 +38235,21 @@ static bool metal_graph_eval_token_raw_swa_streaming(
                                            DS4_N_EMBD,
                                            DS4_N_HC) != 0;
     }
+    if (ok && ds4_model_is_deepseek41()) {
+        const float identity_pre[DS4_MAX_HC] = {1.0f, 0.0f, 0.0f, 0.0f};
+        ok = ds4_gpu_tensor_write(metal_graph_v41_pre_mix(g), 0,
+                                  identity_pre,
+                                  (uint64_t)DS4_N_HC * sizeof(float)) != 0;
+    }
     if (batch_static_decode) {
-        for (uint32_t il = 0; ok && il < DS4_N_LAYER; il++) {
+        const uint32_t n_backbone = ds4_model_is_deepseek41()
+            ? directional_steering_layer_count() : DS4_N_LAYER;
+        for (uint32_t il = 0; ok && il < n_backbone; il++) {
+            if (ds4_model_is_deepseek41()) {
+                ok = metal_graph_v41_engram_apply_one(
+                    g, model, weights, &weights->layer[il], il, pos);
+            }
+            if (!ok) break;
             ok = metal_graph_encode_decode_layer(g,
                                                  model,
                                                  &weights->layer[il],
@@ -37889,7 +38301,9 @@ static bool metal_graph_eval_token_raw_swa_streaming(
 
     double encode_s = 0.0;
     double execute_s = 0.0;
-    for (uint32_t il = 0; ok && il < DS4_N_LAYER; il++) {
+    const uint32_t n_backbone = ds4_model_is_deepseek41()
+        ? directional_steering_layer_count() : DS4_N_LAYER;
+    for (uint32_t il = 0; ok && il < n_backbone; il++) {
         const double tl0 = profile ? now_sec() : 0.0;
         if (!static_decode_map && !metal_graph_stream_map_layer_decode(model, weights, il)) {
             ok = false;
@@ -37901,6 +38315,10 @@ static bool metal_graph_eval_token_raw_swa_streaming(
             metal_graph_stream_readahead_output(model, weights);
         }
         if (ok) ok = ds4_gpu_begin_commands() != 0;
+        if (ok && ds4_model_is_deepseek41()) {
+            ok = metal_graph_v41_engram_apply_one(
+                g, model, weights, &weights->layer[il], il, pos);
+        }
         bool encoded_layer = false;
         if (ok) {
             ok = metal_graph_encode_decode_layer(g,
@@ -38310,7 +38728,8 @@ static bool metal_graph_prefill_decode_streaming_range(
         ds4_session_cancel_fn  cancel,
         void                  *cancel_ud,
         bool                  *cancelled) {
-    if (!metal_graph_use_streaming_decode_prefill(g, weights, n_tokens)) return false;
+    if (!ds4_model_is_deepseek41() &&
+        !metal_graph_use_streaming_decode_prefill(g, weights, n_tokens)) return false;
     if (!prompt || start > (uint32_t)prompt->len ||
         n_tokens > (uint32_t)prompt->len - start) return false;
     if (start == 0) {
@@ -41679,6 +42098,16 @@ static bool metal_graph_reset_prefill_state(ds4_gpu_graph *g) {
     memset(g->layer_n_comp, 0, sizeof(g->layer_n_comp));
     memset(g->layer_n_index_comp, 0, sizeof(g->layer_n_index_comp));
     g->mtp_n_raw = 0;
+    if (g->v41_engram_tokens && g->v41_engram_token_cap != 0) {
+        for (uint32_t i = 0; i < g->v41_engram_token_cap; i++) {
+            g->v41_engram_tokens[i] = -1;
+        }
+    }
+    g->v41_candidate_epoch = 0;
+    g->v41_candidate_n_comp = 0;
+    g->v41_candidate_source_tier = -1;
+    memset(g->v41_candidate_tier_epoch, 0,
+           sizeof(g->v41_candidate_tier_epoch));
     metal_graph_dspark_cache_reset(g);
     metal_graph_dspark_capture_invalidate(g);
     for (uint32_t il = 0; il < DS4_N_LAYER; il++) {
@@ -42761,7 +43190,8 @@ static bool metal_graph_prefill_raw_swa(
         bool                  *cancelled) {
     if (n_tokens <= 0 || n_tokens > prompt->len) return false;
     if ((uint32_t)n_tokens > g->prefill_cap) return false;
-    if (metal_graph_use_streaming_decode_prefill_range(g, weights, 0,
+    if (ds4_model_is_deepseek41() ||
+        metal_graph_use_streaming_decode_prefill_range(g, weights, 0,
                                                        (uint32_t)n_tokens)) {
         return metal_graph_prefill_decode_streaming_range(g,
                                                           model,
@@ -42851,8 +43281,9 @@ static bool metal_graph_prefill_chunked_range(
         ds4_gpu_stream_expert_cache_reset_route_hotness();
     }
     if (!imatrix &&
-        metal_graph_use_streaming_decode_prefill_range(g, weights,
-                                                       start, n_tokens)) {
+        (ds4_model_is_deepseek41() ||
+         metal_graph_use_streaming_decode_prefill_range(g, weights,
+                                                        start, n_tokens))) {
         return metal_graph_prefill_decode_streaming_range(g,
                                                           model,
                                                           weights,
@@ -64901,12 +65332,16 @@ static bool ds4_engine_glm_mtp_spec_enabled(const ds4_engine *e) {
 #endif
 
 bool ds4_engine_has_mtp(ds4_engine *e) {
-    return e && e->backend != DS4_BACKEND_CPU &&
+    /* V4.1's target verifier is intentionally disabled until its multi-row
+     * path carries Engram and hierarchical compressor state per proposal. */
+    return e && !ds4_model_is_deepseek41() &&
+           e->backend != DS4_BACKEND_CPU &&
            e->distributed.role == DS4_DISTRIBUTED_NONE &&
            e->mtp_ready;
 }
 
 int ds4_engine_mtp_draft_tokens(ds4_engine *e) {
+    if (e && ds4_model_is_deepseek41()) return 0;
     if (e && DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_QWEN &&
         e->backend != DS4_BACKEND_CPU && qwen_has_mtp(&e->model)) {
         const char *depth = getenv("DS4_QWEN_MTP_K");
@@ -72575,6 +73010,31 @@ void ds4_test_deepseek41_candidate_mask(
         uint32_t      compress_len) {
     deepseek41_candidate_mask_from_scores(out, scores,
                                            n_comp, compress_len);
+}
+
+void ds4_test_deepseek41_engram_hash(
+        uint64_t       out[24],
+        const int32_t  tokens[4],
+        const uint32_t primes[24],
+        const uint64_t offsets[24],
+        const uint64_t multipliers[4]) {
+    deepseek41_engram_hash_compressed(out, tokens, primes,
+                                      offsets, multipliers);
+}
+
+void ds4_test_deepseek41_engram_inject(
+        float       * out_hc,
+        const float * inp_hc,
+        const float * key_hc,
+        const float * value,
+        const float * q_weight,
+        const float * k_weight,
+        uint32_t      n_embd,
+        uint32_t      n_hc,
+        float         eps) {
+    deepseek41_engram_inject_reference(out_hc, inp_hc, key_hc, value,
+                                       q_weight, k_weight,
+                                       n_embd, n_hc, eps);
 }
 
 int ds4_test_tensor_to_entry(const char *name, int name_len) {
@@ -86913,6 +87373,10 @@ bool ds4_session_prompt_lookup_supported(const ds4_session *s) {
         !prompt_lookup_draft_enabled()) {
         return false;
     }
+    /* The V4.1 single-token target is exact, but its multi-row verifier does
+     * not yet carry per-row Engram/history and HC-pre state. Never silently
+     * route it through the older DSV4 verifier. */
+    if (ds4_model_is_deepseek41()) return false;
     if (ds4_session_is_qwen4(s)) {
         return s->qwen4_graph_ready && !s->qwen4_graph.ssd_streaming &&
                s->qwen4_graph.snap_ple_hist != NULL &&
@@ -86933,7 +87397,8 @@ bool ds4_engine_prompt_lookup_supported(const ds4_engine *e) {
     (void)e;
     return false;
 #else
-    return e && e->backend == DS4_BACKEND_METAL && e->metal_ready &&
+    return e && !ds4_model_is_deepseek41() &&
+           e->backend == DS4_BACKEND_METAL && e->metal_ready &&
            prompt_lookup_draft_enabled() &&
            (g_ds4_shape.family != DS4_MODEL_FAMILY_GLM_DSA ||
             prompt_lookup_glm_enabled());

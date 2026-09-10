@@ -5828,6 +5828,63 @@ kernel void kernel_v41_candidate_expand_mask(
         block_mask[(ulong)t * n_blocks + c / block_size];
 }
 
+// DeepSeek-V4.1 Engram gate and residual injection. One threadgroup owns one
+// hyperconnection row and reduces its normalized key match before updating the
+// row with the value shared by all HC copies.
+kernel void kernel_v41_engram_inject(
+        device       float  *hc [[buffer(0)]],
+        device const float  *kv [[buffer(1)]],
+        device const ushort *q_weight [[buffer(2)]],
+        device const ushort *k_weight [[buffer(3)]],
+        constant uint &n_embd [[buffer(4)]],
+        constant uint &n_hc [[buffer(5)]],
+        constant float &eps [[buffer(6)]],
+        uint hci [[threadgroup_position_in_grid]],
+        uint tid [[thread_position_in_threadgroup]],
+        uint nth [[threads_per_threadgroup]]) {
+    if (hci >= n_hc) return;
+    const ulong base = (ulong)hci * n_embd;
+    device float *h = hc + base;
+    device const float *key = kv + base;
+    device const float *value = kv + (ulong)n_hc * n_embd;
+    device const ushort *qw = q_weight + base;
+    device const ushort *kw = k_weight + base;
+    float h2 = 0.0f;
+    float k2 = 0.0f;
+    float dot = 0.0f;
+    for (uint d = tid; d < n_embd; d += nth) {
+        const float hv = h[d];
+        const float keyv = key[d];
+        h2 += hv * hv;
+        k2 += keyv * keyv;
+        dot += hv * bf16_to_f32_dsv4(qw[d]) *
+               bf16_to_f32_dsv4(kw[d]) * keyv;
+    }
+    threadgroup float h2_sum[256];
+    threadgroup float k2_sum[256];
+    threadgroup float dot_sum[256];
+    h2_sum[tid] = h2;
+    k2_sum[tid] = k2;
+    dot_sum[tid] = dot;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    for (uint stride = nth >> 1u; stride != 0u; stride >>= 1u) {
+        if (tid < stride) {
+            h2_sum[tid] += h2_sum[tid + stride];
+            k2_sum[tid] += k2_sum[tid + stride];
+            dot_sum[tid] += dot_sum[tid + stride];
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+    const float inv_h = rsqrt(h2_sum[0] / float(n_embd) + eps);
+    const float inv_k = rsqrt(k2_sum[0] / float(n_embd) + eps);
+    const float match = dot_sum[0] * inv_h * inv_k * rsqrt(float(n_embd));
+    const float signed_root = copysign(sqrt(max(abs(match), 1.0e-6f)), match);
+    const float gate = 1.0f / (1.0f + exp(-signed_root));
+    for (uint d = tid; d < n_embd; d += nth) {
+        h[d] += gate * value[d];
+    }
+}
+
 // Sorts each token's selected compressed rows by row id. The indexer selects by
 // score, but attention scans compressed K/V in cache order in the dense graph.
 // Sorting preserves that order while still letting the indexed attention kernel

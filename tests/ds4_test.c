@@ -1403,6 +1403,47 @@ static void test_metal_v41_candidate_blocks(void) {
     ds4_gpu_tensor_free(score_t);
 }
 
+static void test_metal_v41_engram_inject(void) {
+    enum { N_EMBD = 2, N_HC = 2 };
+    const float h[4] = {1, 2, -2, 1};
+    const float kv[6] = {3, 4, 4, -3, 0.5f, -0.25f};
+    const float want[4] = {
+        1.38243587f, 1.80878207f, -1.88243587f, 0.94121793f,
+    };
+    float got[4] = {0};
+    const uint64_t page = (uint64_t)getpagesize();
+    void *model_raw = NULL;
+    TEST_ASSERT(posix_memalign(&model_raw, (size_t)page, (size_t)page) == 0);
+    ds4_gpu_tensor *h_t = ds4_gpu_tensor_alloc(sizeof(h));
+    ds4_gpu_tensor *kv_t = ds4_gpu_tensor_alloc(sizeof(kv));
+    TEST_ASSERT(model_raw && h_t && kv_t);
+    if (!model_raw || !h_t || !kv_t) {
+        free(model_raw);
+        ds4_gpu_tensor_free(kv_t);
+        ds4_gpu_tensor_free(h_t);
+        return;
+    }
+    memset(model_raw, 0, (size_t)page);
+    uint16_t *weights = model_raw;
+    for (uint32_t i = 0; i < 2u * N_EMBD * N_HC; i++) {
+        weights[i] = 0x3f80u; /* BF16 1.0 */
+    }
+    const uint64_t k_offset = (uint64_t)N_EMBD * N_HC * sizeof(uint16_t);
+    TEST_ASSERT(ds4_gpu_tensor_write(h_t, 0, h, sizeof(h)) != 0);
+    TEST_ASSERT(ds4_gpu_tensor_write(kv_t, 0, kv, sizeof(kv)) != 0);
+    TEST_ASSERT(ds4_gpu_set_model_map(model_raw, page) != 0);
+    TEST_ASSERT(ds4_gpu_v41_engram_inject_tensor(
+        h_t, kv_t, model_raw, page, 0, k_offset,
+        N_EMBD, N_HC, 1.0e-6f) != 0);
+    TEST_ASSERT(ds4_gpu_tensor_read(h_t, 0, got, sizeof(got)) != 0);
+    for (uint32_t i = 0; i < 4u; i++) {
+        TEST_ASSERT(fabsf(got[i] - want[i]) < 2.0e-5f);
+    }
+    ds4_gpu_tensor_free(kv_t);
+    ds4_gpu_tensor_free(h_t);
+    free(model_raw);
+}
+
 static void test_metal_f16_compressor_pair_state_store_exact_case(
         uint32_t width,
         uint32_t ratio,
@@ -6334,6 +6375,7 @@ static void test_metal_kernel_group(void) {
 #if defined(__APPLE__)
     test_metal_v41_compressor_pool();
     test_metal_v41_candidate_blocks();
+    test_metal_v41_engram_inject();
     test_metal_batch_qkv_finalizer_exact();
     test_metal_f16_compressor_pair_state_store_exact();
     test_metal_comp_rows_update_exact();
