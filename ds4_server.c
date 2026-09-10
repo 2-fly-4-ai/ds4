@@ -14959,12 +14959,24 @@ static bool send_models(server *s, int fd) {
         append_model_json(&b, s, "qwen3.8-flash-next-chat");
         buf_putc(&b, ',');
         append_model_json(&b, s, "qwen3.8-flash-next-reasoner");
+    } else if (ds4_engine_is_glm53(s->engine)) {
+        append_model_json(&b, s, "glm-5.3-flash");
+        buf_putc(&b, ',');
+        append_model_json(&b, s, "glm-5.3-flash-chat");
+        buf_putc(&b, ',');
+        append_model_json(&b, s, "glm-5.3-flash-reasoner");
     } else if (ds4_engine_is_glm_dsa(s->engine)) {
         append_model_json(&b, s, "glm-5.2");
         buf_putc(&b, ',');
         append_model_json(&b, s, "glm-5.2-chat");
         buf_putc(&b, ',');
         append_model_json(&b, s, "glm-5.2-reasoner");
+    } else if (ds4_engine_is_deepseek41(s->engine)) {
+        append_model_json(&b, s, "deepseek-v4.1-flash");
+        buf_putc(&b, ',');
+        append_model_json(&b, s, "deepseek-v4.1-flash-chat");
+        buf_putc(&b, ',');
+        append_model_json(&b, s, "deepseek-v4.1-flash-reasoner");
     } else {
         append_model_json(&b, s, "deepseek-v4-flash");
         buf_putc(&b, ',');
@@ -17958,6 +17970,11 @@ static void test_model_alias_thinking_controls(void) {
     TEST_ASSERT(model_alias_disables_thinking("zai/glm-5.2-chat"));
     TEST_ASSERT(!model_alias_disables_thinking("glm-5.2"));
     TEST_ASSERT(model_alias_enables_thinking("deepseek-reasoner"));
+    TEST_ASSERT(model_alias_disables_thinking("deepseek-v4.1-flash-chat"));
+    TEST_ASSERT(model_alias_enables_thinking("deepseek-v4.1-flash-reasoner"));
+    TEST_ASSERT(server_model_alias_known("deepseek-v4.1-flash"));
+    TEST_ASSERT(server_model_alias_known("deepseek-v4.1-flash-chat"));
+    TEST_ASSERT(server_model_alias_known("deepseek-v4.1-flash-reasoner"));
     TEST_ASSERT(model_alias_enables_thinking("glm-5.2-reasoner"));
     TEST_ASSERT(model_alias_enables_thinking("zai/glm-5.2-reasoner"));
     TEST_ASSERT(server_model_alias_known("glm-5.2-chat"));
