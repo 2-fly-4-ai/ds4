@@ -741,6 +741,9 @@ typedef struct {
 typedef struct {
     char *role;
     char *content;
+    /* DeepSeek V4.1 quick-instruction extension: action/title/query/
+     * authority/domain/read_url. Ignored by other model syntaxes. */
+    char *task;
     server_image_inputs images;
     char *reasoning;
     char *tool_call_id;
@@ -880,6 +883,7 @@ static void chat_msg_add_tool_call_id(chat_msg *m, const char *id) {
 static void chat_msg_free(chat_msg *m) {
     free(m->role);
     free(m->content);
+    free(m->task);
     server_image_inputs_free(&m->images);
     free(m->reasoning);
     free(m->tool_call_id);
@@ -2135,6 +2139,11 @@ static bool parse_messages(const char **p, chat_msgs *msgs) {
                     free(key);
                     goto fail;
                 }
+            } else if (!strcmp(key, "task")) {
+                if (!json_string_replace(p, &msg.task)) {
+                    free(key);
+                    goto fail;
+                }
             } else if (!strcmp(key, "tool_call_id")) {
                 char *id = NULL;
                 if (!json_string(p, &id)) {
@@ -3171,6 +3180,38 @@ static bool role_is_user_like(const char *role) {
     return !strcmp(role, "user") || !strcmp(role, "tool") || !strcmp(role, "function");
 }
 
+static const char *deepseek41_task_token(const char *task) {
+    if (!task) return NULL;
+    if (!strcmp(task, "action")) return "<｜action｜>";
+    if (!strcmp(task, "title")) return "<｜title｜>";
+    if (!strcmp(task, "query")) return "<｜query｜>";
+    if (!strcmp(task, "authority")) return "<｜authority｜>";
+    if (!strcmp(task, "domain")) return "<｜domain｜>";
+    if (!strcmp(task, "read_url")) return "<｜read_url｜>";
+    return NULL;
+}
+
+static bool validate_deepseek41_message_extensions(const chat_msgs *msgs,
+                                                   char *err, size_t errlen) {
+    for (int i = 0; msgs && i < msgs->len; i++) {
+        const chat_msg *m = &msgs->v[i];
+        if (!m->task) continue;
+        if (!deepseek41_task_token(m->task)) {
+            snprintf(err, errlen, "unsupported DeepSeek V4.1 task: %s", m->task);
+            return false;
+        }
+        bool role_ok = !strcmp(m->task, "title") ?
+                       !strcmp(m->role, "assistant") :
+                       !strcmp(m->role, "user");
+        if (!role_ok) {
+            snprintf(err, errlen, "DeepSeek V4.1 task %s is invalid on role %s",
+                     m->task, m->role ? m->role : "");
+            return false;
+        }
+    }
+    return true;
+}
+
 static bool chat_history_uses_tool_context(const chat_msgs *msgs,
                                            const char *tool_schemas) {
     if (tool_schemas && tool_schemas[0]) return true;
@@ -3317,7 +3358,22 @@ static char *render_deepseek41_chat_prompt_text(const chat_msgs *msgs,
         } else if (!strcmp(m->role, "user")) {
             buf_puts(&out, "<｜User｜>");
             buf_puts(&out, m->content ? m->content : "");
-            pending_assistant = true;
+            const char *task_token = deepseek41_task_token(m->task);
+            if (task_token) {
+                if (!strcmp(m->task, "action")) {
+                    buf_puts(&out, "<｜Assistant｜>");
+                    buf_puts(&out, think ? "<think>" : "</think>");
+                }
+                buf_puts(&out, task_token);
+                pending_assistant = false;
+            } else {
+                pending_assistant = true;
+            }
+            pending_tool_result = false;
+        } else if (!strcmp(m->role, "latest_reminder")) {
+            buf_puts(&out, "<｜latest_reminder｜>");
+            buf_puts(&out, m->content ? m->content : "");
+            pending_assistant = false;
             pending_tool_result = false;
         } else if (!strcmp(m->role, "tool") || !strcmp(m->role, "function")) {
             if (!pending_tool_result) buf_puts(&out, "<｜User｜>");
@@ -3340,6 +3396,8 @@ static char *render_deepseek41_chat_prompt_text(const chat_msgs *msgs,
             buf_puts(&out, m->content ? m->content : "");
             append_v41_dsml_tool_calls_text(&out, &m->calls);
             buf_puts(&out, "<｜end▁of▁sentence｜>");
+            if (m->task && !strcmp(m->task, "title"))
+                buf_puts(&out, "<｜title｜>");
             pending_assistant = false;
             pending_tool_result = false;
         }
@@ -4271,6 +4329,13 @@ static bool parse_chat_request(ds4_engine *e, server *s, const char *body, int d
     if (*p != '}') goto bad;
     if (!got_messages) {
         snprintf(err, errlen, "missing messages");
+        chat_msgs_free(&msgs);
+        free(tool_schemas);
+        request_free(r);
+        return false;
+    }
+    if (r->model_syntax == SERVER_MODEL_SYNTAX_DEEPSEEK41 &&
+        !validate_deepseek41_message_extensions(&msgs, err, errlen)) {
         chat_msgs_free(&msgs);
         free(tool_schemas);
         request_free(r);
@@ -18023,6 +18088,56 @@ static void test_deepseek41_prompt_and_dsml_contract(void) {
     TEST_ASSERT(strstr(custom_effort,
         "<｜System｜>Reasoning Effort: 88 (range 1-100, the higher the value, the more thorough the reasoning)\n\n") != NULL);
     free(custom_effort);
+
+    chat_msgs quick = {0};
+    chat_msg reminder = {0};
+    reminder.role = xstrdup("latest_reminder");
+    reminder.content = xstrdup("2026-09-11,Fiji");
+    chat_msgs_push(&quick, reminder);
+    chat_msg query = {0};
+    query.role = xstrdup("user");
+    query.content = xstrdup("weather today");
+    query.task = xstrdup("query");
+    chat_msgs_push(&quick, query);
+    char *quick_prompt = render_chat_prompt_text_for_syntax(
+        SERVER_MODEL_SYNTAX_DEEPSEEK41, &quick, NULL, NULL,
+        DS4_THINK_NONE);
+    TEST_ASSERT(!strcmp(quick_prompt,
+        "<｜begin▁of▁sentence｜><｜latest_reminder｜>2026-09-11,Fiji"
+        "<｜User｜>weather today<｜query｜>"));
+    free(quick_prompt);
+    chat_msgs_free(&quick);
+
+    chat_msgs action_msgs = {0};
+    chat_msg action = {0};
+    action.role = xstrdup("user");
+    action.content = xstrdup("current weather");
+    action.task = xstrdup("action");
+    chat_msgs_push(&action_msgs, action);
+    char *action_prompt = render_chat_prompt_text_for_syntax_with_v41_budget(
+        SERVER_MODEL_SYNTAX_DEEPSEEK41, &action_msgs, NULL, NULL,
+        DS4_THINK_HIGH, 61);
+    TEST_ASSERT(!strcmp(action_prompt,
+        "<｜begin▁of▁sentence｜><｜System｜>"
+        "Reasoning Effort: 61 (range 1-100, the higher the value, the more thorough the reasoning)\n\n"
+        "<｜User｜>current weather<｜Assistant｜><think><｜action｜>"));
+    free(action_prompt);
+    chat_msgs_free(&action_msgs);
+
+    const char *task_json =
+        "[{\"role\":\"user\",\"content\":\"classify\",\"task\":\"domain\"}]";
+    chat_msgs parsed_task = {0};
+    TEST_ASSERT(parse_messages(&task_json, &parsed_task));
+    TEST_ASSERT(parsed_task.len == 1 &&
+                !strcmp(parsed_task.v[0].task, "domain"));
+    char task_err[128] = {0};
+    TEST_ASSERT(validate_deepseek41_message_extensions(
+        &parsed_task, task_err, sizeof(task_err)));
+    free(parsed_task.v[0].task);
+    parsed_task.v[0].task = xstrdup("invalid");
+    TEST_ASSERT(!validate_deepseek41_message_extensions(
+        &parsed_task, task_err, sizeof(task_err)));
+    chat_msgs_free(&parsed_task);
 
     chat_msgs system_history = {0};
     chat_msg leading_system = {0};
