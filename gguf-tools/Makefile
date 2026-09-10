@@ -45,12 +45,16 @@ endif
 CFLAGS ?= -O3 -Wall -Wextra -std=c11 $(NATIVE_CPU_FLAG)
 CPPFLAGS ?= -D_GNU_SOURCE
 
-.PHONY: all clean quality-score quality-llama-score gguf-requantize-dense test-deepseek41-manifest
+.PHONY: all clean quality-score quality-llama-score gguf-requantize-dense \
+	test-deepseek41-manifest test-deepseek41-mxfp4
 
 all: deepseek4-quantize gguf-requantize-dense $(QUANTS_SHARED)
 
 test-deepseek41-manifest:
 	python3 -m unittest tests/test_deepseek41_manifest.py
+
+test-deepseek41-mxfp4:
+	python3 -m unittest tests/test_deepseek41_mxfp4.py
 
 gguf-requantize-dense: gguf_requantize_dense.c quants.c quants.h
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ gguf_requantize_dense.c quants.c -lm -pthread

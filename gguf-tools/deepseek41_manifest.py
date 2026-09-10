@@ -304,6 +304,49 @@ def read_exact_response(response, length, label):
     return data
 
 
+def load_checkpoint_headers(
+    hf_dir,
+    weight_map,
+    fetch_missing_headers=False,
+    repo=DEFAULT_REPO,
+    revision=DEFAULT_REVISION,
+):
+    """Load local headers and optionally range-fetch headers for absent shards."""
+    shard_names = sorted(set(weight_map.values()))
+    tensors = {}
+    missing_shards = []
+    remote_shards = []
+    for shard_name in shard_names:
+        path = os.path.join(hf_dir, shard_name)
+        if not os.path.isfile(path):
+            if not fetch_missing_headers:
+                missing_shards.append(shard_name)
+                continue
+            remote_shards.append(shard_name)
+            continue
+        header = load_safetensors_header(path)
+        for name, info in header.items():
+            if weight_map.get(name) != shard_name:
+                fail(f"{shard_name}: {name} is assigned to {weight_map.get(name)!r}")
+            if name in tensors:
+                fail(f"duplicate tensor in shard headers: {name}")
+            tensors[name] = dict(info, shard=shard_name, remote=False)
+
+    if remote_shards:
+        def fetch(shard_name):
+            return shard_name, load_remote_safetensors_header(repo, revision, shard_name)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+            for shard_name, header in executor.map(fetch, remote_shards):
+                for name, info in header.items():
+                    if weight_map.get(name) != shard_name:
+                        fail(f"{shard_name}: {name} is assigned to {weight_map.get(name)!r}")
+                    if name in tensors:
+                        fail(f"duplicate tensor in shard headers: {name}")
+                    tensors[name] = dict(info, shard=shard_name, remote=True)
+    return tensors, missing_shards
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("hf_dir", help="downloaded deepseek-ai/DeepSeek-V4.1-Flash directory")
@@ -335,42 +378,15 @@ def main():
         os.path.join(args.hf_dir, "model.safetensors.index.json")
     )
     validate_index(weight_map)
-
     shard_names = sorted(set(weight_map.values()))
-    tensors = {}
-    missing_shards = []
-    remote_shards = []
-    for shard_name in shard_names:
-        path = os.path.join(args.hf_dir, shard_name)
-        if not os.path.isfile(path):
-            if not args.fetch_missing_headers:
-                missing_shards.append(shard_name)
-                continue
-            remote_shards.append(shard_name)
-            continue
-        else:
-            header = load_safetensors_header(path)
-        for name, info in header.items():
-            if weight_map.get(name) != shard_name:
-                fail(f"{shard_name}: {name} is assigned to {weight_map.get(name)!r}")
-            if name in tensors:
-                fail(f"duplicate tensor in shard headers: {name}")
-            tensors[name] = info
 
-    if remote_shards:
-        def fetch(shard_name):
-            return shard_name, load_remote_safetensors_header(
-                args.repo, args.revision, shard_name
-            )
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
-            for shard_name, header in executor.map(fetch, remote_shards):
-                for name, info in header.items():
-                    if weight_map.get(name) != shard_name:
-                        fail(f"{shard_name}: {name} is assigned to {weight_map.get(name)!r}")
-                    if name in tensors:
-                        fail(f"duplicate tensor in shard headers: {name}")
-                    tensors[name] = info
+    tensors, missing_shards = load_checkpoint_headers(
+        args.hf_dir,
+        weight_map,
+        fetch_missing_headers=args.fetch_missing_headers,
+        repo=args.repo,
+        revision=args.revision,
+    )
 
     if missing_shards and not args.allow_missing_shards:
         fail(f"missing {len(missing_shards)} shards; first is {missing_shards[0]}")
