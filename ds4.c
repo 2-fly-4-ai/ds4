@@ -20953,6 +20953,7 @@ typedef struct {
     ds4_gpu_tensor *hc_pre_by_tier[DS4_MAX_GPUS];   /* views of hc_split */
     ds4_gpu_tensor *hc_post_by_tier[DS4_MAX_GPUS];  /* views of hc_split */
     ds4_gpu_tensor *hc_comb_by_tier[DS4_MAX_GPUS];  /* views of hc_split */
+    ds4_gpu_tensor *v41_pre_mix_by_tier[DS4_MAX_GPUS];
     ds4_gpu_tensor *attn_cur_by_tier[DS4_MAX_GPUS];
     ds4_gpu_tensor *attn_norm_by_tier[DS4_MAX_GPUS];
     ds4_gpu_tensor *qr_by_tier[DS4_MAX_GPUS];
@@ -21352,6 +21353,7 @@ DS4_GPU_GRAPH_CLASS_P_ACCESSOR(hc_split)
 DS4_GPU_GRAPH_CLASS_P_ACCESSOR(hc_pre)
 DS4_GPU_GRAPH_CLASS_P_ACCESSOR(hc_post)
 DS4_GPU_GRAPH_CLASS_P_ACCESSOR(hc_comb)
+DS4_GPU_GRAPH_CLASS_P_ACCESSOR(v41_pre_mix)
 DS4_GPU_GRAPH_CLASS_P_ACCESSOR(attn_cur)
 DS4_GPU_GRAPH_CLASS_P_ACCESSOR(attn_norm)
 DS4_GPU_GRAPH_CLASS_P_ACCESSOR(qr)
@@ -21577,6 +21579,15 @@ static bool metal_graph_set_active_tier_decode(ds4_gpu_graph *g, int tier) {
         if (src && dst) {
             const uint64_t hc_bytes = (uint64_t)DS4_N_HC * DS4_N_EMBD * sizeof(float);
             if (!ds4_gpu_tensor_copy_xdev(dst, src, hc_bytes)) return false;
+        }
+        if (ds4_model_is_deepseek41()) {
+            ds4_gpu_tensor *src_pre = g->v41_pre_mix_by_tier[g->active_tier];
+            ds4_gpu_tensor *dst_pre = g->v41_pre_mix_by_tier[tier];
+            if (src_pre && dst_pre &&
+                !ds4_gpu_tensor_copy_xdev(dst_pre, src_pre,
+                                          (uint64_t)DS4_N_HC * sizeof(float))) {
+                return false;
+            }
         }
     }
     g->active_tier = tier;
@@ -21847,6 +21858,7 @@ static void metal_graph_free(ds4_gpu_graph *g) {
         ds4_gpu_tensor_free(g->hc_post_by_tier[t]);
         ds4_gpu_tensor_free(g->hc_pre_by_tier[t]);
         ds4_gpu_tensor_free(g->hc_split_by_tier[t]);
+        ds4_gpu_tensor_free(g->v41_pre_mix_by_tier[t]);
         ds4_gpu_tensor_free(g->hc_mix_by_tier[t]);
         ds4_gpu_tensor_free(g->flat_hc_by_tier[t]);
         ds4_gpu_tensor_free(g->cur_hc_by_tier[t]);
@@ -23106,6 +23118,11 @@ static bool metal_graph_alloc_raw_cap(
         g->hc_comb_by_tier[t] = ds4_gpu_tensor_view(g->hc_split_by_tier[t],
                                                      2ull * DS4_N_HC * sizeof(float),
                                                      (uint64_t)DS4_N_HC * DS4_N_HC * sizeof(float));
+        if (ds4_model_is_deepseek41()) {
+            g->v41_pre_mix_by_tier[t] =
+                ds4_gpu_tensor_alloc_ptr_on(t,
+                    (uint64_t)DS4_N_HC * sizeof(float));
+        }
         g->attn_cur_by_tier[t] = ds4_gpu_tensor_alloc_ptr_on(t, (uint64_t)DS4_N_EMBD * sizeof(float));
         g->attn_norm_by_tier[t] = ds4_gpu_tensor_alloc_ptr_on(t, (uint64_t)DS4_N_EMBD * sizeof(float));
         g->qr_by_tier[t] = ds4_gpu_tensor_alloc_ptr_on(t, q_rank * sizeof(float));
@@ -23471,6 +23488,7 @@ static bool metal_graph_alloc_raw_cap(
         class_p_ok =
             g->cur_hc_by_tier[t] && g->flat_hc_by_tier[t] && g->hc_mix_by_tier[t] && g->hc_split_by_tier[t] &&
             g->hc_pre_by_tier[t] && g->hc_post_by_tier[t] && g->hc_comb_by_tier[t] &&
+            (!ds4_model_is_deepseek41() || g->v41_pre_mix_by_tier[t]) &&
             g->attn_cur_by_tier[t] && g->attn_norm_by_tier[t] && g->qr_by_tier[t] && g->qr_norm_by_tier[t] &&
             g->q_by_tier[t] && g->kv_raw_by_tier[t] && g->kv_by_tier[t] &&
             g->comp_kv_cur_by_tier[t] && g->comp_sc_cur_by_tier[t] &&
@@ -25885,6 +25903,37 @@ static bool metal_graph_decode_hc_pre(
                                                   DS4_HC_EPS) != 0;
 }
 
+/* DeepSeek-V4.1 derives post/comb/current-pre from this residual, but the
+ * sublayer input is collapsed with the pre-mix carried from the previous
+ * sublayer.  Save the newly-derived pre only after the collapse so it becomes
+ * the input mix for the following attention/FFN stage. */
+static bool metal_graph_decode_hc_pre_v41(
+        ds4_gpu_tensor       *out,
+        ds4_gpu_tensor       *split,
+        const ds4_gpu_tensor *mix,
+        const ds4_gpu_tensor *residual_hc,
+        ds4_gpu_tensor       *carried_pre,
+        const ds4_model      *model,
+        uint64_t              scale_offset,
+        uint64_t              base_offset) {
+    return ds4_gpu_hc_split_sinkhorn_tensor(split,
+                                             mix,
+                                             model->map,
+                                             model->size,
+                                             scale_offset,
+                                             base_offset,
+                                             DS4_N_HC,
+                                             DS4_N_HC_SINKHORN_ITER,
+                                             DS4_HC_EPS) != 0 &&
+           ds4_gpu_hc_weighted_sum_tensor(out,
+                                           residual_hc,
+                                           carried_pre,
+                                           DS4_N_EMBD,
+                                           DS4_N_HC) != 0 &&
+           ds4_gpu_tensor_copy(carried_pre, 0, split, 0,
+                               (uint64_t)DS4_N_HC * sizeof(float)) != 0;
+}
+
 static bool metal_graph_hc_norm_fusion_check_enabled(void) {
     static int cache = -1;
     return metal_graph_env_flag("DS4_METAL_HC_NORM_FUSION_CHECK", &cache);
@@ -28079,6 +28128,7 @@ static bool metal_graph_encode_decode_layer_phase(
     bool router_project_select_fused = false;
     if (phase != METAL_DECODE_LAYER_FROM_ROUTER) {
     const bool fuse_hc_norm =
+        !ds4_model_is_deepseek41() &&
         DS4_N_HC == 4 &&
         !metal_graph_use_reference_hc_decode() &&
         !metal_graph_use_reference_hc_norm_decode();
@@ -28201,6 +28251,16 @@ static bool metal_graph_encode_decode_layer_phase(
                                                   il,
                                                   pos);
         }
+    } else if (ok && ds4_model_is_deepseek41()) {
+        ok = metal_graph_decode_hc_pre_v41(
+                metal_graph_attn_cur(g),
+                metal_graph_hc_split(g),
+                metal_graph_hc_mix(g),
+                metal_graph_cur_hc(g),
+                metal_graph_v41_pre_mix(g),
+                model,
+                layer->hc_attn_scale->abs_offset,
+                layer->hc_attn_base->abs_offset);
     } else if (ok) {
         ok = metal_graph_decode_hc_pre(metal_graph_attn_cur(g),
                                        metal_graph_hc_split(g),
@@ -29771,6 +29831,16 @@ static bool metal_graph_encode_decode_layer_phase(
                                                   il,
                                                   pos);
         }
+    } else if (ok && ds4_model_is_deepseek41()) {
+        ok = metal_graph_decode_hc_pre_v41(
+                metal_graph_ffn_cur(g),
+                metal_graph_hc_split(g),
+                metal_graph_hc_mix(g),
+                metal_graph_after_attn_hc(g),
+                metal_graph_v41_pre_mix(g),
+                model,
+                layer->hc_ffn_scale->abs_offset,
+                layer->hc_ffn_base->abs_offset);
     } else if (ok) {
         ok = metal_graph_decode_hc_pre(metal_graph_ffn_cur(g),
                                        metal_graph_hc_split(g),
@@ -31299,7 +31369,25 @@ static bool metal_graph_encode_output_head(
             ok = metal_graph_layer_stage_profile_boundary("output", (name), DS4_N_LAYER, 0, 1, &output_stage_t0); \
         } \
     } while (0)
-    bool ok = ds4_gpu_rms_norm_plain_tensor(metal_graph_flat_hc(g), metal_graph_cur_hc(g), (uint32_t)hc_dim, DS4_RMS_EPS) != 0;
+    bool ok = true;
+    if (ds4_model_is_deepseek41()) {
+        ok = ds4_gpu_hc_weighted_sum_tensor(metal_graph_output_embd(g),
+                                             metal_graph_cur_hc(g),
+                                             metal_graph_v41_pre_mix(g),
+                                             DS4_N_EMBD,
+                                             DS4_N_HC) != 0;
+        if (ok) {
+            ok = ds4_gpu_rms_norm_weight_tensor(metal_graph_output_norm(g),
+                                                 metal_graph_output_embd(g),
+                                                 model->map,
+                                                 model->size,
+                                                 weights->output_norm->abs_offset,
+                                                 DS4_N_EMBD,
+                                                 DS4_RMS_EPS) != 0;
+        }
+        goto output_projection;
+    }
+    ok = ds4_gpu_rms_norm_plain_tensor(metal_graph_flat_hc(g), metal_graph_cur_hc(g), (uint32_t)hc_dim, DS4_RMS_EPS) != 0;
     DS4_METAL_PROFILE_OUTPUT_STAGE("hc_flat_norm");
     if (ok) ok = ds4_gpu_matmul_f16_tensor(metal_graph_output_pre(g),
                                              model->map,
@@ -31349,6 +31437,7 @@ static bool metal_graph_encode_output_head(
     if (ok) {
         metal_graph_debug_dump_tensor("result_norm", metal_graph_output_norm(g), DS4_N_EMBD, DS4_N_LAYER, 0);
     }
+output_projection:
     if (ok && g->chain_top1_view) {
         ok = weights->output &&
              weights->output->type == DS4_TENSOR_Q8_0 &&
@@ -33722,7 +33811,17 @@ static bool metal_graph_encode_token_raw_swa(
             second_split_after_layers,
             allow_split_flush);
 
-    for (uint32_t il = 0; ok && il < DS4_N_LAYER; il++) {
+    if (ok && ds4_model_is_deepseek41()) {
+        const float identity_pre[DS4_MAX_HC] = {1.0f, 0.0f, 0.0f, 0.0f};
+        ok = ds4_gpu_tensor_write(metal_graph_v41_pre_mix(g), 0,
+                                  identity_pre,
+                                  (uint64_t)DS4_N_HC * sizeof(float)) != 0;
+    }
+
+    const uint32_t n_backbone = ds4_model_is_deepseek41()
+        ? directional_steering_layer_count()
+        : DS4_N_LAYER;
+    for (uint32_t il = 0; ok && il < n_backbone; il++) {
         ok = metal_graph_encode_decode_layer(g,
                                              model,
                                              &weights->layer[il],
