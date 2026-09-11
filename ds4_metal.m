@@ -13668,6 +13668,13 @@ static int ds4_gpu_stream_prefill_batch_selected_addr_enabled(
     if (getenv("DS4_METAL_ENABLE_STREAMING_PREFILL_BATCH_SELECTED_ADDR") != NULL) {
         return 1;
     }
+    /* V4.1 CED's exact-shared hybrid deliberately batches only the routed
+     * IQ2/Q2 body.  Keep its address-table path beyond the generic 760-row
+     * crossover: unlike the F16 grouped fallback it is byte-identical to
+     * one-row decode, and the encoder-only schedule amortizes its page setup. */
+    if (getenv("DS4_METAL_V41_CED_HYBRID_PREFILL") != NULL) {
+        return 1;
+    }
     const uint32_t max_tokens =
         ds4_gpu_stream_prefill_batch_selected_addr_auto_max(n_total_expert);
     const uint32_t min_tokens =
