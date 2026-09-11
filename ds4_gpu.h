@@ -1342,6 +1342,49 @@ int ds4_gpu_dsv4_qkv_rms_norm_rows_tensor(
         uint32_t                rows,
         float                   eps);
 
+int ds4_gpu_v41_qkv_rms_norm_round_bf16_tensor(
+        ds4_gpu_tensor       *q_out,
+        const ds4_gpu_tensor *q,
+        const void           *model_map,
+        uint64_t              model_size,
+        uint64_t              q_weight_offset,
+        uint32_t              q_n,
+        ds4_gpu_tensor       *kv_out,
+        const ds4_gpu_tensor *kv,
+        uint64_t              kv_weight_offset,
+        uint32_t              kv_n,
+        uint32_t              rows,
+        float                 eps);
+
+/* Test-only oracle for the rejected schedule-changing all-in-one fusion.
+ * The arithmetic is exact in isolation, but production deliberately does not
+ * call it because moving KV finalization before Q projection changes model
+ * logits.  Keep this declaration only while the regression oracle remains. */
+int ds4_gpu_v41_qkv_rms_norm_kv_rope_store_tensor(
+        ds4_gpu_tensor       *q_out,
+        const ds4_gpu_tensor *q,
+        const void           *model_map,
+        uint64_t              model_size,
+        uint64_t              q_weight_offset,
+        uint32_t              q_n,
+        ds4_gpu_tensor       *kv_out,
+        const ds4_gpu_tensor *kv,
+        uint64_t              kv_weight_offset,
+        uint32_t              kv_n,
+        ds4_gpu_tensor       *raw_cache,
+        uint32_t              raw_cap,
+        uint32_t              raw_row,
+        uint32_t              n_rot,
+        uint32_t              pos0,
+        uint32_t              n_ctx_orig,
+        float                 freq_base,
+        float                 freq_scale,
+        float                 ext_factor,
+        float                 attn_factor,
+        float                 beta_fast,
+        float                 beta_slow,
+        float                 eps);
+
 int ds4_gpu_dsv4_qkv_rms_norm_kv_rope_fp8_store_tensor(
         ds4_gpu_tensor       *q_out,
         const ds4_gpu_tensor *q,
@@ -1511,6 +1554,39 @@ int ds4_gpu_rope_tail_tensor(
         float             attn_factor,
         float             beta_fast,
         float             beta_slow);
+
+int ds4_gpu_v41_q_rope_tail_round_bf16_tensor(
+        ds4_gpu_tensor *x,
+        uint32_t        n_tok,
+        uint32_t        n_head,
+        uint32_t        head_dim,
+        uint32_t        n_rot,
+        uint32_t        pos0,
+        uint32_t        n_ctx_orig,
+        bool            inverse,
+        float           freq_base,
+        float           freq_scale,
+        float           ext_factor,
+        float           attn_factor,
+        float           beta_fast,
+        float           beta_slow);
+
+int ds4_gpu_v41_kv_round_rope_store_tensor(
+        ds4_gpu_tensor *kv,
+        ds4_gpu_tensor *raw_cache,
+        uint32_t        raw_cap,
+        uint32_t        raw_row,
+        uint32_t        head_dim,
+        uint32_t        n_rot,
+        uint32_t        pos0,
+        uint32_t        n_ctx_orig,
+        bool            inverse,
+        float           freq_base,
+        float           freq_scale,
+        float           ext_factor,
+        float           attn_factor,
+        float           beta_fast,
+        float           beta_slow);
 
 int ds4_gpu_glm_rope_tail_tensor(
         ds4_gpu_tensor *x,

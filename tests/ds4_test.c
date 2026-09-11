@@ -1064,6 +1064,240 @@ static void test_metal_v41_cache_quantization(void) {
     free(large_got);
 }
 
+#if defined(__APPLE__)
+static void test_metal_v41_qkv_norm_round_fusion_exact(void) {
+    enum { ROWS = 3, QN = 1024, KVN = 512 };
+    const uint64_t q_count = (uint64_t)ROWS * QN;
+    const uint64_t kv_count = (uint64_t)ROWS * KVN;
+    const uint64_t q_bytes = q_count * sizeof(float);
+    const uint64_t kv_bytes = kv_count * sizeof(float);
+    const uint64_t q_weight_bytes = (uint64_t)QN * sizeof(float);
+    const uint64_t kv_weight_offset = q_weight_bytes;
+    const uint64_t model_bytes = q_weight_bytes + (uint64_t)KVN * sizeof(float);
+    const uint64_t model_alloc = test_round_up_u64(model_bytes, (uint64_t)getpagesize());
+    void *model_raw = NULL;
+    TEST_ASSERT(posix_memalign(&model_raw, (size_t)getpagesize(), (size_t)model_alloc) == 0);
+    if (!model_raw) return;
+    memset(model_raw, 0, (size_t)model_alloc);
+    float *weights = model_raw;
+    for (uint32_t i = 0; i < QN + KVN; i++) {
+        const int v = (int)((i * 31337u + (i >> 2u) * 97u) % 2003u) - 1001;
+        weights[i] = (float)v / 997.0f;
+    }
+
+    ds4_gpu_tensor *q = ds4_gpu_tensor_alloc(q_bytes);
+    ds4_gpu_tensor *kv = ds4_gpu_tensor_alloc(kv_bytes);
+    ds4_gpu_tensor *ref_q = ds4_gpu_tensor_alloc(q_bytes);
+    ds4_gpu_tensor *ref_kv = ds4_gpu_tensor_alloc(kv_bytes);
+    ds4_gpu_tensor *fused_q = ds4_gpu_tensor_alloc(q_bytes);
+    ds4_gpu_tensor *fused_kv = ds4_gpu_tensor_alloc(kv_bytes);
+    float *q_input = malloc((size_t)q_bytes);
+    float *kv_input = malloc((size_t)kv_bytes);
+    float *ref = malloc((size_t)q_bytes);
+    float *got = malloc((size_t)q_bytes);
+    const bool allocated = q && kv && ref_q && ref_kv && fused_q && fused_kv &&
+        q_input && kv_input && ref && got;
+    TEST_ASSERT(allocated);
+    if (allocated) {
+        for (uint64_t i = 0; i < q_count; i++) {
+            const int v = (int)((i * 7919u + (i >> 3u) * 104729u) % 40009u) - 20004;
+            q_input[i] = (float)v / 4093.0f;
+        }
+        for (uint64_t i = 0; i < kv_count; i++) {
+            const int v = (int)((i * 65537u + (i >> 1u) * 257u) % 30011u) - 15005;
+            kv_input[i] = (float)v / 3079.0f;
+        }
+        TEST_ASSERT(ds4_gpu_tensor_write(q, 0, q_input, q_bytes) != 0);
+        TEST_ASSERT(ds4_gpu_tensor_write(kv, 0, kv_input, kv_bytes) != 0);
+        TEST_ASSERT(ds4_gpu_set_model_map(model_raw, model_alloc) != 0);
+        TEST_ASSERT(ds4_gpu_dsv4_qkv_rms_norm_rows_tensor(
+            ref_q, q, model_raw, model_alloc, 0, QN,
+            ref_kv, kv, kv_weight_offset, KVN, ROWS, 1.0e-6f) != 0);
+        TEST_ASSERT(ds4_gpu_v41_round_bf16_tensor(ref_q, ROWS, QN) != 0);
+        TEST_ASSERT(ds4_gpu_v41_round_bf16_tensor(ref_kv, ROWS, KVN) != 0);
+        TEST_ASSERT(ds4_gpu_v41_qkv_rms_norm_round_bf16_tensor(
+            fused_q, q, model_raw, model_alloc, 0, QN,
+            fused_kv, kv, kv_weight_offset, KVN, ROWS, 1.0e-6f) != 0);
+
+        TEST_ASSERT(ds4_gpu_tensor_read(ref_q, 0, ref, q_bytes) != 0);
+        TEST_ASSERT(ds4_gpu_tensor_read(fused_q, 0, got, q_bytes) != 0);
+        test_float_compare_stats stats = test_compare_float_bits(ref, got, q_count);
+        fprintf(stderr, "ds4-test: V4.1 Q norm+BF16 fusion exact=%zu/%llu max_ulp=%u\n",
+                stats.mismatch_count, (unsigned long long)q_count, stats.max_ulp);
+        TEST_ASSERT(stats.mismatch_count == 0u);
+        TEST_ASSERT(ds4_gpu_tensor_read(ref_kv, 0, ref, kv_bytes) != 0);
+        TEST_ASSERT(ds4_gpu_tensor_read(fused_kv, 0, got, kv_bytes) != 0);
+        stats = test_compare_float_bits(ref, got, kv_count);
+        fprintf(stderr, "ds4-test: V4.1 KV norm+BF16 fusion exact=%zu/%llu max_ulp=%u\n",
+                stats.mismatch_count, (unsigned long long)kv_count, stats.max_ulp);
+        TEST_ASSERT(stats.mismatch_count == 0u);
+    }
+    free(got); free(ref); free(kv_input); free(q_input);
+    ds4_gpu_tensor_free(fused_kv); ds4_gpu_tensor_free(fused_q);
+    ds4_gpu_tensor_free(ref_kv); ds4_gpu_tensor_free(ref_q);
+    ds4_gpu_tensor_free(kv); ds4_gpu_tensor_free(q);
+    free(model_raw);
+}
+
+static void test_metal_v41_q_rope_round_fusion_exact(void) {
+    enum { TOKENS = 3, HEADS = 5, HEAD_DIM = 512, N_ROT = 64 };
+    const uint64_t count = (uint64_t)TOKENS * HEADS * HEAD_DIM;
+    const uint64_t bytes = count * sizeof(float);
+    float *input = malloc((size_t)bytes);
+    float *ref_host = malloc((size_t)bytes);
+    float *got_host = malloc((size_t)bytes);
+    ds4_gpu_tensor *ref = ds4_gpu_tensor_alloc(bytes);
+    ds4_gpu_tensor *fused = ds4_gpu_tensor_alloc(bytes);
+    const bool allocated = input && ref_host && got_host && ref && fused;
+    TEST_ASSERT(allocated);
+    if (allocated) {
+        for (uint64_t i = 0; i < count; i++) {
+            const int v = (int)((i * 8191u + (i >> 4u) * 131u) % 65521u) - 32760;
+            input[i] = test_v41_round_bf16((float)v / 8192.0f);
+        }
+        TEST_ASSERT(ds4_gpu_tensor_write(ref, 0, input, bytes) != 0);
+        TEST_ASSERT(ds4_gpu_tensor_write(fused, 0, input, bytes) != 0);
+        TEST_ASSERT(ds4_gpu_rope_tail_tensor(
+            ref, TOKENS, HEADS, HEAD_DIM, N_ROT, 65530u, 4096u, false,
+            10000.0f, 0.25f, 1.0f, 0.8f, 32.0f, 1.0f) != 0);
+        TEST_ASSERT(ds4_gpu_v41_round_bf16_tensor(
+            ref, TOKENS, HEADS * HEAD_DIM) != 0);
+        TEST_ASSERT(ds4_gpu_v41_q_rope_tail_round_bf16_tensor(
+            fused, TOKENS, HEADS, HEAD_DIM, N_ROT, 65530u, 4096u, false,
+            10000.0f, 0.25f, 1.0f, 0.8f, 32.0f, 1.0f) != 0);
+        TEST_ASSERT(ds4_gpu_tensor_read(ref, 0, ref_host, bytes) != 0);
+        TEST_ASSERT(ds4_gpu_tensor_read(fused, 0, got_host, bytes) != 0);
+        const test_float_compare_stats stats =
+            test_compare_float_bits(ref_host, got_host, count);
+        fprintf(stderr, "ds4-test: V4.1 Q RoPE+BF16 fusion exact=%zu/%llu max_ulp=%u\n",
+                stats.mismatch_count, (unsigned long long)count, stats.max_ulp);
+        TEST_ASSERT(stats.mismatch_count == 0u);
+    }
+    ds4_gpu_tensor_free(fused); ds4_gpu_tensor_free(ref);
+    free(got_host); free(ref_host); free(input);
+}
+
+static void test_metal_v41_qkv_rope_store_fusion_exact(void) {
+    enum { QN = 1024, KVN = 512, RAW_CAP = 5, RAW_ROW = 3 };
+    const uint64_t q_bytes = (uint64_t)QN * sizeof(float);
+    const uint64_t kv_bytes = (uint64_t)KVN * sizeof(float);
+    const uint64_t raw_bytes = (uint64_t)RAW_CAP * kv_bytes;
+    const uint64_t kv_weight_offset = q_bytes;
+    const uint64_t model_bytes = q_bytes + kv_bytes;
+    const uint64_t model_alloc = test_round_up_u64(model_bytes, (uint64_t)getpagesize());
+    void *model_raw = NULL;
+    TEST_ASSERT(posix_memalign(&model_raw, (size_t)getpagesize(), (size_t)model_alloc) == 0);
+    float *q_in = malloc((size_t)q_bytes), *kv_in = malloc((size_t)kv_bytes);
+    float *ref_host = malloc((size_t)raw_bytes), *got_host = malloc((size_t)raw_bytes);
+    ds4_gpu_tensor *q = ds4_gpu_tensor_alloc(q_bytes), *kv = ds4_gpu_tensor_alloc(kv_bytes);
+    ds4_gpu_tensor *ref_q = ds4_gpu_tensor_alloc(q_bytes), *ref_kv = ds4_gpu_tensor_alloc(kv_bytes);
+    ds4_gpu_tensor *got_q = ds4_gpu_tensor_alloc(q_bytes), *got_kv = ds4_gpu_tensor_alloc(kv_bytes);
+    ds4_gpu_tensor *ref_raw = ds4_gpu_tensor_alloc(raw_bytes), *got_raw = ds4_gpu_tensor_alloc(raw_bytes);
+    const bool allocated = model_raw && q_in && kv_in && ref_host && got_host &&
+        q && kv && ref_q && ref_kv && got_q && got_kv && ref_raw && got_raw;
+    TEST_ASSERT(allocated);
+    if (allocated) {
+        memset(model_raw, 0, (size_t)model_alloc);
+        float *weights = model_raw;
+        for (uint32_t i = 0; i < QN + KVN; i++)
+            weights[i] = (float)((int)((i * 12289u) % 2003u) - 1001) / 997.0f;
+        for (uint32_t i = 0; i < QN; i++)
+            q_in[i] = (float)((int)((i * 4099u) % 10009u) - 5004) / 2053.0f;
+        for (uint32_t i = 0; i < KVN; i++)
+            kv_in[i] = (float)((int)((i * 6151u) % 12007u) - 6003) / 3079.0f;
+        for (uint64_t i = 0; i < (uint64_t)RAW_CAP * KVN; i++)
+            ref_host[i] = -123.25f;
+        TEST_ASSERT(ds4_gpu_tensor_write(q, 0, q_in, q_bytes) != 0);
+        TEST_ASSERT(ds4_gpu_tensor_write(kv, 0, kv_in, kv_bytes) != 0);
+        TEST_ASSERT(ds4_gpu_tensor_write(ref_raw, 0, ref_host, raw_bytes) != 0);
+        TEST_ASSERT(ds4_gpu_tensor_write(got_raw, 0, ref_host, raw_bytes) != 0);
+        TEST_ASSERT(ds4_gpu_set_model_map(model_raw, model_alloc) != 0);
+        TEST_ASSERT(ds4_gpu_dsv4_qkv_rms_norm_rows_tensor(
+            ref_q, q, model_raw, model_alloc, 0, QN,
+            ref_kv, kv, kv_weight_offset, KVN, 1, 1.0e-6f) != 0);
+        TEST_ASSERT(ds4_gpu_v41_round_bf16_tensor(ref_q, 1, QN) != 0);
+        TEST_ASSERT(ds4_gpu_v41_round_bf16_tensor(ref_kv, 1, KVN) != 0);
+        TEST_ASSERT(ds4_gpu_rope_tail_tensor(ref_kv, 1, 1, KVN, 64, 32767,
+            4096, false, 10000.0f, .25f, 1.0f, .8f, 32.0f, 1.0f) != 0);
+        TEST_ASSERT(ds4_gpu_v41_window_kv_quantize_tensor(ref_kv, 1, KVN) != 0);
+        TEST_ASSERT(ds4_gpu_store_raw_kv_tensor(ref_raw, ref_kv,
+            RAW_CAP, RAW_ROW, KVN) != 0);
+        TEST_ASSERT(ds4_gpu_v41_qkv_rms_norm_kv_rope_store_tensor(
+            got_q, q, model_raw, model_alloc, 0, QN,
+            got_kv, kv, kv_weight_offset, KVN, got_raw, RAW_CAP, RAW_ROW,
+            64, 32767, 4096, 10000.0f, .25f, 1.0f, .8f,
+            32.0f, 1.0f, 1.0e-6f) != 0);
+
+        TEST_ASSERT(ds4_gpu_tensor_read(ref_q, 0, ref_host, q_bytes) != 0);
+        TEST_ASSERT(ds4_gpu_tensor_read(got_q, 0, got_host, q_bytes) != 0);
+        test_float_compare_stats stats = test_compare_float_bits(ref_host, got_host, QN);
+        TEST_ASSERT(stats.mismatch_count == 0u);
+        TEST_ASSERT(ds4_gpu_tensor_read(ref_kv, 0, ref_host, kv_bytes) != 0);
+        TEST_ASSERT(ds4_gpu_tensor_read(got_kv, 0, got_host, kv_bytes) != 0);
+        stats = test_compare_float_bits(ref_host, got_host, KVN);
+        TEST_ASSERT(stats.mismatch_count == 0u);
+        TEST_ASSERT(ds4_gpu_tensor_read(ref_raw, 0, ref_host, raw_bytes) != 0);
+        TEST_ASSERT(ds4_gpu_tensor_read(got_raw, 0, got_host, raw_bytes) != 0);
+        stats = test_compare_float_bits(ref_host, got_host, (uint64_t)RAW_CAP * KVN);
+        fprintf(stderr, "ds4-test: V4.1 QKV norm/RoPE/store fusion exact=%zu/%u max_ulp=%u\n",
+                stats.mismatch_count, RAW_CAP * KVN, stats.max_ulp);
+        TEST_ASSERT(stats.mismatch_count == 0u);
+    }
+    ds4_gpu_tensor_free(got_raw); ds4_gpu_tensor_free(ref_raw);
+    ds4_gpu_tensor_free(got_kv); ds4_gpu_tensor_free(got_q);
+    ds4_gpu_tensor_free(ref_kv); ds4_gpu_tensor_free(ref_q);
+    ds4_gpu_tensor_free(kv); ds4_gpu_tensor_free(q);
+    free(got_host); free(ref_host); free(kv_in); free(q_in); free(model_raw);
+}
+
+static void test_metal_v41_kv_finalize_fusion_exact(void) {
+    enum { WIDTH = 512, RAW_CAP = 7, RAW_ROW = 5 };
+    const uint64_t row_bytes = (uint64_t)WIDTH * sizeof(float);
+    const uint64_t raw_bytes = (uint64_t)RAW_CAP * row_bytes;
+    float input[WIDTH];
+    float *ref_host = malloc((size_t)raw_bytes);
+    float *got_host = malloc((size_t)raw_bytes);
+    ds4_gpu_tensor *ref = ds4_gpu_tensor_alloc(row_bytes);
+    ds4_gpu_tensor *got = ds4_gpu_tensor_alloc(row_bytes);
+    ds4_gpu_tensor *ref_raw = ds4_gpu_tensor_alloc(raw_bytes);
+    ds4_gpu_tensor *got_raw = ds4_gpu_tensor_alloc(raw_bytes);
+    const bool allocated = ref_host && got_host && ref && got && ref_raw && got_raw;
+    TEST_ASSERT(allocated);
+    if (allocated) {
+        for (uint32_t i = 0; i < WIDTH; i++)
+            input[i] = (float)((int)((i * 65521u + 97u) % 20011u) - 10005) / 4099.0f;
+        for (uint64_t i = 0; i < (uint64_t)RAW_CAP * WIDTH; i++)
+            ref_host[i] = 81.5f;
+        TEST_ASSERT(ds4_gpu_tensor_write(ref, 0, input, row_bytes) != 0);
+        TEST_ASSERT(ds4_gpu_tensor_write(got, 0, input, row_bytes) != 0);
+        TEST_ASSERT(ds4_gpu_tensor_write(ref_raw, 0, ref_host, raw_bytes) != 0);
+        TEST_ASSERT(ds4_gpu_tensor_write(got_raw, 0, ref_host, raw_bytes) != 0);
+        TEST_ASSERT(ds4_gpu_v41_round_bf16_tensor(ref, 1, WIDTH) != 0);
+        TEST_ASSERT(ds4_gpu_rope_tail_tensor(ref, 1, 1, WIDTH, 64, 65530,
+            4096, false, 10000.0f, .25f, 1.0f, .8f, 32.0f, 1.0f) != 0);
+        TEST_ASSERT(ds4_gpu_v41_window_kv_quantize_tensor(ref, 1, WIDTH) != 0);
+        TEST_ASSERT(ds4_gpu_store_raw_kv_tensor(
+            ref_raw, ref, RAW_CAP, RAW_ROW, WIDTH) != 0);
+        TEST_ASSERT(ds4_gpu_v41_kv_round_rope_store_tensor(
+            got, got_raw, RAW_CAP, RAW_ROW, WIDTH, 64, 65530, 4096, false,
+            10000.0f, .25f, 1.0f, .8f, 32.0f, 1.0f) != 0);
+        TEST_ASSERT(ds4_gpu_tensor_read(ref, 0, ref_host, row_bytes) != 0);
+        TEST_ASSERT(ds4_gpu_tensor_read(got, 0, got_host, row_bytes) != 0);
+        test_float_compare_stats stats = test_compare_float_bits(ref_host, got_host, WIDTH);
+        TEST_ASSERT(stats.mismatch_count == 0u);
+        TEST_ASSERT(ds4_gpu_tensor_read(ref_raw, 0, ref_host, raw_bytes) != 0);
+        TEST_ASSERT(ds4_gpu_tensor_read(got_raw, 0, got_host, raw_bytes) != 0);
+        stats = test_compare_float_bits(ref_host, got_host, (uint64_t)RAW_CAP * WIDTH);
+        fprintf(stderr, "ds4-test: V4.1 KV finalizer fusion exact=%zu/%u max_ulp=%u\n",
+                stats.mismatch_count, RAW_CAP * WIDTH, stats.max_ulp);
+        TEST_ASSERT(stats.mismatch_count == 0u);
+    }
+    ds4_gpu_tensor_free(got_raw); ds4_gpu_tensor_free(ref_raw);
+    ds4_gpu_tensor_free(got); ds4_gpu_tensor_free(ref);
+    free(got_host); free(ref_host);
+}
+#endif
+
 static void test_metal_store_raw_kv_batch_wrap(void) {
     const uint32_t raw_cap = 5;
     const uint32_t head_dim = 3;
@@ -6674,6 +6908,10 @@ static void test_metal_kernel_group(void) {
     test_dspark_cache_window_crop();
     test_metal_q8_0_decode_pair_exact();
 #if defined(__APPLE__)
+    test_metal_v41_qkv_norm_round_fusion_exact();
+    test_metal_v41_q_rope_round_fusion_exact();
+    test_metal_v41_qkv_rope_store_fusion_exact();
+    test_metal_v41_kv_finalize_fusion_exact();
     test_metal_v41_compressor_pool();
     test_metal_v41_candidate_blocks();
     test_metal_v41_engram_inject();

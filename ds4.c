@@ -29716,7 +29716,9 @@ static bool metal_graph_encode_decode_layer_phase(
         metal_graph_debug_dump_tensor("q_lora", metal_graph_qr(g), q_rank, il, pos);
     }
     const bool kvnorm_dump = metal_graph_debug_wants("KVnorm", il, pos);
+    const bool qnorm_dump = metal_graph_debug_wants("q_lora_norm", il, pos);
     bool kv_rope_fused = false;
+    bool v41_qkv_round_fused = false;
     if (qkv_rms_fused) {
         if (!resume_after_qa_kv_raw && ok && !qkv_pair_projected) {
             ok = metal_graph_matmul_dense_quant_tensor(metal_graph_kv_raw(g),
@@ -29805,7 +29807,24 @@ static bool metal_graph_encode_decode_layer_phase(
                 kv_rope_fused = kv_rope_fused || kv_norm_store_fused;
             }
             if (ok && !kv_norm_store_fused) {
-            ok = ds4_gpu_dsv4_qkv_rms_norm_rows_tensor(metal_graph_qr_norm(g),
+            v41_qkv_round_fused =
+                ds4_model_is_deepseek41() && !qnorm_dump && !kvnorm_dump &&
+                getenv("DS4_METAL_DISABLE_V41_QKV_NORM_ROUND_FUSE") == NULL;
+            ok = v41_qkv_round_fused
+                ? ds4_gpu_v41_qkv_rms_norm_round_bf16_tensor(
+                                                         metal_graph_qr_norm(g),
+                                                         metal_graph_qr(g),
+                                                         model->map,
+                                                         model->size,
+                                                         layer->attn_q_a_norm->abs_offset,
+                                                         (uint32_t)q_rank,
+                                                         metal_graph_kv(g),
+                                                         metal_graph_kv_raw(g),
+                                                         layer->attn_kv_a_norm->abs_offset,
+                                                         DS4_N_HEAD_DIM,
+                                                         1,
+                                                         DS4_RMS_EPS) != 0
+                : ds4_gpu_dsv4_qkv_rms_norm_rows_tensor(metal_graph_qr_norm(g),
                                                          metal_graph_qr(g),
                                                          model->map,
                                                          model->size,
@@ -29828,7 +29847,7 @@ static bool metal_graph_encode_decode_layer_phase(
     if (ok) {
         metal_graph_debug_dump_tensor("q_lora_norm", metal_graph_qr_norm(g), q_rank, il, pos);
     }
-    if (ok && ds4_model_is_deepseek41()) {
+    if (ok && ds4_model_is_deepseek41() && !v41_qkv_round_fused) {
         ok = ds4_gpu_v41_round_bf16_tensor(
                 metal_graph_qr_norm(g), 1, (uint32_t)q_rank) != 0;
     }
@@ -29860,6 +29879,7 @@ static bool metal_graph_encode_decode_layer_phase(
     }
     const bool decode_q_norm_debug = metal_graph_debug_wants("Qnorm", il, pos);
     bool decode_q_norm_rope_fused = false;
+    bool v41_q_rope_round_fused = false;
     if (ok && !ds4_model_is_deepseek41() && !decode_q_norm_debug) {
         decode_q_norm_rope_fused =
             ds4_gpu_head_rms_norm_rope_tail_tensor(metal_graph_q(g),
@@ -29890,12 +29910,26 @@ static bool metal_graph_encode_decode_layer_phase(
         if (ok) {
             metal_graph_debug_dump_tensor("Qnorm", metal_graph_q(g), q_dim, il, pos);
         }
-        if (ok) ok = ds4_gpu_rope_tail_tensor(metal_graph_q(g), 1, tp_heads, DS4_N_HEAD_DIM,
-                                                DS4_N_ROT, pos,
-                                                compressed ? (uint32_t)DS4_ROPE_ORIG_CTX : 0,
-                                                false, freq_base, freq_scale, ext_factor, attn_factor,
-                                                DS4_ROPE_YARN_BETA_FAST, DS4_ROPE_YARN_BETA_SLOW) != 0;
-        if (ok && ds4_model_is_deepseek41()) {
+        if (ok && ds4_model_is_deepseek41() &&
+            getenv("DS4_METAL_DISABLE_V41_Q_ROPE_ROUND_FUSE") == NULL) {
+            v41_q_rope_round_fused =
+                ds4_gpu_v41_q_rope_tail_round_bf16_tensor(
+                    metal_graph_q(g), 1, tp_heads, DS4_N_HEAD_DIM,
+                    DS4_N_ROT, pos,
+                    compressed ? (uint32_t)DS4_ROPE_ORIG_CTX : 0,
+                    false, freq_base, freq_scale, ext_factor, attn_factor,
+                    DS4_ROPE_YARN_BETA_FAST, DS4_ROPE_YARN_BETA_SLOW) != 0;
+            ok = v41_q_rope_round_fused;
+        } else if (ok) {
+            ok = ds4_gpu_rope_tail_tensor(metal_graph_q(g), 1, tp_heads,
+                                           DS4_N_HEAD_DIM, DS4_N_ROT, pos,
+                                           compressed ? (uint32_t)DS4_ROPE_ORIG_CTX : 0,
+                                           false, freq_base, freq_scale,
+                                           ext_factor, attn_factor,
+                                           DS4_ROPE_YARN_BETA_FAST,
+                                           DS4_ROPE_YARN_BETA_SLOW) != 0;
+        }
+        if (ok && ds4_model_is_deepseek41() && !v41_q_rope_round_fused) {
             ok = ds4_gpu_v41_round_bf16_tensor(
                     metal_graph_q(g), 1, tp_heads * DS4_N_HEAD_DIM) != 0;
         }
@@ -29923,9 +29957,24 @@ static bool metal_graph_encode_decode_layer_phase(
             metal_graph_debug_dump_tensor("KVnorm", metal_graph_kv(g), DS4_N_HEAD_DIM, il, pos);
         }
     }
-    if (ok && ds4_model_is_deepseek41() && !kv_rope_fused) {
+    if (ok && ds4_model_is_deepseek41() && !kv_rope_fused &&
+        !metal_graph_tp_ablate("kv") && !metal_graph_use_reference_kv_decode() &&
+        !resume_after_kv_store && raw_cache != NULL && raw_row < raw_cap &&
+        phase == METAL_DECODE_LAYER_FULL &&
+        getenv("DS4_METAL_DISABLE_V41_KV_FINALIZE_FUSE") == NULL) {
+        kv_norm_store_fused = ds4_gpu_v41_kv_round_rope_store_tensor(
+            metal_graph_kv(g), raw_cache, raw_cap, raw_row,
+            DS4_N_HEAD_DIM, DS4_N_ROT, pos,
+            compressed ? (uint32_t)DS4_ROPE_ORIG_CTX : 0,
+            false, freq_base, freq_scale, ext_factor, attn_factor,
+            DS4_ROPE_YARN_BETA_FAST, DS4_ROPE_YARN_BETA_SLOW) != 0;
+        kv_rope_fused = kv_norm_store_fused;
+        if (!kv_norm_store_fused) ok = false;
+    }
+    if (ok && ds4_model_is_deepseek41() && !kv_rope_fused &&
+        !v41_qkv_round_fused) {
         ok = ds4_gpu_v41_round_bf16_tensor(
-                metal_graph_kv(g), 1, DS4_N_HEAD_DIM) != 0;
+            metal_graph_kv(g), 1, DS4_N_HEAD_DIM) != 0;
     }
     const bool tp_ablate_kv = metal_graph_tp_ablate("kv");
     fuse_kv_rope_store =
@@ -30721,6 +30770,21 @@ static bool metal_graph_encode_decode_layer_phase(
         layer->attn_output_b->type == DS4_TENSOR_Q8_0 &&
         !metal_graph_directional_steering_attn_enabled(g) &&
         !metal_graph_use_reference_attn_out_hc();
+    if (ds4_model_is_deepseek41() &&
+        getenv("DS4_METAL_TRACE_V41_FUSIONS") != NULL) {
+        static bool traced_v41_attn_out_hc = false;
+        if (!traced_v41_attn_out_hc) {
+            fprintf(stderr,
+                    "ds4: V4.1 scalar attention-output/HC fusion %s "
+                    "(tp=%u a_type=%u b_type=%u cuda_tp=%d)\n",
+                    fuse_attn_out_hc ? "selected" : "not-selected",
+                    g->tp_world,
+                    layer->attn_output_a->type,
+                    layer->attn_output_b->type,
+                    cuda_tp_attn);
+            traced_v41_attn_out_hc = true;
+        }
+    }
     const bool fuse_tp_attn_out_hc =
         cuda_tp_attn &&
         !metal_graph_use_reference_attn_out_hc() &&
