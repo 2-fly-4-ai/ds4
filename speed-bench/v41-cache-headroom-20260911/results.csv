@@ -1,0 +1,4 @@
+metric,baseline_a,candidate_a,candidate_b,baseline_b,baseline_mean,candidate_mean,change_percent
+generation_tps,15.32,14.76,15.81,15.72,15.520,15.285,-1.51
+steady_decode_tps,15.73,15.31,16.43,16.32,16.025,15.870,-0.97
+final64_tps,16.28,16.14,17.30,17.16,16.720,16.720,0.00
