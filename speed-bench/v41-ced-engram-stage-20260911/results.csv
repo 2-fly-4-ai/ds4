@@ -1,0 +1,3 @@
+prompt_tokens,baseline_a_tps,candidate_a_tps,candidate_b_tps,baseline_b_tps,baseline_mean_tps,candidate_mean_tps,gain_percent
+512,21.57,22.60,22.11,21.58,21.575,22.355,3.62
+1024,26.14,27.72,27.74,24.82,25.480,27.730,8.83

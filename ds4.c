@@ -35026,6 +35026,97 @@ static bool metal_graph_v41_engram_apply_one(
     return ok;
 }
 
+static bool metal_graph_v41_engram_staging_requested(void) {
+#if defined(__APPLE__)
+    const char *env = getenv("DS4_METAL_V41_CED_STAGE_ENGRAM");
+    return env && env[0] && strcmp(env, "0") != 0;
+#else
+    return false;
+#endif
+}
+
+/* All prompt token IDs are known before CED prefill starts.  Stage their
+ * exact Engram gathers together before encoding the layer.
+ * The routed-FFN batch buffers are idle during attention and are large enough
+ * for the bounded <=1024-row hybrid, so this experiment adds no persistent
+ * Metal allocation.  Injection remains one row at a time below. */
+static bool metal_graph_v41_engram_stage_batch(
+        ds4_gpu_graph           *g,
+        const ds4_model         *model,
+        const ds4_weights       *weights,
+        const ds4_layer_weights *layer,
+        uint32_t                 il,
+        uint32_t                 n_tokens) {
+    const int slot = deepseek41_engram_slot_for_layer(il);
+    if (slot < 0 || !g || !layer || !layer->engram_wkv ||
+        layer->engram_wkv->type != DS4_TENSOR_Q8_0 || n_tokens == 0) {
+        return false;
+    }
+    const uint64_t engram_input =
+        (uint64_t)(DS4_N_ENGRAM_MAX_NGRAM - 1u) *
+        DS4_N_ENGRAM_HEAD * DS4_N_ENGRAM_HEAD_DIM;
+    const uint64_t engram_output =
+        (uint64_t)(DS4_N_HC + 1u) * DS4_N_EMBD;
+    const uint64_t input_bytes =
+        (uint64_t)n_tokens * engram_input * sizeof(float);
+    const uint64_t output_bytes =
+        (uint64_t)n_tokens * engram_output * sizeof(float);
+    ds4_gpu_tensor *batch_embed = metal_graph_batch_routed_mid(g);
+    ds4_gpu_tensor *batch_kv = metal_graph_batch_routed_down(g);
+    if (!batch_embed || !batch_kv ||
+        ds4_gpu_tensor_bytes(batch_embed) < input_bytes ||
+        ds4_gpu_tensor_bytes(batch_kv) < output_bytes) {
+        return false;
+    }
+
+    float *host = xmalloc((size_t)input_bytes);
+    for (uint32_t pos = 0; pos < n_tokens; pos++) {
+        uint64_t rows[24];
+        deepseek41_engram_hash_history(rows, g->v41_engram_tokens,
+                                       pos, (uint32_t)slot);
+        deepseek41_engram_gather_one(
+            host + (uint64_t)pos * engram_input,
+            model, weights, rows, (uint32_t)slot);
+    }
+    const bool uploaded = ds4_gpu_tensor_write(
+        batch_embed, 0, host, input_bytes) != 0;
+    free(host);
+    return uploaded;
+}
+
+static bool metal_graph_v41_engram_apply_staged(
+        ds4_gpu_graph           *g,
+        const ds4_model         *model,
+        const ds4_layer_weights *layer,
+        uint32_t                 pos) {
+    const uint64_t engram_output =
+        (uint64_t)(DS4_N_HC + 1u) * DS4_N_EMBD;
+    const uint64_t engram_input =
+        (uint64_t)(DS4_N_ENGRAM_MAX_NGRAM - 1u) *
+        DS4_N_ENGRAM_HEAD * DS4_N_ENGRAM_HEAD_DIM;
+    ds4_gpu_tensor *embed_row = ds4_gpu_tensor_view(
+        metal_graph_batch_routed_mid(g),
+        (uint64_t)pos * engram_input * sizeof(float),
+        engram_input * sizeof(float));
+    ds4_gpu_tensor *kv_row = ds4_gpu_tensor_view(
+        metal_graph_batch_routed_down(g),
+        (uint64_t)pos * engram_output * sizeof(float),
+        engram_output * sizeof(float));
+    const bool ok = embed_row && kv_row &&
+        metal_graph_matmul_plain_tensor(
+            kv_row, model, layer->engram_wkv,
+            engram_input, engram_output, embed_row, 1) &&
+        ds4_gpu_v41_engram_inject_tensor(
+            metal_graph_cur_hc(g), kv_row,
+            model->map, model->size,
+            layer->engram_q->abs_offset,
+            layer->engram_k->abs_offset,
+            DS4_N_EMBD, DS4_N_HC, DS4_RMS_EPS) != 0;
+    ds4_gpu_tensor_free(kv_row);
+    ds4_gpu_tensor_free(embed_row);
+    return ok;
+}
+
 /* Encode a full single-token decode step on Metal.  This is the generation
  * hot path: update caches, run all layers, then produce logits. */
 static bool metal_graph_encode_token_raw_swa(
@@ -39498,15 +39589,28 @@ static bool metal_graph_prefill_v41_ced_hybrid_encoder(
         const uint32_t full_comp = consumer ? g->layer_n_comp[owner] : 0u;
         const uint32_t full_index = consumer ? g->layer_n_index_comp[owner] : 0u;
         const bool host_engram = deepseek41_engram_slot_for_layer(il) >= 0;
+        const bool staged_engram =
+            host_engram && metal_graph_v41_engram_staging_requested();
 
-        if (!host_engram) ok = ds4_gpu_begin_commands() != 0;
+        if (!host_engram || staged_engram) ok = ds4_gpu_begin_commands() != 0;
+        if (ok && staged_engram) {
+            ok = metal_graph_v41_engram_stage_batch(
+                g, model, weights, layer, il, n_tokens);
+            if (!ok) {
+                fprintf(stderr,
+                        "ds4: V4.1 CED Engram staging failed "
+                        "at layer %u\n", il);
+            }
+        }
         for (uint32_t pos = 0; ok && pos < n_tokens; pos++) {
             if (cancel && cancel(cancel_ud)) {
                 if (cancelled) *cancelled = true;
                 ok = false;
                 break;
             }
-            if (host_engram) ok = ds4_gpu_begin_commands() != 0;
+            if (host_engram && !staged_engram) {
+                ok = ds4_gpu_begin_commands() != 0;
+            }
             ds4_gpu_tensor *src_hc = metal_graph_tensor_row_view(
                 metal_graph_batch_cur_hc(g), pos, hc_values);
             ds4_gpu_tensor *src_pre = ds4_gpu_tensor_view(
@@ -39523,8 +39627,11 @@ static bool metal_graph_prefill_v41_ced_hybrid_encoder(
                  ds4_gpu_tensor_copy(metal_graph_v41_pre_mix(g), 0,
                                      src_pre, 0, pre_bytes) != 0;
             if (ok) {
-                ok = metal_graph_v41_engram_apply_one(
-                    g, model, weights, layer, il, pos);
+                ok = staged_engram ?
+                    metal_graph_v41_engram_apply_staged(
+                        g, model, layer, pos) :
+                    metal_graph_v41_engram_apply_one(
+                        g, model, weights, layer, il, pos);
             }
             if (ok && consumer) {
                 const uint32_t causal =
@@ -39554,7 +39661,7 @@ static bool metal_graph_prefill_v41_ced_hybrid_encoder(
             ds4_gpu_tensor_free(dst_hc);
             ds4_gpu_tensor_free(src_pre);
             ds4_gpu_tensor_free(src_hc);
-            if (host_engram) {
+            if (host_engram && !staged_engram) {
                 if (ok) ok = ds4_gpu_end_commands() != 0;
                 else (void)ds4_gpu_synchronize();
             }
@@ -39564,7 +39671,7 @@ static bool metal_graph_prefill_v41_ced_hybrid_encoder(
                         il, pos);
             }
         }
-        if (!host_engram) {
+        if (!host_engram || staged_engram) {
             if (ok) ok = ds4_gpu_end_commands() != 0;
             else (void)ds4_gpu_synchronize();
         }
