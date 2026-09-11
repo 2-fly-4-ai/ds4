@@ -2187,6 +2187,7 @@ typedef struct {
     pthread_cond_t work_cond;
     pthread_cond_t done_cond;
     uint32_t n_threads;
+    uint32_t active_threads;
     uint32_t n_workers;
     uint32_t generation;
     uint32_t done;
@@ -2219,7 +2220,7 @@ static void *ds4_worker_main(void *arg) {
         ds4_parallel_fn fn = g_pool.fn;
         void *ctx = g_pool.ctx;
         const uint64_t n_rows = g_pool.n_rows;
-        const uint32_t n_threads = g_pool.n_threads;
+        const uint32_t n_threads = g_pool.active_threads;
         pthread_mutex_unlock(&g_pool.mutex);
 
         const uint64_t rows_per_thread = (n_rows + n_threads - 1) / n_threads;
@@ -2267,6 +2268,7 @@ static void ds4_threads_init(void) {
     pthread_cond_init(&g_pool.work_cond, NULL);
     pthread_cond_init(&g_pool.done_cond, NULL);
     g_pool.n_threads = n_threads;
+    g_pool.active_threads = n_threads;
     g_pool.n_workers = n_threads > 0 ? n_threads - 1 : 0;
     g_pool.generation = 0;
     g_pool.done = 0;
@@ -2301,10 +2303,17 @@ static void ds4_threads_shutdown(void) {
 
 /* Run a row-parallel CPU kernel, falling back to serial execution for small
  * jobs or nested calls where spawning more work would only add latency. */
-static void ds4_parallel_for_min_rows(uint64_t n_rows, ds4_parallel_fn fn, void *ctx, uint64_t min_parallel_rows) {
+static void ds4_parallel_for_min_rows_max_threads(
+        uint64_t n_rows, ds4_parallel_fn fn, void *ctx,
+        uint64_t min_parallel_rows, uint32_t max_threads) {
     ds4_threads_init();
 
-    if (g_parallel_depth > 0 || g_pool.n_threads <= 1 || n_rows < min_parallel_rows) {
+    uint32_t active_threads = g_pool.n_threads;
+    if (max_threads > 0 && active_threads > max_threads) {
+        active_threads = max_threads;
+    }
+    if (g_parallel_depth > 0 || active_threads <= 1 ||
+        n_rows < min_parallel_rows) {
         fn(ctx, 0, n_rows);
         return;
     }
@@ -2313,11 +2322,13 @@ static void ds4_parallel_for_min_rows(uint64_t n_rows, ds4_parallel_fn fn, void 
     g_pool.fn = fn;
     g_pool.ctx = ctx;
     g_pool.n_rows = n_rows;
+    g_pool.active_threads = active_threads;
     g_pool.done = 0;
     g_pool.generation++;
     pthread_cond_broadcast(&g_pool.work_cond);
 
-    const uint64_t rows_per_thread = (n_rows + g_pool.n_threads - 1) / g_pool.n_threads;
+    const uint64_t rows_per_thread =
+        (n_rows + active_threads - 1) / active_threads;
     uint64_t main_row1 = rows_per_thread;
     if (main_row1 > n_rows) main_row1 = n_rows;
     pthread_mutex_unlock(&g_pool.mutex);
@@ -2333,6 +2344,13 @@ static void ds4_parallel_for_min_rows(uint64_t n_rows, ds4_parallel_fn fn, void 
         pthread_cond_wait(&g_pool.done_cond, &g_pool.mutex);
     }
     pthread_mutex_unlock(&g_pool.mutex);
+}
+
+static void ds4_parallel_for_min_rows(
+        uint64_t n_rows, ds4_parallel_fn fn, void *ctx,
+        uint64_t min_parallel_rows) {
+    ds4_parallel_for_min_rows_max_threads(
+        n_rows, fn, ctx, min_parallel_rows, 0);
 }
 
 static void ds4_parallel_for(uint64_t n_rows, ds4_parallel_fn fn, void *ctx) {
@@ -35069,6 +35087,38 @@ static bool metal_graph_v41_engram_staging_requested(void) {
 #endif
 }
 
+static bool metal_graph_v41_engram_parallel_gather_requested(void) {
+#if defined(__APPLE__)
+    const char *env = getenv("DS4_METAL_V41_CED_PARALLEL_ENGRAM_GATHER");
+    if (env && env[0]) return strcmp(env, "0") != 0;
+    return true;
+#else
+    return false;
+#endif
+}
+
+typedef struct {
+    float               *host;
+    const ds4_gpu_graph *g;
+    const ds4_model     *model;
+    const ds4_weights   *weights;
+    uint64_t             engram_input;
+    uint32_t             slot;
+} metal_graph_v41_engram_gather_ctx;
+
+static void metal_graph_v41_engram_gather_worker(
+        void *opaque, uint64_t row0, uint64_t row1) {
+    metal_graph_v41_engram_gather_ctx *ctx = opaque;
+    for (uint64_t pos = row0; pos < row1; pos++) {
+        uint64_t rows[24];
+        deepseek41_engram_hash_history(
+            rows, ctx->g->v41_engram_tokens, (uint32_t)pos, ctx->slot);
+        deepseek41_engram_gather_one(
+            ctx->host + pos * ctx->engram_input,
+            ctx->model, ctx->weights, rows, ctx->slot);
+    }
+}
+
 /* All prompt token IDs are known before CED prefill starts.  Stage their
  * exact Engram gathers together before encoding the layer.
  * The routed-FFN batch buffers are idle during attention and are sized for the
@@ -35103,18 +35153,38 @@ static bool metal_graph_v41_engram_stage_batch(
         return false;
     }
 
+    const bool profile =
+        getenv("DS4_METAL_V41_CED_HYBRID_STAGE_PROFILE") != NULL;
+    const double gather_t0 = profile ? now_sec() : 0.0;
     float *host = xmalloc((size_t)input_bytes);
-    for (uint32_t pos = 0; pos < n_tokens; pos++) {
-        uint64_t rows[24];
-        deepseek41_engram_hash_history(rows, g->v41_engram_tokens,
-                                       pos, (uint32_t)slot);
-        deepseek41_engram_gather_one(
-            host + (uint64_t)pos * engram_input,
-            model, weights, rows, (uint32_t)slot);
+    metal_graph_v41_engram_gather_ctx gather = {
+        .host = host,
+        .g = g,
+        .model = model,
+        .weights = weights,
+        .engram_input = engram_input,
+        .slot = (uint32_t)slot,
+    };
+    if (metal_graph_v41_engram_parallel_gather_requested()) {
+        /* Four workers saturated the mapped Engram tables on M5 Max; using
+         * every CPU worker contends with Metal and slows the full prefill. */
+        ds4_parallel_for_min_rows_max_threads(
+            n_tokens, metal_graph_v41_engram_gather_worker, &gather, 1, 4);
+    } else {
+        metal_graph_v41_engram_gather_worker(&gather, 0, n_tokens);
     }
+    const double upload_t0 = profile ? now_sec() : 0.0;
     const bool uploaded = ds4_gpu_tensor_write(
         batch_embed, 0, host, input_bytes) != 0;
     free(host);
+    if (profile) {
+        const double done = now_sec();
+        fprintf(stderr,
+                "ds4: V4.1 CED Engram stage layer=%u rows=%u "
+                "gather=%.3f ms upload=%.3f ms\n",
+                il, n_tokens, (upload_t0 - gather_t0) * 1000.0,
+                (done - upload_t0) * 1000.0);
+    }
     return uploaded;
 }
 
@@ -39577,6 +39647,12 @@ static bool metal_graph_prefill_v41_ced_hybrid_encoder(
         2ull * DS4_N_HC + (uint64_t)DS4_N_HC * DS4_N_HC;
     const uint64_t mix_row_bytes = mix_values * sizeof(float);
     const uint64_t pre_bytes = (uint64_t)DS4_N_HC * sizeof(float);
+    const bool stage_profile =
+        getenv("DS4_METAL_V41_CED_HYBRID_STAGE_PROFILE") != NULL;
+    double attention_s = 0.0;
+    double ffn_s = 0.0;
+    double boundary_s = 0.0;
+    double engram_host_s = 0.0;
     if (!g || !model || !weights || !prompt || !replay_hc || !replay_mix ||
         n_tokens <= V41_REPLAY_WINDOW ||
         n_tokens > metal_graph_v41_ced_hybrid_max_tokens() ||
@@ -39641,11 +39717,14 @@ static bool metal_graph_prefill_v41_ced_hybrid_encoder(
         const bool host_engram = deepseek41_engram_slot_for_layer(il) >= 0;
         const bool staged_engram =
             host_engram && metal_graph_v41_engram_staging_requested();
+        const double attention_t0 = stage_profile ? now_sec() : 0.0;
 
         if (!host_engram || staged_engram) ok = ds4_gpu_begin_commands() != 0;
         if (ok && staged_engram) {
+            const double engram_t0 = stage_profile ? now_sec() : 0.0;
             ok = metal_graph_v41_engram_stage_batch(
                 g, model, weights, layer, il, n_tokens);
+            if (stage_profile) engram_host_s += now_sec() - engram_t0;
             if (!ok) {
                 fprintf(stderr,
                         "ds4: V4.1 CED Engram staging failed "
@@ -39729,8 +39808,12 @@ static bool metal_graph_prefill_v41_ced_hybrid_encoder(
             g->layer_n_comp[owner] = full_comp;
             g->layer_n_index_comp[owner] = full_index;
         }
+        const double attention_elapsed =
+            stage_profile ? now_sec() - attention_t0 : 0.0;
+        if (stage_profile) attention_s += attention_elapsed;
         if (!ok) break;
 
+        const double ffn_t0 = stage_profile ? now_sec() : 0.0;
         ok = ds4_gpu_begin_commands() != 0;
         /* Preserve the exact single-row HC/sinkhorn transition used by
          * ordinary V4.1 decode.  These operations are tiny, but their
@@ -39875,6 +39958,14 @@ static bool metal_graph_prefill_v41_ced_hybrid_encoder(
             fprintf(stderr,
                     "ds4: V4.1 CED hybrid FFN failed at layer %u\n", il);
         }
+        const double ffn_elapsed = stage_profile ? now_sec() - ffn_t0 : 0.0;
+        if (stage_profile) {
+            ffn_s += ffn_elapsed;
+            fprintf(stderr,
+                    "ds4: V4.1 CED hybrid layer=%u attention=%.3f ms "
+                    "ffn=%.3f ms\n",
+                    il, attention_elapsed * 1000.0, ffn_elapsed * 1000.0);
+        }
         if (ok) {
             ds4_gpu_tensor *tmp = metal_graph_batch_cur_hc(g);
             g->batch_cur_hc_by_tier[g->active_tier] =
@@ -39961,6 +40052,7 @@ static bool metal_graph_prefill_v41_ced_hybrid_encoder(
     if (ext_factor != 0.0f && freq_scale > 0.0f) {
         attn_factor /= 1.0f + 0.1f * logf(1.0f / freq_scale);
     }
+    const double boundary_t0 = stage_profile ? now_sec() : 0.0;
     ok = ds4_gpu_begin_commands() != 0;
     for (uint32_t pos = 0; ok && pos < n_tokens; pos++) {
         ds4_gpu_tensor *src_hc = metal_graph_tensor_row_view(
@@ -39992,6 +40084,16 @@ static bool metal_graph_prefill_v41_ced_hybrid_encoder(
     }
     if (ok) ok = ds4_gpu_end_commands() != 0;
     else (void)ds4_gpu_synchronize();
+    if (stage_profile) {
+        boundary_s += now_sec() - boundary_t0;
+        fprintf(stderr,
+                "ds4: V4.1 CED hybrid stages tokens=%u "
+                "attention_inclusive=%.3f ms engram_host=%.3f ms "
+                "ffn=%.3f ms boundary=%.3f ms\n",
+                n_tokens, attention_s * 1000.0,
+                engram_host_s * 1000.0, ffn_s * 1000.0,
+                boundary_s * 1000.0);
+    }
     return ok;
 }
 
