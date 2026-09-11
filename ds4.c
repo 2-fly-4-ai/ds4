@@ -21815,6 +21815,8 @@ typedef struct {
     bool owns_prefill_workspace;
     bool materialize_ffn_out;
     bool v41_batch_ffn_prepared;
+    bool v41_hybrid_encoder_active;
+    ds4_gpu_tensor *v41_hybrid_selected_view;
     /* Class P (replicated per tier — this is
      * consumed in per-layer attn/FFN kernels, NOT embedding-only). Read-only
      * after init; replicate by writing the same host directions buffer to
@@ -22453,6 +22455,12 @@ static void metal_graph_free(ds4_gpu_graph *g) {
     ds4_gpu_decode_graphs_invalidate();
     free(g->v41_engram_host_embed);
     free(g->v41_engram_tokens);
+    /* Normally released at the end of the bounded hybrid encoder.  Keep the
+     * graph destructor safe if a future early-exit path reaches cleanup while
+     * the last per-row view is still live; destroy the view before its parent
+     * comp_selected tensor below. */
+    ds4_gpu_tensor_free(g->v41_hybrid_selected_view);
+    g->v41_hybrid_selected_view = NULL;
     /* free every Class P slot across all DS4_MAX_GPUS tier
      * slots. Unallocated slots are NULL and ds4_gpu_tensor_free(NULL) is a
      * no-op. The hc_pre / hc_post / hc_comb views must be freed BEFORE
@@ -29001,6 +29009,10 @@ static bool metal_graph_decode_v41_compressed(
     const uint32_t n_comp = g->layer_n_comp[owner];
     ds4_gpu_tensor *selected = NULL;
     uint32_t n_selected = 0;
+    if (g->v41_hybrid_encoder_active) {
+        ds4_gpu_tensor_free(g->v41_hybrid_selected_view);
+        g->v41_hybrid_selected_view = NULL;
+    }
     if (ok && ds4_v41_layer_owns_index(il) &&
         n_comp > DS4_N_INDEXER_TOP_K) {
         const uint64_t q_dim =
@@ -29094,13 +29106,35 @@ static bool metal_graph_decode_v41_compressed(
                         metal_graph_comp_mask(g), n_comp) != 0;
             }
         }
-        if (ok) ok = ds4_gpu_indexer_topk_tensor(
+        ds4_gpu_tensor *topk_out = metal_graph_comp_selected(g);
+        if (ok && g->v41_hybrid_encoder_active) {
+            g->v41_hybrid_selected_view = ds4_gpu_tensor_view(
                 metal_graph_comp_selected(g),
-                metal_graph_indexer_scores(g), n_comp, 1,
+                (uint64_t)pos * DS4_N_INDEXER_TOP_K * sizeof(int32_t),
+                (uint64_t)DS4_N_INDEXER_TOP_K * sizeof(int32_t));
+            ok = g->v41_hybrid_selected_view != NULL;
+            if (ok) topk_out = g->v41_hybrid_selected_view;
+        }
+        if (ok) ok = ds4_gpu_indexer_topk_tensor(
+                topk_out, metal_graph_indexer_scores(g), n_comp, 1,
                 DS4_N_INDEXER_TOP_K) != 0;
+        if (ok && g->v41_hybrid_encoder_active) selected = topk_out;
+    } else if (ok && g->v41_hybrid_encoder_active &&
+               n_comp > DS4_N_INDEXER_TOP_K) {
+        /* CED hybrid runs the shared index-source layer across the complete
+         * prompt before its consumer layers.  Preserve the token-major
+         * contract by restoring the source layer's selection for this row;
+         * otherwise consumers would all observe the source layer's final
+         * top-k once the compressed cache grows beyond 512 entries. */
+        g->v41_hybrid_selected_view = ds4_gpu_tensor_view(
+            metal_graph_comp_selected(g),
+            (uint64_t)pos * DS4_N_INDEXER_TOP_K * sizeof(int32_t),
+            (uint64_t)DS4_N_INDEXER_TOP_K * sizeof(int32_t));
+        ok = g->v41_hybrid_selected_view != NULL;
+        if (ok) selected = g->v41_hybrid_selected_view;
     }
     if (ok && n_comp > DS4_N_INDEXER_TOP_K) {
-        selected = metal_graph_comp_selected(g);
+        if (!selected) selected = metal_graph_comp_selected(g);
         n_selected = DS4_N_INDEXER_TOP_K;
     }
 
@@ -35037,8 +35071,8 @@ static bool metal_graph_v41_engram_staging_requested(void) {
 
 /* All prompt token IDs are known before CED prefill starts.  Stage their
  * exact Engram gathers together before encoding the layer.
- * The routed-FFN batch buffers are idle during attention and are large enough
- * for the bounded <=1024-row hybrid, so this experiment adds no persistent
+ * The routed-FFN batch buffers are idle during attention and are sized for the
+ * active bounded hybrid batch, so this experiment adds no persistent
  * Metal allocation.  Injection remains one row at a time below. */
 static bool metal_graph_v41_engram_stage_batch(
         ds4_gpu_graph           *g,
@@ -39501,12 +39535,27 @@ static bool metal_graph_v41_ced_hybrid_prefill_requested(void) {
 #endif
 }
 
+static uint32_t metal_graph_v41_ced_hybrid_max_tokens(void) {
+    uint32_t max_tokens = 4096u;
+#if defined(__APPLE__)
+    const char *env = getenv("DS4_METAL_V41_CED_HYBRID_MAX");
+    if (env && env[0]) {
+        char *end = NULL;
+        const unsigned long v = strtoul(env, &end, 10);
+        if (end != env && *end == '\0' && v >= 129ul && v <= 8192ul) {
+            max_tokens = (uint32_t)v;
+        }
+    }
+#endif
+    return max_tokens;
+}
+
 /* Execute the V4.1 encoder layer-major while preserving its causal attention
  * state machine.  Attention still advances one token at a time inside each
  * layer; the expensive shared/routed FFN is evaluated once for all rows so a
- * dequantized expert tile can serve many prompt tokens.  This is deliberately
- * a narrow experiment (text-only, <=1024 rows) until parity and crossover are
- * measured. */
+ * dequantized expert tile can serve many prompt tokens.  The default remains
+ * a bounded text-only <=4096-row experiment; an explicit override permits
+ * larger parity/crossover probes without changing ordinary behavior. */
 static bool metal_graph_prefill_v41_ced_hybrid_encoder(
         ds4_gpu_graph          *g,
         const ds4_model        *model,
@@ -39529,7 +39578,8 @@ static bool metal_graph_prefill_v41_ced_hybrid_encoder(
     const uint64_t mix_row_bytes = mix_values * sizeof(float);
     const uint64_t pre_bytes = (uint64_t)DS4_N_HC * sizeof(float);
     if (!g || !model || !weights || !prompt || !replay_hc || !replay_mix ||
-        n_tokens <= V41_REPLAY_WINDOW || n_tokens > 1024u ||
+        n_tokens <= V41_REPLAY_WINDOW ||
+        n_tokens > metal_graph_v41_ced_hybrid_max_tokens() ||
         n_tokens > g->prefill_cap || g->placement || g->tp_world >= 2 ||
         g->prefill_has_visual || !metal_graph_batch_v41_pre_mix(g)) {
         fprintf(stderr,
@@ -40036,14 +40086,19 @@ static bool metal_graph_prefill_v41_ced_range(
 
     const bool hybrid_encoder =
         metal_graph_v41_ced_hybrid_prefill_requested() &&
-        n_tokens <= 1024u && n_tokens <= g->prefill_cap &&
+        n_tokens <= metal_graph_v41_ced_hybrid_max_tokens() &&
+        n_tokens <= g->prefill_cap &&
         !g->prefill_has_visual;
     if (hybrid_encoder) {
         const double hybrid_t0 = profile ? now_sec() : 0.0;
+        g->v41_hybrid_encoder_active = true;
         ok = metal_graph_prefill_v41_ced_hybrid_encoder(
             g, model, weights, prompt, n_tokens, replay_hc, replay_mix,
             cancel, cancel_ud, cancelled, show_progress,
             display_progress, display_progress_ud);
+        g->v41_hybrid_encoder_active = false;
+        ds4_gpu_tensor_free(g->v41_hybrid_selected_view);
+        g->v41_hybrid_selected_view = NULL;
         if (profile) encoder_s += now_sec() - hybrid_t0;
     } else {
     /* Encoder pass plus the layer-20 cache projection. */

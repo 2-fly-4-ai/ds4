@@ -1,0 +1,6 @@
+corpus,prompt_tokens,serial_prefill_tps,hybrid_prefill_tps,gain_percent,full_logit_arrays,parity
+security,1088,22.14,25.39,14.68,9,byte_exact
+security,1536,23.45,27.49,17.23,1,byte_exact
+security_balanced,2048,25.225,29.025,15.06,9,byte_exact
+story,2048,27.40,32.23,17.63,5,byte_exact
+security,4096,28.26,31.55,11.64,3,byte_exact
