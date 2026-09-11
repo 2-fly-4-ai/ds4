@@ -1887,6 +1887,7 @@ static void ds4_gpu_model_residency_clear(void) {
  * must be skipped; pages fault in lazily through the same view buffers,
  * exactly like ssd-streaming mode. */
 static int g_model_residency_skipped;
+static int g_model_residency_force;
 
 void ds4_gpu_model_residency_skip(int skip) {
     g_model_residency_skipped = skip;
@@ -1894,7 +1895,7 @@ void ds4_gpu_model_residency_skip(int skip) {
 
 static int ds4_gpu_model_residency_request_views(void) {
     if (g_model_view_count == 0 ||
-        g_ssd_streaming_mode ||
+        (g_ssd_streaming_mode && !g_model_residency_force) ||
         g_model_residency_skipped ||
         getenv("DS4_METAL_NO_RESIDENCY") != NULL) {
         return 1;
@@ -2683,7 +2684,9 @@ static int ds4_gpu_warm_model_views(void) {
     id<MTLComputePipelineState> pipeline = ds4_gpu_get_pipeline("kernel_touch_u8_stride");
     if (!pipeline) return 0;
 
-    uint64_t stride = 1024ull * 1024ull;
+    uint64_t stride = g_model_residency_force
+        ? (uint64_t)getpagesize()
+        : 1024ull * 1024ull;
     const char *stride_env = getenv("DS4_METAL_MODEL_WARMUP_STRIDE_MB");
     if (stride_env && stride_env[0]) {
         char *end = NULL;
@@ -2751,6 +2754,22 @@ static int ds4_gpu_warm_model_views(void) {
     }
 
     return 1;
+}
+
+int ds4_gpu_force_current_model_views_resident(void) {
+    if (!g_initialized && !ds4_gpu_init()) return 0;
+    if (g_model_view_count == 0) return 0;
+    const double t0 = ds4_gpu_now_ms();
+    g_model_residency_force = 1;
+    const int resident = ds4_gpu_model_residency_request_views();
+    const double t1 = ds4_gpu_now_ms();
+    const int warmed = resident ? ds4_gpu_warm_model_views() : 0;
+    const double t2 = ds4_gpu_now_ms();
+    g_model_residency_force = 0;
+    fprintf(stderr,
+            "ds4: V4.1 encoder residency request %.3f ms, dense page warm %.3f ms (%u views)\n",
+            t1 - t0, t2 - t1, g_model_view_count);
+    return resident && warmed;
 }
 
 static const char *ds4_gpu_mul_mm_id_map0_name(uint32_t ne20) {

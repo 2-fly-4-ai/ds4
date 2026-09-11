@@ -1,0 +1,9 @@
+experiment,variant,run,prompt_tokens,prefill_tps,gen_tokens,gen_tps,first_ms,steady_tps,total_prefill_s,residency_s
+scalar,baseline,1,512,24.60,64,10.64,164.736,10.77,,
+scalar,candidate,1,512,24.67,64,10.77,164.645,10.91,,
+scalar,candidate,2,512,26.45,64,11.51,162.717,11.68,,
+scalar,baseline,2,512,26.07,64,11.39,162.402,11.55,,
+residency,layer-major,1,512,20.98,4,7.94,168.838,8.95,24.409,0
+residency,resident,1,512,20.74,4,6.69,259.636,8.86,24.683,6.572
+residency,layer-major,1,8192,36.69,4,4.25,489.099,6.63,223.304,0
+residency,resident,1,8192,41.12,4,4.59,484.646,7.75,199.245,11.987

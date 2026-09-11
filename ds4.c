@@ -39684,6 +39684,54 @@ static uint32_t metal_graph_v41_ced_hybrid_max_tokens(void) {
     return max_tokens;
 }
 
+static bool metal_graph_v41_resident_encoder_requested(void) {
+#if defined(__APPLE__)
+    const char *env = getenv("DS4_METAL_V41_CED_RESIDENT_ENCODER");
+    return env && env[0] && strcmp(env, "0") != 0;
+#else
+    return false;
+#endif
+}
+
+static bool metal_graph_stream_map_v41_resident_encoder(
+        const ds4_model   *model,
+        const ds4_weights *weights) {
+    enum { V41_ENCODER_LAST_LAYER = 19 };
+    ds4_model_map_span_vec spans;
+    if (!weights_model_map_spans(weights, 0, V41_ENCODER_LAST_LAYER,
+                                 false, &spans)) {
+        fprintf(stderr, "ds4: V4.1 could not build resident encoder spans\n");
+        return false;
+    }
+    const uint64_t bytes = model_map_span_vec_total_bytes(&spans);
+    fprintf(stderr,
+            "ds4: V4.1 resident encoder plan %.2f GiB across %u spans\n",
+            (double)bytes / (1024.0 * 1024.0 * 1024.0), spans.len);
+    const double t0 = now_sec();
+    bool ok = metal_graph_install_model_spans(
+        model, &spans, "V4.1 resident encoder");
+#if defined(__APPLE__)
+    if (ok) {
+        const uint64_t page = (uint64_t)getpagesize();
+        for (uint32_t i = 0; i < spans.len; i++) {
+            const uint64_t lo = spans.v[i].off & ~(page - 1u);
+            const uint64_t hi =
+                (spans.v[i].end + page - 1u) & ~(page - 1u);
+            if (hi > lo) {
+                (void)madvise((uint8_t *)model->map + lo,
+                              (size_t)(hi - lo), MADV_WILLNEED);
+            }
+        }
+        ok = ds4_gpu_force_current_model_views_resident() != 0;
+    }
+#endif
+    fprintf(stderr,
+            "ds4: V4.1 resident encoder transition %.3f s (%s)\n",
+            now_sec() - t0, ok ? "ready" : "failed");
+    free(spans.v);
+    return ok;
+}
+
 /* Execute the V4.1 encoder layer-major while preserving its causal attention
  * state machine.  Attention still advances one token at a time inside each
  * layer; the expensive shared/routed FFN is evaluated once for all rows so a
@@ -40105,6 +40153,20 @@ static bool metal_graph_prefill_v41_ced_hybrid_encoder(
     else (void)ds4_gpu_synchronize();
     if (!ok) return false;
 
+    /* A resident-encoder run mapped only layers 0..19.  The boundary
+     * projection below is the first consumer of decoder layer 20, so restore
+     * the normal static decoder map here—after all encoder commands have
+     * completed and before opening the boundary command buffer. */
+    if (g->ssd_streaming && metal_graph_v41_resident_encoder_requested()) {
+        const double decoder_map_t0 = now_sec();
+        ok = metal_graph_stream_map_decode_static_all(model, weights);
+        if (ok) g->streaming_static_decode_map_current = true;
+        fprintf(stderr,
+                "ds4: V4.1 resident encoder decoder-map recovery %.3f s (%s)\n",
+                now_sec() - decoder_map_t0, ok ? "ready" : "failed");
+        if (!ok) return false;
+    }
+
     /* Project the final encoder rows into layer 20's global decoder cache.
      * This prefix intentionally stops before decoder attention/FFN. */
     const uint32_t boundary_il = V41_ENCODER_LAYERS;
@@ -40228,9 +40290,19 @@ static bool metal_graph_prefill_v41_ced_range(
     const uint32_t replay_start = n_tokens - V41_REPLAY_WINDOW;
     const float identity_pre[DS4_MAX_HC] = {1.0f, 0.0f, 0.0f, 0.0f};
 
+    const bool hybrid_encoder =
+        metal_graph_v41_ced_hybrid_prefill_requested() &&
+        n_tokens <= metal_graph_v41_ced_hybrid_max_tokens() &&
+        n_tokens <= g->prefill_cap &&
+        !g->prefill_has_visual;
+    const bool resident_encoder =
+        hybrid_encoder && metal_graph_v41_resident_encoder_requested();
+
     if (g->ssd_streaming) {
-        ok = metal_graph_stream_map_decode_static_all(model, weights);
-        if (ok) g->streaming_static_decode_map_current = true;
+        ok = resident_encoder
+            ? metal_graph_stream_map_v41_resident_encoder(model, weights)
+            : metal_graph_stream_map_decode_static_all(model, weights);
+        if (ok) g->streaming_static_decode_map_current = !resident_encoder;
     }
     if (progress) progress(progress_ud, "prefill_chunk", 0, prompt->len);
     if (display_progress)
@@ -40250,11 +40322,6 @@ static bool metal_graph_prefill_v41_ced_range(
             1.0f + 0.1f * logf(1.0f / boundary_freq_scale);
     }
 
-    const bool hybrid_encoder =
-        metal_graph_v41_ced_hybrid_prefill_requested() &&
-        n_tokens <= metal_graph_v41_ced_hybrid_max_tokens() &&
-        n_tokens <= g->prefill_cap &&
-        !g->prefill_has_visual;
     if (hybrid_encoder) {
         const double hybrid_t0 = profile ? now_sec() : 0.0;
         g->v41_hybrid_encoder_active = true;
