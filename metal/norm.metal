@@ -242,6 +242,172 @@ kernel void kernel_dsv4_qkv_rms_norm_f32_4(
     }
 }
 
+// DeepSeek V4.1 consumes both normalized low-rank rows as BF16.  The old
+// schedule launched kernel_v41_cache_quantize_f32 twice after the paired RMS
+// normalization.  This sibling preserves the exact reduction and multiply
+// order above, then performs the same round-to-nearest-even BF16 conversion as
+// the standalone V4.1 rounder while each float4 is still in registers.
+static inline float ds4_v41_norm_round_bf16(float value) {
+    uint bits = as_type<uint>(value);
+    if ((bits & 0x7f800000u) == 0x7f800000u) return value;
+    bits += 0x00007fffu + ((bits >> 16u) & 1u);
+    return as_type<float>(bits & 0xffff0000u);
+}
+
+kernel void kernel_v41_qkv_rms_norm_round_bf16_f32_4(
+        constant ds4_metal_args_qkv_rms_norm & args,
+        device const float4 * q_src,
+        device const float4 * q_weight,
+        device       float4 * q_dst,
+        device const float4 * kv_src,
+        device const float4 * kv_weight,
+        device       float4 * kv_dst,
+        threadgroup float * shmem_f32 [[threadgroup(0)]],
+        uint3   tgpig[[threadgroup_position_in_grid]],
+        ushort3 tpitg[[thread_position_in_threadgroup]],
+        ushort  sgitg[[simdgroup_index_in_threadgroup]],
+        ushort  tiisg[[thread_index_in_simdgroup]],
+        ushort3 ntg[[threads_per_threadgroup]]) {
+    if (sgitg == 0) shmem_f32[tiisg] = 0.0f;
+
+    const uint row = tgpig.x;
+    const bool kv_task = tgpig.y != 0;
+    const int n = kv_task ? args.kv_n : args.q_n;
+    const int n4 = kv_task ? args.kv_n4 : args.q_n4;
+    const uint64_t row_stride4 =
+        (kv_task ? args.kv_row_stride : args.q_row_stride) / sizeof(float4);
+    device const float4 * x =
+        kv_task ? kv_src + row * row_stride4 : q_src + row * row_stride4;
+    device const float4 * w = kv_task ? kv_weight : q_weight;
+    device float4 * y =
+        kv_task ? kv_dst + row * row_stride4 : q_dst + row * row_stride4;
+
+    float sumf = 0.0f;
+    for (int i = tpitg.x; i < n4; i += ntg.x) {
+        const float4 v = x[i];
+        sumf += dot(v, v);
+    }
+    sumf = simd_sum(sumf);
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    if (tiisg == 0) shmem_f32[sgitg] = sumf;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    sumf = shmem_f32[tiisg];
+    sumf = simd_sum(sumf);
+
+#ifdef DS4_METAL_NORM_RSQRT_DISABLE
+    const float scale = 1.0f / sqrt(sumf / float(n) + args.eps);
+#else
+    const float scale = rsqrt(sumf / float(n) + args.eps);
+#endif
+
+    for (int i = tpitg.x; i < n4; i += ntg.x) {
+        const float4 v = (x[i] * scale) * w[i];
+        y[i] = float4(ds4_v41_norm_round_bf16(v.x),
+                      ds4_v41_norm_round_bf16(v.y),
+                      ds4_v41_norm_round_bf16(v.z),
+                      ds4_v41_norm_round_bf16(v.w));
+    }
+}
+
+// Complete V4.1 decode Q/KV finalizer.  Q keeps the exact norm+BF16 result.
+// KV continues through the established affine RoPE, V4.1 window-cache E4M3
+// simulation, BF16 result rounding, and the raw-cache FP16 round trip.  This
+// is still one row on the established decode path; it does not batch either
+// projection and is unrelated to the unsafe multi-row projection experiment.
+kernel void kernel_v41_qkv_rms_norm_kv_rope_store_f32_4(
+        constant ds4_metal_args_qkv_rms_norm & args,
+        constant ds4_metal_args_dsv4_rope_affine_pair & rope,
+        constant ds4_metal_args_dsv4_kv_fp8_store & store,
+        device const float4 * q_src,
+        device const float4 * q_weight,
+        device       float4 * q_dst,
+        device const float4 * kv_src,
+        device const float4 * kv_weight,
+        device       float4 * kv_dst,
+        device       float  * raw_cache,
+        threadgroup float * scratch [[threadgroup(0)]],
+        uint3   tgpig[[threadgroup_position_in_grid]],
+        ushort3 tpitg[[thread_position_in_threadgroup]],
+        ushort  sgitg[[simdgroup_index_in_threadgroup]],
+        ushort  tiisg[[thread_index_in_simdgroup]],
+        ushort3 ntg[[threads_per_threadgroup]]) {
+    if (sgitg == 0) scratch[tiisg] = 0.0f;
+    const bool kv_task = tgpig.y != 0;
+    const int n = kv_task ? args.kv_n : args.q_n;
+    const int n4 = kv_task ? args.kv_n4 : args.q_n4;
+    const uint64_t stride4 =
+        (kv_task ? args.kv_row_stride : args.q_row_stride) / sizeof(float4);
+    device const float4 *x = kv_task ? kv_src : q_src;
+    device const float4 *w = kv_task ? kv_weight : q_weight;
+    device float4 *y = kv_task ? kv_dst : q_dst;
+
+    float sumf = 0.0f;
+    for (int i = tpitg.x; i < n4; i += ntg.x) {
+        const float4 v = x[i + tgpig.x * stride4];
+        sumf += dot(v, v);
+    }
+    sumf = simd_sum(sumf);
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    if (tiisg == 0) scratch[sgitg] = sumf;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    sumf = simd_sum(scratch[tiisg]);
+#ifdef DS4_METAL_NORM_RSQRT_DISABLE
+    const float scale = 1.0f / sqrt(sumf / float(n) + args.eps);
+#else
+    const float scale = rsqrt(sumf / float(n) + args.eps);
+#endif
+    for (int i = tpitg.x; i < n4; i += ntg.x) {
+        const float4 v = (x[i + tgpig.x * stride4] * scale) * w[i];
+        y[i + tgpig.x * stride4] =
+            float4(ds4_v41_norm_round_bf16(v.x),
+                   ds4_v41_norm_round_bf16(v.y),
+                   ds4_v41_norm_round_bf16(v.z),
+                   ds4_v41_norm_round_bf16(v.w));
+    }
+    if (!kv_task) return;
+
+    threadgroup_barrier(mem_flags::mem_device_and_threadgroup);
+    device float *kv = (device float *)(kv_dst + tgpig.x * stride4);
+    const int n_nope = rope.head_dim - rope.n_dims;
+    if (n_nope < 0) return;
+    ds4_rope_tail_pair_affine_row(rope,
+                                  (device const char *)kv,
+                                  (device char *)kv,
+                                  n_nope,
+                                  rope.pos0,
+                                  tpitg.x,
+                                  ntg.x);
+    threadgroup_barrier(mem_flags::mem_device_and_threadgroup);
+
+    // Verbatim mode-0 V4.1 window-cache quantization, including BF16 input
+    // and output rounding.  Only the first SIMD group participates in values;
+    // every lane observes each barrier.
+    for (int off = 0; off < args.kv_n; off += 32) {
+        if (tpitg.x < 32u) {
+            const float v = ds4_v41_norm_round_bf16(kv[off + tpitg.x]);
+            scratch[tpitg.x] = abs(v);
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        for (uint stride = 16u; stride != 0u; stride >>= 1u) {
+            if (tpitg.x < stride)
+                scratch[tpitg.x] = max(scratch[tpitg.x], scratch[tpitg.x + stride]);
+            threadgroup_barrier(mem_flags::mem_threadgroup);
+        }
+        if (tpitg.x < 32u) {
+            const float v = ds4_v41_norm_round_bf16(kv[off + tpitg.x]);
+            const float amax = max(scratch[0], 1.0e-4f);
+            const float fp8_scale = exp2(ceil(log2(amax / 448.0f)));
+            const float out = dsv4_e4m3fn_dequant(
+                clamp(v / fp8_scale, -448.0f, 448.0f)) * fp8_scale;
+            kv[off + tpitg.x] = ds4_v41_norm_round_bf16(out);
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+    device float *raw = raw_cache + (int64_t)store.raw_row * args.kv_n;
+    for (int i = tpitg.x; i < args.kv_n; i += ntg.x)
+        raw[i] = (float)((half)kv[i]);
+}
+
 // Decode-only triple fusion: the q/kv RMS norm, the KV RoPE tail, and the
 // FP8/raw finalizer were three back-to-back dispatches on the same rows.
 // The q threadgroup is byte-identical to kernel_dsv4_qkv_rms_norm_f32_4.

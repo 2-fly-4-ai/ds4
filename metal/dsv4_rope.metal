@@ -595,6 +595,96 @@ kernel void kernel_dsv4_rope_tail_f32_inplace_pair_affine(
 
 }
 
+static inline float ds4_v41_rope_round_bf16(float value) {
+    uint bits = as_type<uint>(value);
+    if ((bits & 0x7f800000u) == 0x7f800000u) return value;
+    bits += 0x00007fffu + ((bits >> 16u) & 1u);
+    return as_type<float>(bits & 0xffff0000u);
+}
+
+// V4.1 Q finalizer: apply the established affine single-row RoPE and then the
+// model-required BF16 round in the same dispatch.  A device fence separates
+// the pair-wise RoPE writes from the element-wise final rounding.
+kernel void kernel_v41_q_rope_tail_round_bf16_f32(
+        constant ds4_metal_args_dsv4_rope_affine_pair & args [[buffer(0)]],
+        device float * x [[buffer(1)]],
+        uint tid [[thread_index_in_threadgroup]],
+        ushort3 ntg [[threads_per_threadgroup]],
+        uint3 tgpig [[threadgroup_position_in_grid]]) {
+    const int head = (int)tgpig.x;
+    const int token = (int)tgpig.y;
+    const int n_nope = args.head_dim - args.n_dims;
+    if (n_nope < 0) return;
+    const uint raw_pos = args.pos0 + (uint)token * args.pos_step;
+    device float *row = (device float *)((device char *)x +
+        (uint64_t)token * args.token_bytes + (uint64_t)head * args.row_bytes);
+    if (args.n_dims != 0) {
+        ds4_rope_tail_pair_affine_row(args,
+                                      (device const char *)row,
+                                      (device char *)row,
+                                      n_nope,
+                                      raw_pos,
+                                      tid,
+                                      ntg.x);
+        threadgroup_barrier(mem_flags::mem_device_and_threadgroup);
+    }
+    for (int i = (int)tid; i < args.head_dim; i += (int)ntg.x) {
+        row[i] = ds4_v41_rope_round_bf16(row[i]);
+    }
+}
+
+// V4.1 KV finalizer kept at the original post-Q scheduling point: BF16 input
+// round, affine RoPE, window-cache E4M3 simulation with BF16 output, then the
+// raw-cache FP16 round trip.  This preserves the old cross-stage ordering.
+kernel void kernel_v41_kv_round_rope_store_f32(
+        constant ds4_metal_args_dsv4_kv_fp8_store & store,
+        constant ds4_metal_args_dsv4_rope_affine_pair & rope,
+        device float *kv,
+        device float *raw_cache,
+        threadgroup float *scratch [[threadgroup(0)]],
+        uint tid [[thread_index_in_threadgroup]],
+        ushort3 ntg [[threads_per_threadgroup]]) {
+    for (int i = (int)tid; i < store.head_dim; i += (int)ntg.x)
+        kv[i] = ds4_v41_rope_round_bf16(kv[i]);
+    threadgroup_barrier(mem_flags::mem_device_and_threadgroup);
+    const int n_nope = rope.head_dim - rope.n_dims;
+    if (n_nope < 0) return;
+    if (rope.n_dims != 0) {
+        ds4_rope_tail_pair_affine_row(rope,
+                                      (device const char *)kv,
+                                      (device char *)kv,
+                                      n_nope,
+                                      rope.pos0,
+                                      tid,
+                                      ntg.x);
+        threadgroup_barrier(mem_flags::mem_device_and_threadgroup);
+    }
+    for (int off = 0; off < store.head_dim; off += 32) {
+        if (tid < 32u) {
+            const float v = ds4_v41_rope_round_bf16(kv[off + tid]);
+            scratch[tid] = abs(v);
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        for (uint stride = 16u; stride != 0u; stride >>= 1u) {
+            if (tid < stride)
+                scratch[tid] = max(scratch[tid], scratch[tid + stride]);
+            threadgroup_barrier(mem_flags::mem_threadgroup);
+        }
+        if (tid < 32u) {
+            const float v = ds4_v41_rope_round_bf16(kv[off + tid]);
+            const float amax = max(scratch[0], 1.0e-4f);
+            const float scale = exp2(ceil(log2(amax / 448.0f)));
+            const float out = dsv4_e4m3fn_dequant(
+                clamp(v / scale, -448.0f, 448.0f)) * scale;
+            kv[off + tid] = ds4_v41_rope_round_bf16(out);
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+    device float *raw = raw_cache + (int64_t)store.raw_row * store.head_dim;
+    for (int i = (int)tid; i < store.head_dim; i += (int)ntg.x)
+        raw[i] = (float)((half)kv[i]);
+}
+
 // Decode-only fusion of the KV RoPE tail with the FP8/raw finalizer. Both were
 // already single 64-thread threadgroups on the same row, back to back, so the
 // pair cost two dispatches (~12.4 us) to touch 2 KB. The RoPE body below is a
