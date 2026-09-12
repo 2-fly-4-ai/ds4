@@ -63382,6 +63382,12 @@ static bool qwen4_graph_alloc(ds4_qwen4_gpu_graph *g, const ds4_weights *w, uint
         const ds4_layer_weights *l = &w->layer[il];
         g->pipeline_enabled = ds4_gpu_qwen4_half_mid_supported(
             l->ffn_gate_exps->type, l->ffn_up_exps->type, l->ffn_down_exps->type);
+#ifdef __APPLE__
+        g->pipeline_enabled = g->pipeline_enabled ||
+            (l->ffn_gate_exps->type == DS4_TENSOR_Q4_K &&
+             l->ffn_up_exps->type == DS4_TENSOR_Q4_K &&
+             l->ffn_down_exps->type == DS4_TENSOR_MXFP4);
+#endif
     }
     g->sel_stride = g->k_blocks * 4u + 4u;
     g->n_logit_rows = prompt_lookup ? (g->pipeline_enabled ? 16u : 8u) : (mtp ? 2u : 1u);
@@ -63512,7 +63518,11 @@ static bool qwen4_gemv(const ds4_qwen4_gpu_graph *g, ds4_gpu_tensor *out, const 
         if (n_tok > 1u &&
             ((g->exact_verify_rows && n_tok <= 16u) ||
              (n_tok <= 8u && getenv("DS4_QWEN4_Q8_ROWS_SCALAR")))) {
+#ifdef __APPLE__
+            rc = ds4_gpu_qwen4_q8_0_verify_rows_tensor(
+#else
             rc = ds4_gpu_matmul_q8_0_decode_rows_exact_tensor(
+#endif
                 out, m->map, m->size, w->abs_offset,
                 in_dim, out_dim, x, n_tok);
         } else {
@@ -63810,7 +63820,14 @@ static bool qwen4_graph_moe(ds4_qwen4_gpu_graph *g, const ds4_model *m, const ds
      * crossover is between 64 and 128 rows. Other quant types retain the
      * established >8-row policy. */
     const bool q4_mm_batch = l->ffn_gate_exps->type != DS4_TENSOR_Q4_0 || T >= 128u;
-    const bool mm = T > 8u && q4_mm_batch && (DS4_N_EMBD % 64u) == 0 && (DS4_N_FF_EXP % 64u) == 0 &&
+    /* A wide verifier must retain the scalar expert reduction order. The
+     * prefill GEMMs round inputs to half and cannot verify exact drafts. */
+#ifdef __APPLE__
+    const bool exact_rows = g->exact_verify_rows && T <= 16u;
+#else
+    const bool exact_rows = false;
+#endif
+    const bool mm = !exact_rows && T > 8u && q4_mm_batch && (DS4_N_EMBD % 64u) == 0 && (DS4_N_FF_EXP % 64u) == 0 &&
         qwen4_expert_type_has_mm(l->ffn_gate_exps->type) &&
         l->ffn_up_exps->type == l->ffn_gate_exps->type &&
         qwen4_expert_type_has_mm(l->ffn_down_exps->type) &&

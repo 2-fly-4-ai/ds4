@@ -197,6 +197,53 @@ kernel void kernel_mul_mv_q8_0_f32(
     kernel_mul_mv_q8_0_f32_impl<N_R0_Q8_0, constant ds4_metal_args_mul_mv &>(args, src0, src1, dst, shmem, tgpig, tiisg, sgitg);
 }
 
+/* Exact Qwen verifier rows. Keep the scalar K walk and both levels
+ * of reduction; only share the quantized weight loads between input rows. */
+template<short B>
+void q8_exact_multi(constant ds4_metal_args_mul_mv &a,
+        device const char *w,device const char *x,device char *out,
+        threadgroup char *mem,uint3 tg,ushort lane,ushort sg) {
+    constexpr short R=N_R0_Q8_0,Q=8;
+    const short NSG=FC_mul_mv_nsg;
+    const int r0=tg.x*R,t0=tg.y*B,nb=a.ne00/QK8_0;
+    const short ix=lane/4,il=lane%4;
+    const int ib0=sg*Q+ix;
+    float acc[B][R]={};
+    for(int ib=ib0;ib<nb;ib+=NSG*Q) {
+        float y[B][Q];
+        FOR_UNROLL(short b=0;b<B;b++) {
+            device const float *xb=(device const float *)(x+(uint64_t)min(t0+b,a.ne1-1)*a.nb11);
+            FOR_UNROLL(short i=0;i<Q;i++)y[b][i]=xb[ib*QK8_0+il*Q+i];
+        }
+        FOR_UNROLL(short r=0;r<R;r++)if(r0+r<a.ne01) {
+            device const block_q8_0 *wr=(device const block_q8_0 *)(w+(uint64_t)(r0+r)*a.nb01);
+            float sum[B]={};
+            FOR_UNROLL(short i=0;i<Q;i++) {
+                const float q=wr[ib].qs[il*Q+i];
+                FOR_UNROLL(short b=0;b<B;b++)sum[b]+=q*y[b][i];
+            }
+            const float d=wr[ib].d;
+            FOR_UNROLL(short b=0;b<B;b++)acc[b][r]+=sum[b]*d;
+        }
+    }
+    FOR_UNROLL(short b=0;b<B;b++)if(t0+b<a.ne1) {
+        helper_mv_reduce_and_write<R>((device float *)out+(uint64_t)(t0+b)*a.ne0,
+            acc[b],r0,a.ne01,lane,sg,mem);
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+}
+
+kernel void kernel_q8_exact_multi2(constant ds4_metal_args_mul_mv &a,
+    device const char *w,device const char *x,device char *out,threadgroup char *mem,
+    uint3 tg [[threadgroup_position_in_grid]],ushort lane [[thread_index_in_simdgroup]],ushort sg [[simdgroup_index_in_threadgroup]]) {
+    q8_exact_multi<2>(a,w,x,out,mem,tg,lane,sg);
+}
+kernel void kernel_q8_exact_multi4(constant ds4_metal_args_mul_mv &a,
+    device const char *w,device const char *x,device char *out,threadgroup char *mem,
+    uint3 tg [[threadgroup_position_in_grid]],ushort lane [[thread_index_in_simdgroup]],ushort sg [[simdgroup_index_in_threadgroup]]) {
+    q8_exact_multi<4>(a,w,x,out,mem,tg,lane,sg);
+}
+
 // Greedy output-head variant.  It preserves kernel_mul_mv_q8_0_f32's
 // per-row K traversal and reduction tree, but retains only the best of two
 // vocabulary rows per threadgroup.  A tiny second pass reduces these

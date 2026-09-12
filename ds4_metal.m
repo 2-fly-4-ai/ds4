@@ -19243,7 +19243,7 @@ int ds4_gpu_matmul_q8_0_tensor(
     return ok;
 }
 
-int ds4_gpu_matmul_q8_0_decode_rows_exact_tensor(
+static int ds4_gpu_matmul_q8_0_decode_rows_impl(
         ds4_gpu_tensor       *out,
         const void           *model_map,
         uint64_t              model_size,
@@ -19251,7 +19251,8 @@ int ds4_gpu_matmul_q8_0_decode_rows_exact_tensor(
         uint64_t              in_dim,
         uint64_t              out_dim,
         const ds4_gpu_tensor *x,
-        uint32_t              n_rows) {
+        uint32_t              n_rows,
+        bool                  qwen_verifier) {
     if (!g_initialized && !ds4_gpu_init()) return 0;
     if (!out || !x || !model_map || n_rows == 0 ||
         n_rows > INT32_MAX || in_dim == 0 || out_dim == 0 ||
@@ -19288,7 +19289,9 @@ int ds4_gpu_matmul_q8_0_decode_rows_exact_tensor(
         if (!wbuf) return 0;
 
         ds4_gpu_mv_dispatch dispatch = ds4_gpu_make_q8_0_mv_dispatch();
-        if (out_dim > 65536u) dispatch.nsg = 8;
+        /* Qwen must match scalar decode even for the mid-sized QKV
+         * projections. Preserve the established dispatch of other callers. */
+        if (out_dim > (qwen_verifier ? 4096u : 65536u)) dispatch.nsg = 8;
         ds4_gpu_q8_0_matvec_args args =
             ds4_gpu_make_q8_0_mv_args(in_dim, out_dim);
         args.ne11 = (int32_t)n_rows;
@@ -19297,8 +19300,12 @@ int ds4_gpu_matmul_q8_0_decode_rows_exact_tensor(
         args.ne1 = (int32_t)n_rows;
         args.nr0 = dispatch.nr0;
 
+        const uint32_t multi = qwen_verifier && n_rows > 1u && n_rows <= 16u ?
+            (n_rows >= 4u ? 4u : 2u) : 1u;
+        const char *function = multi == 4u ? "kernel_q8_exact_multi4" :
+            multi == 2u ? "kernel_q8_exact_multi2" : dispatch.function_name;
         id<MTLComputePipelineState> pipeline =
-            ds4_gpu_get_mul_mv_pipeline(dispatch.function_name, dispatch.nsg);
+            ds4_gpu_get_mul_mv_pipeline(function, dispatch.nsg);
         if (!pipeline) return 0;
 
         int owned = 0;
@@ -19315,7 +19322,7 @@ int ds4_gpu_matmul_q8_0_decode_rows_exact_tensor(
                 MTLSizeMake(((NSUInteger)out_dim +
                              (NSUInteger)dispatch.nr0 - 1u) /
                                 (NSUInteger)dispatch.nr0,
-                            (NSUInteger)n_rows,
+                            (NSUInteger)((n_rows + multi - 1u) / multi),
                             1)
              threadsPerThreadgroup:
                 MTLSizeMake(32, (NSUInteger)dispatch.nsg, 1)];
@@ -19324,6 +19331,22 @@ int ds4_gpu_matmul_q8_0_decode_rows_exact_tensor(
         return ds4_gpu_finish_command_buffer(
                 cb, owned, "Q8_0 exact decode-row matvec");
     }
+}
+
+int ds4_gpu_matmul_q8_0_decode_rows_exact_tensor(
+        ds4_gpu_tensor *out, const void *model_map, uint64_t model_size,
+        uint64_t weight_offset, uint64_t in_dim, uint64_t out_dim,
+        const ds4_gpu_tensor *x, uint32_t n_rows) {
+    return ds4_gpu_matmul_q8_0_decode_rows_impl(out, model_map, model_size,
+            weight_offset, in_dim, out_dim, x, n_rows, false);
+}
+
+int ds4_gpu_qwen4_q8_0_verify_rows_tensor(
+        ds4_gpu_tensor *out, const void *model_map, uint64_t model_size,
+        uint64_t weight_offset, uint64_t in_dim, uint64_t out_dim,
+        const ds4_gpu_tensor *x, uint32_t n_rows) {
+    return ds4_gpu_matmul_q8_0_decode_rows_impl(out, model_map, model_size,
+            weight_offset, in_dim, out_dim, x, n_rows, true);
 }
 
 int ds4_gpu_matmul_q8_0_decode_mpp_tensor(

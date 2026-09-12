@@ -1880,6 +1880,39 @@ static void test_dense_mm(arena_t *a, uint32_t in_dim, uint32_t rows, uint32_t T
     ds4_gpu_tensor_free(gout); ds4_gpu_tensor_free(gx);
 }
 
+static void test_q8_multi(arena_t *a) {
+    const uint32_t shapes[][2]={{32,19},{128,257},{2560,4096},{2560,4097},{2560,8192},{8192,2560},{2560,262144}};
+    const uint32_t widths[]={1,2,3,4,5,7,8,15,16};
+    for(uint32_t si=0;si<7;si++) {
+        const uint32_t D=shapes[si][0],E=shapes[si][1];
+        const uint64_t nb=D/32,off=arena_alloc(a,(uint64_t)E*nb*34);
+        for(uint64_t b=0;b<(uint64_t)E*nb;b++) {
+            unsigned char *w=a->base+off+b*34;
+            uint16_t scale=f32_to_f16(0.002f*(1+b%7));memcpy(w,&scale,2);
+            for(uint32_t k=0;k<32;k++)w[k+2]=(unsigned char)(int8_t)((int)((b*17+k*13)%61)-30);
+        }
+        for(uint32_t wi=0;wi<9;wi++) {
+            const uint32_t T=widths[wi];const uint64_t count=(uint64_t)T*E;
+            float *x=rand_vec((uint64_t)T*D,1.0f);
+            ds4_gpu_tensor *gx=upload(x,(uint64_t)T*D),*out=upload(NULL,count);free(x);
+            /* Independent one-token oracle, not the batched dispatch. */
+            for(uint32_t t=0;t<T;t++) {
+                ds4_gpu_tensor *xi=ds4_gpu_tensor_view(gx,(uint64_t)t*D*4,(uint64_t)D*4);
+                ds4_gpu_tensor *yi=ds4_gpu_tensor_view(out,(uint64_t)t*E*4,(uint64_t)E*4);
+                require_ok(ds4_gpu_matmul_q8_0_tensor(yi,a->base,a->size,off,D,E,xi,1),"Q8 scalar oracle");
+                ds4_gpu_tensor_free(xi);ds4_gpu_tensor_free(yi);
+            }
+            float *ref=download(out,count);
+            require_ok(ds4_gpu_tensor_fill_f32(out,1234567.0f,count),"Q8 poison");
+            require_ok(ds4_gpu_qwen4_q8_0_verify_rows_tensor(out,a->base,a->size,off,D,E,gx,T),"Q8 multi");
+            float *got=download(out,count);
+            require_ok(memcmp(got,ref,count*4)==0,"Q8 multi byte equality");free(got);
+            printf("Q8_MULTI_EXACT in=%u out=%u rows=%u\n",D,E,T);fflush(stdout);
+            free(ref);ds4_gpu_tensor_free(gx);ds4_gpu_tensor_free(out);
+        }
+    }
+}
+
 int main(void) {
     arena_t arena;
     arena.size = (uint64_t)1536 << 20;
@@ -1889,6 +1922,7 @@ int main(void) {
     setenv("DS4_QWEN4_ATTN_SPLIT_KEYS", "8", 1);
     require_ok(ds4_gpu_init(), "GPU initialization");
     require_ok(ds4_gpu_set_model_map(arena.base, arena.size), "model map registration");
+    if (getenv("QWEN4_Q8_MULTI_TEST")) { test_q8_multi(&arena); return 0; }
 
     if (getenv("QWEN4_BENCH")) {
         bench_dispatch(&arena);

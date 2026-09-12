@@ -1,0 +1,19 @@
+ds4: PLE sidecar table: /Users/brianfarley/Desktop/ds4/gguf/qwen38-q4k-tensor/Qwen3.8-Flash-Next-PLE-Q4_1.gguf (ple.weight [160, 320001536], CPU-only)
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Qwen PLE remains CPU-mapped; Metal residency restricted to 1 model spans (69.73 GiB)
+ds4: Metal model views created in 1.953 ms, residency requested in 476.640 ms, warmup 2.563 ms (mapped 71400.42 MiB from offset 10.51 MiB)
+ds4: Metal mapped mmaped model as 1 overlapping shared buffers
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 0.10 GiB (raw 0.08 + compressed 0.02) + buffers 2.61 GiB + resident model 69.73 GiB = 72.43 GiB planned
+ds4: memory detail: ctx=3072 prefill_cap=3072 raw_kv_rows=3072 compressed_kv_rows=769 backend=metal
+QWEN_PORT_ARM variant=8 arm=0 prompt=2048 temp=0 neural=0 lookup=0 cycles=0 accepted=0 ms=2825.163 tps=45.307
+QWEN_PORT_REWIND_EXACT variant=8 arm=0
+QWEN_PORT_ARM variant=8 arm=1 prompt=2048 temp=0 neural=68 lookup=0 cycles=67 accepted=60 ms=2047.063 tps=62.529
+QWEN_PROPOSAL_STATE_DIFF expected_bytes=0 actual_bytes=5709824 (allowed diagnostic)
+QWEN_PORT_REWIND_ORIGINAL_COMPARE back=1
+QWEN_PROPOSAL_STATE_DIFF expected_bytes=5709824 actual_bytes=5707008 (allowed diagnostic)
+QWEN_PORT_REWIND_EXACT variant=8 arm=1
+QWEN_PORT_RESTORE_CONTINUATION_PASS variant=8 tokens=8
+QWEN_PORT_PARITY_PASS variant=8 tokens=128 prompt=2048 snapshot=187593308

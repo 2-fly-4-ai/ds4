@@ -144,6 +144,7 @@ static int batch_scalar_probe(const char *model_path) {
 
     ds4_engine_options opt = {
         .model_path = model_path,
+        .ple_path = getenv("HOT_PLE"),
         .backend = DS4_BACKEND_METAL,
         .context_size = 4096,
         .power_percent = 100,
@@ -225,7 +226,7 @@ int main(int argc,char **argv) {
     bool relaxed_route=getenv("HOT_RELAX_ROUTE")!=NULL;
     bool reference_plain=getenv("HOT_REFERENCE_PLAIN")!=NULL;
     ck(budget>0&&budget<=512,"budget");variant(reference_plain?candidate:0);
-    ds4_engine_options opt={.model_path=argv[1],.backend=DS4_BACKEND_METAL,.context_size=ctx+1024,
+    ds4_engine_options opt={.model_path=argv[1],.ple_path=getenv("HOT_PLE"),.backend=DS4_BACKEND_METAL,.context_size=ctx+1024,
         .power_percent=100,.warm_weights=getenv("HOT_NO_WARM")==NULL,.glm_mtp=neural_allowed,.dspark_exact_sampling=true};
     ds4_engine *e=NULL;ck(ds4_engine_open(&e,&opt)==0,"engine");
     ds4_tokens prompt={0};ds4_encode_chat_prompt(e,NULL,getenv("HOT_TASK"),DS4_THINK_NONE,&prompt);

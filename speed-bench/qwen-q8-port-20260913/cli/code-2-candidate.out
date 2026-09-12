@@ -1,0 +1,33 @@
+```python
+class Node:
+    """Doubly linked list node for LRU cache."""
+    def __init__(self, key=None, value=None):
+        self.key = key
+        self.value = value
+        self.prev = None
+        self.next = None
+
+
+class LRUCache:
+    """
+    LRU Cache implementation using a doubly linked list and a dictionary.
+    
+    The doubly linked list maintains the order of usage (most recently used at head,
+    least recently used at tail). The dictionary provides O(1) lookup for nodes.
+    """
+    
+    def __init__(self, capacity: int):
+        if capacity <= 0:
+            raise ValueError("Capacity must be positive")
+        self.capacity = capacity
+        self.cache = {}  # key -> Node
+        
+        # Dummy head and tail nodes to simplify edge cases
+        self.head = Node()  # Most recently used side
+        self.tail = Node()  # Least recently used side
+        self.head.next = self.tail
+        self.tail.prev = self.head
+    
+    def _remove_node(self, node: Node):
+        """Remove a node from the doubly linked list."""
+        prev_node = node.prev
