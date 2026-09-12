@@ -41,3 +41,7 @@ The exactness harness permits disposable neural-proposal-state differences, neve
 Use the existing `tests/run_qwen_q4k_wide_oracle.sh`, `tests/run_qwen_q8_main_comparison.sh`, and `tests/run_qwen_q8_stream_smoke.sh`. Main-comparison script requires an old-main checkout for a valid future A/B. Resident model and PLE paths are documented in `qwen-q8-port-20260913.md`; they were not modified. Raw final logs/outputs are in the adjacent directory.
 
 Retain this small, exact Qwen-specific gain. It adds to the prior Q8 verifier work, not a replacement for it. MTP still uses its existing enable setting; no router policy changes are included.
+
+## Main promotion
+
+Focused commit `d6d0594` was fast-forwarded onto main and all default Metal binaries rebuilt successfully. A post-merge 256-token lighthouse-story smoke matched the candidate output byte-for-byte. It reported 62.55 generation t/s, with 107/149 drafts accepted (71.8%); this single run is a correctness/deployment smoke, not a replacement for the paired comparison above or evidence of an additional speed gain. Build and smoke artifacts are archived alongside the candidate evidence. No server was started.
