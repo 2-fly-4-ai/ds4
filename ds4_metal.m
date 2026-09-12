@@ -50036,6 +50036,7 @@ enum {
     QWEN4_K_ATTN_MERGE_NPT1,
     QWEN4_K_ATTN_MM,
     QWEN4_K_MOE_MID,
+    QWEN4_K_MOE_MID_FUSED,
     QWEN4_K_MOE_DOWN,
     QWEN4_K_MOE_REDUCE,
     QWEN4_K_MTP_STAGE,
@@ -50099,6 +50100,7 @@ static const char *const qwen4_kernel_names[QWEN4_K_COUNT] = {
     "kernel_qwen4_attn_merge_npt1",
     "kernel_qwen4_attn_mm",
     "kernel_qwen4_moe_mid",
+    "kernel_qwen4_moe_mid_fused",
     "kernel_qwen4_moe_down",
     "kernel_qwen4_moe_reduce",
     "kernel_qwen4_mtp_stage",
@@ -50742,7 +50744,11 @@ int ds4_gpu_qwen4_moe_mid_tensor(
         b[6] = b[1];
     }
     const uint32_t rows_per_tg = 4u * 2u;
-    return qwen4_dispatch(QWEN4_K_MOE_MID, &args, sizeof(args), b, 7,
+    /* Two-token Q4_K verification shares activation loads across gate/up;
+     * the diagnostic disable keeps an independent scalar-kernel oracle. */
+    const int kernel = weight_type == 12u && n_tokens == 2u && !getenv("DS4_QWEN_GU_DISABLE") ?
+        QWEN4_K_MOE_MID_FUSED : QWEN4_K_MOE_MID;
+    return qwen4_dispatch(kernel, &args, sizeof(args), b, 7,
                           MTLSizeMake((ff_dim + rows_per_tg - 1) / rows_per_tg, n_out, n_tokens),
                           MTLSizeMake(128, 1, 1), 0);
 }

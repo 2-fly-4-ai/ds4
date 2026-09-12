@@ -1,0 +1,15 @@
+ds4: PLE sidecar table: /Users/brianfarley/Desktop/ds4/gguf/qwen38-q4k-tensor/Qwen3.8-Flash-Next-PLE-Q4_1.gguf (ple.weight [160, 320001536], CPU-only)
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Qwen PLE remains CPU-mapped; Metal residency restricted to 1 model spans (69.73 GiB)
+ds4: Metal model views created in 1.907 ms, residency requested in 495.039 ms, warmup 3.440 ms (mapped 71400.42 MiB from offset 10.51 MiB)
+ds4: Metal mapped mmaped model as 1 overlapping shared buffers
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 0.13 GiB (raw 0.10 + compressed 0.03) + buffers 3.49 GiB + resident model 69.73 GiB = 73.35 GiB planned
+ds4: memory detail: ctx=4096 prefill_cap=4096 raw_kv_rows=4096 compressed_kv_rows=1025 backend=metal
+ds4: memory: KV 0.13 GiB (raw 0.10 + compressed 0.03) + buffers 3.49 GiB = 3.62 GiB context
+ds4: memory detail: ctx=4096 prefill_cap=4096 raw_kv_rows=4096 compressed_kv_rows=1025 backend=metal
+processing 51 input tokens: 51/51 (100.0%)
+ds4: prefill: 208.30 t/s, generation: 49.37 t/s
+ds4: Qwen3.8 mtp: 149 verify cycles, 107 drafts accepted (71.8%)

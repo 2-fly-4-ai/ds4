@@ -1667,6 +1667,42 @@ struct ds4_metal_args_qwen4_moe {
     uint32_t address_table;
 };
 
+/* Share each activation load between gate/up while retaining the scalar
+ * per-lane K order and the same SIMD reductions for both results. */
+static inline float2 qwen4_q4k_gate_up_dot(device const char *gate,
+        device const char *up, device const float *x, uint in_dim, ushort lane) {
+    float ga=0.0f, ua=0.0f;
+    const uint group=lane/4, l=(lane%4)*8, shift=(group&1u)*4u;
+    for (uint ib=0; ib<in_dim/256; ib++) {
+        device const uchar *gb=(device const uchar *)(gate+(uint64_t)ib*144);
+        device const uchar *ub=(device const uchar *)(up+(uint64_t)ib*144);
+        device const uchar *gs=gb+4, *us=ub+4;
+        uint gscale,gmin,uscale,umin;
+        if(group<4) {
+            gscale=gs[group]&63u; gmin=gs[group+4]&63u;
+            uscale=us[group]&63u; umin=us[group+4]&63u;
+        } else {
+            gscale=(gs[group+4]&15u)|((gs[group-4]&192u)>>2);
+            gmin=(gs[group+4]>>4)|((gs[group]&192u)>>2);
+            uscale=(us[group+4]&15u)|((us[group-4]&192u)>>2);
+            umin=(us[group+4]>>4)|((us[group]&192u)>>2);
+        }
+        const float gd=(float)(*(device const half *)gb)*(float)gscale;
+        const float gm=(float)(*(device const half *)(gb+2))*(float)gmin;
+        const float ud=(float)(*(device const half *)ub)*(float)uscale;
+        const float um=(float)(*(device const half *)(ub+2))*(float)umin;
+        device const uchar *gq=gb+16+(group>>1)*32+l;
+        device const uchar *uq=ub+16+(group>>1)*32+l;
+        device const float *y=x+ib*256+group*32+l;
+        for(uint i=0;i<8;i++) {
+            const float v=y[i];
+            ga+=(gd*(float)((gq[i]>>shift)&15u)-gm)*v;
+            ua+=(ud*(float)((uq[i]>>shift)&15u)-um)*v;
+        }
+    }
+    return float2(simd_sum(ga),simd_sum(ua));
+}
+
 /* dot of one quantized expert row with x, lanes split as in the K3 kernels:
  * ix = block stride, it = element pair inside the block */
 static inline float qwen4_row_dot(device const char *row, device const float *x,
@@ -1862,6 +1898,53 @@ kernel void kernel_qwen4_moe_mid(
         const uint64_t off = ebase + (uint64_t)r * row_bytes;
         const float g = qwen4_row_dot(gb + off, xt, type, args.in_dim, tiisg);
         const float u = qwen4_row_dot(ub + off, xt, type, args.in_dim, tiisg);
+        if (tiisg == 0) {
+            mid[((uint64_t)tok * n_out + slot) * args.out_rows + r] = qwen4_silu(g) * u;
+        }
+    }
+}
+
+kernel void kernel_qwen4_moe_mid_fused(
+        constant ds4_metal_args_qwen4_moe & args,
+        device const char    *gate_base,
+        device const char    *up_base,
+        device const int32_t *selected,   /* [T][n_slots] */
+        device const float   *x,          /* [T][in_dim] */
+        device float         *mid,        /* [T][n_slots+has_shared][out_rows] */
+        device const char    *sh_gate,    /* shared expert gate rows */
+        device const char    *sh_up,
+        uint3 tgpig [[threadgroup_position_in_grid]],
+        ushort tiisg [[thread_index_in_simdgroup]],
+        ushort sgitg [[simdgroup_index_in_threadgroup]]) {
+    const uint slot = tgpig.y;
+    const uint tok = tgpig.z;
+    const uint n_out = args.n_slots + args.has_shared;
+    const uint row0 = (tgpig.x * QWEN4_MOE_NSG + (uint)sgitg) * QWEN4_MOE_NR0;
+    if (row0 >= args.out_rows || slot >= n_out || tok >= args.n_tokens) return;
+    const bool shared = slot == args.n_slots;
+    const uint type = shared ? args.shared_type : args.weight_type;
+    const uint row_bytes = shared ? args.shared_row_bytes : args.row_bytes;
+    device const char *gb = shared ? sh_gate : gate_base;
+    device const char *ub = shared ? sh_up : up_base;
+    const uint expert = shared ? 0 : (uint)selected[(uint64_t)tok * args.n_slots + slot];
+    /* SSD mode supplies GPU address tables; row arithmetic and shared-expert
+     * handling remain identical to resident decode. */
+    if (!shared && args.address_table) {
+        gb = (device const char *)((device const uint64_t *)gate_base)[expert];
+        ub = (device const char *)((device const uint64_t *)up_base)[expert];
+    }
+    const uint64_t ebase = shared || args.address_table ? 0 : (uint64_t)expert * args.expert_bytes;
+    device const float *xt = x + (uint64_t)tok * args.in_dim;
+    for (uint r = row0; r < row0 + QWEN4_MOE_NR0 && r < args.out_rows; r++) {
+        const uint64_t off = ebase + (uint64_t)r * row_bytes;
+        float g, u;
+        if (type == 12u && !shared) {
+            const float2 gu=qwen4_q4k_gate_up_dot(gb+off,ub+off,xt,args.in_dim,tiisg);
+            g=gu.x; u=gu.y;
+        } else {
+            g=qwen4_row_dot(gb+off,xt,type,args.in_dim,tiisg);
+            u=qwen4_row_dot(ub+off,xt,type,args.in_dim,tiisg);
+        }
         if (tiisg == 0) {
             mid[((uint64_t)tok * n_out + slot) * args.out_rows + r] = qwen4_silu(g) * u;
         }

@@ -448,6 +448,7 @@ endif
 test-qwen4-kernels: $(QWEN4_KERNEL_TEST)
 	./$(QWEN4_KERNEL_TEST)
 	QWEN4_Q8_MULTI_TEST=1 ./$(QWEN4_KERNEL_TEST)
+	QWEN_GU_TEST=1 ./$(QWEN4_KERNEL_TEST)
 
 # DS4_QWEN4_SNAPSHOT=<HF checkpoint dir> DS4_QWEN4_MMPROJ=<mmproj.gguf> DS4_QWEN4_IMAGE=<image>
 test-qwen4-vision: tests/test_qwen4_vision

@@ -1,0 +1,37 @@
+cc -O3 -ffast-math -g -mcpu=native -Wall -Wextra -std=c99 -fno-finite-math-only -I. -o tests/test_glm_short_matmul_parity tests/test_glm_short_matmul_parity.c ds4_metal.o ds4_layer_pack.o ds4_image.o -lm -pthread -framework Foundation -framework Metal
+cc -O3 -ffast-math -g -mcpu=native -Wall -Wextra -std=c99 -fno-finite-math-only -I. -o tests/test_glm_pool_prefix tests/test_glm_pool_prefix.c ds4_metal.o ds4_layer_pack.o ds4_image.o -lm -pthread -framework Foundation -framework Metal
+./tests/test_glm_short_matmul_parity
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 0.026 ms, residency requested in 1.637 ms, warmup 3.689 ms (mapped 64.00 MiB from offset 0.00 MiB)
+ds4: Metal mapped mmaped model as 1 overlapping shared buffers
+SHORT_MATMUL type=30 k=16384 m=24 rows=1 different=0
+SHORT_MATMUL type=30 k=16384 m=24 rows=2 different=0
+SHORT_MATMUL type=30 k=16384 m=24 rows=4 different=0
+SHORT_MATMUL type=30 k=16384 m=24 rows=8 different=0
+SHORT_MATMUL type=30 k=16384 m=24 rows=9 different=0
+SHORT_MATMUL type=30 k=16384 m=24 rows=15 different=0
+SHORT_MATMUL type=30 k=16384 m=24 rows=16 different=0
+SHORT_MATMUL type=12 k=4096 m=128 rows=1 different=0
+SHORT_MATMUL type=12 k=4096 m=128 rows=2 different=0
+SHORT_MATMUL type=12 k=4096 m=128 rows=4 different=0
+SHORT_MATMUL type=12 k=4096 m=128 rows=8 different=0
+SHORT_MATMUL type=12 k=4096 m=128 rows=9 different=0
+SHORT_MATMUL type=12 k=4096 m=128 rows=15 different=0
+SHORT_MATMUL type=12 k=4096 m=128 rows=16 different=0
+SHORT_MATMUL type=12 k=8192 m=4096 rows=1 different=0
+SHORT_MATMUL type=12 k=8192 m=4096 rows=2 different=0
+SHORT_MATMUL type=12 k=8192 m=4096 rows=4 different=0
+SHORT_MATMUL type=12 k=8192 m=4096 rows=8 different=0
+SHORT_MATMUL type=12 k=8192 m=4096 rows=9 different=0
+SHORT_MATMUL type=12 k=8192 m=4096 rows=15 different=0
+SHORT_MATMUL type=12 k=8192 m=4096 rows=16 different=0
+SHORT_MATMUL_COMPLETE failures=0
+./tests/test_glm_pool_prefix
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 0.022 ms, residency requested in 0.095 ms, warmup 3.707 ms (mapped 1.00 MiB from offset 0.00 MiB)
+ds4: Metal mapped mmaped model as 1 overlapping shared buffers
+POOL_COMPLETE cases=528 failures=0

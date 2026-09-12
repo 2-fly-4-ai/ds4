@@ -1913,6 +1913,39 @@ static void test_q8_multi(arena_t *a) {
     }
 }
 
+static void test_gate_up_fused(arena_t *a) {
+    const uint32_t shapes[][2]={{256,17},{512,64},{2560,640}};
+    const uint32_t widths[]={1,2,3,16};
+    for(uint32_t shape=0;shape<3;shape++) {
+        const uint32_t E=shapes[shape][0],F=shapes[shape][1],NE=4;
+        double *shadow;
+        uint64_t go=arena_q4_K(a,NE*F,E,&shadow,0.05f);free(shadow);
+        uint64_t uo=arena_q4_K(a,NE*F,E,&shadow,0.05f);free(shadow);
+        uint64_t sg=arena_q8_0(a,F,E,&shadow,0.05f);free(shadow);
+        uint64_t su=arena_q8_0(a,F,E,&shadow,0.05f);free(shadow);
+        for(uint32_t wi=0;wi<4;wi++)for(uint32_t shared=0;shared<2;shared++)for(uint32_t K=3;K<=10;K+=7) {
+            const uint32_t T=widths[wi],N=T*(K+shared)*F;
+            float *x=rand_vec(T*E,1.0f);
+            int32_t *sel=malloc(T*K*sizeof(*sel));
+            for(uint32_t i=0;i<T*K;i++)sel[i]=(i+i/3)%NE;
+            ds4_gpu_tensor *gx=upload(x,T*E),*gs=ds4_gpu_tensor_alloc(T*K*4),*out=upload(NULL,N);
+            free(x);require_ok(ds4_gpu_tensor_write(gs,0,sel,T*K*4),"GU ids");
+            free(sel);
+            setenv("DS4_QWEN_GU_DISABLE","1",1);
+            require_ok(ds4_gpu_qwen4_moe_mid_tensor(out,gx,gs,a->base,a->size,go,uo,12,NE,T,K,E,F,sg,su,shared?8:UINT32_MAX),"GU base");
+            float *base=download(out,N);
+            unsetenv("DS4_QWEN_GU_DISABLE");
+            require_ok(ds4_gpu_tensor_fill_f32(out,1234567.0f,N),"GU poison");
+            require_ok(ds4_gpu_qwen4_moe_mid_tensor(out,gx,gs,a->base,a->size,go,uo,12,NE,T,K,E,F,sg,su,shared?8:UINT32_MAX),"GU fused");
+            float *got=download(out,N);
+            require_ok(memcmp(base,got,N*4)==0,"GU exact intermediate");
+            printf("GU_EXACT E=%u F=%u T=%u shared=%u slots=%u\n",E,F,T,shared,K);fflush(stdout);
+            free(base);free(got);ds4_gpu_tensor_free(gx);ds4_gpu_tensor_free(gs);ds4_gpu_tensor_free(out);
+        }
+    }
+    unsetenv("DS4_QWEN_GU_DISABLE");
+}
+
 int main(void) {
     arena_t arena;
     arena.size = (uint64_t)1536 << 20;
@@ -1922,6 +1955,7 @@ int main(void) {
     setenv("DS4_QWEN4_ATTN_SPLIT_KEYS", "8", 1);
     require_ok(ds4_gpu_init(), "GPU initialization");
     require_ok(ds4_gpu_set_model_map(arena.base, arena.size), "model map registration");
+    if (getenv("QWEN_GU_TEST")) {test_gate_up_fused(&arena);return 0;}
     if (getenv("QWEN4_Q8_MULTI_TEST")) { test_q8_multi(&arena); return 0; }
 
     if (getenv("QWEN4_BENCH")) {
