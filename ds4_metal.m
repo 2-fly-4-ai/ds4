@@ -50023,6 +50023,10 @@ enum {
     QWEN4_K_MOE_MM_DOWN,
     QWEN4_K_MOE_MM_MID_HALF,
     QWEN4_K_MOE_MM_DOWN_HALF,
+    QWEN4_K_MOE_MM_MID_NAX,
+    QWEN4_K_MOE_MM_DOWN_NAX,
+    QWEN4_K_MOE_MM_MID_NAX64,
+    QWEN4_K_MOE_MM_DOWN_NAX64,
     QWEN4_K_DENSE_MM,
     QWEN4_K_HC_LO_ACT,
     QWEN4_K_HC_MIX_ROWS,
@@ -50082,6 +50086,10 @@ static const char *const qwen4_kernel_names[QWEN4_K_COUNT] = {
     "kernel_qwen4_moe_mm_down",
     "kernel_qwen4_moe_mm_mid_half",
     "kernel_qwen4_moe_mm_down_half",
+    "kernel_qwen4_moe_mm_mid_nax",
+    "kernel_qwen4_moe_mm_down_nax",
+    "kernel_qwen4_moe_mm_mid_nax64",
+    "kernel_qwen4_moe_mm_down_nax64",
     "kernel_qwen4_dense_mm",
     "kernel_qwen4_hc_lo_act",
     "kernel_qwen4_hc_mix_rows",
@@ -50893,6 +50901,20 @@ static uint32_t qwen4_moe_mm_tiles(uint32_t n_tokens) {
     return tiles > 8u ? 8u : tiles;
 }
 
+/* Qwen Flash-Next routed tiles on the Metal 4 tensor API.  This is an
+ * experimental, prefill-only drift-class path: it stages the same half
+ * operands as the simdgroup implementation, but cooperative matmul changes
+ * accumulation order.  Keep the established path as the default/control.
+ * DS4_QWEN4_MOE_MM_NAX=1 selects 32-token tiles, =2 selects 64-token tiles. */
+static uint32_t qwen4_moe_mm_nax(uint32_t type, uint32_t half_mid) {
+    if (half_mid || !(type == 10u || type == 12u || type == 16u || type == 39u) ||
+        !ds4_gpu_mpp_available()) return 0;
+    const char *v = getenv("DS4_QWEN4_MOE_MM_NAX");
+    if (!v || !v[0]) return 0;
+    const long level = strtol(v, NULL, 10);
+    return level <= 0 ? 0u : level >= 2 ? 64u : 32u;
+}
+
 int ds4_gpu_qwen4_pipeline_enabled(void) {
     const char *disable = getenv("DS4_QWEN_PIPELINE_DISABLE");
     return !(disable && disable[0] && disable[0] != '0') &&
@@ -50922,6 +50944,13 @@ int ds4_gpu_qwen4_moe_mm_mid_tensor(
         !qwen4_bind_tensor(&b[5], mid, (uint64_t)n_tokens * n_out * ff_dim * sizeof(float), "moe mid")) {
         return 0;
     }
+    const uint32_t nax = qwen4_moe_mm_nax(weight_type, half_mid);
+    if (nax) {
+        return qwen4_dispatch(nax == 64u ? QWEN4_K_MOE_MM_MID_NAX64 : QWEN4_K_MOE_MM_MID_NAX,
+                              &args, sizeof(args), b, 6,
+                              MTLSizeMake((ff_dim + 63u) / 64u, n_expert, tiles),
+                              MTLSizeMake(128, 1, 1), nax == 64u ? 16384u : 10240u);
+    }
     return qwen4_dispatch(half_mid ? QWEN4_K_MOE_MM_MID_HALF : QWEN4_K_MOE_MM_MID, &args, sizeof(args), b, 6,
                           MTLSizeMake((ff_dim + 31) / 32, n_expert, tiles), MTLSizeMake(128, 1, 1), 0);
 }
@@ -50947,6 +50976,13 @@ int ds4_gpu_qwen4_moe_mm_down_tensor(
         !qwen4_bind_tensor(&b[3], mid, (uint64_t)n_tokens * n_out * ff_dim * sizeof(float), "moe mid") ||
         !qwen4_bind_tensor(&b[4], part, (uint64_t)n_tokens * n_out * out_dim * sizeof(float), "moe partial")) {
         return 0;
+    }
+    const uint32_t nax = qwen4_moe_mm_nax(weight_type, half_mid);
+    if (nax) {
+        return qwen4_dispatch(nax == 64u ? QWEN4_K_MOE_MM_DOWN_NAX64 : QWEN4_K_MOE_MM_DOWN_NAX,
+                              &args, sizeof(args), b, 5,
+                              MTLSizeMake((out_dim + 63u) / 64u, n_expert, tiles),
+                              MTLSizeMake(128, 1, 1), nax == 64u ? 16384u : 8192u);
     }
     return qwen4_dispatch(half_mid ? QWEN4_K_MOE_MM_DOWN_HALF : QWEN4_K_MOE_MM_DOWN, &args, sizeof(args), b, 5,
                           MTLSizeMake((out_dim + 31) / 32, n_expert, tiles), MTLSizeMake(128, 1, 1), 0);

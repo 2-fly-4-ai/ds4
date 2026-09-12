@@ -2468,6 +2468,219 @@ kernel void kernel_qwen4_moe_mm_down_half(
 
 }
 
+#ifdef DS4_METAL_HAS_TENSOR
+/* Routed Qwen expert tiles on the Metal 4 tensor API.  Each threadgroup
+ * computes 64 expert rows by NR1 routed tokens while reusing every
+ * dequantized weight tile.  Operands are rounded to the same half values as
+ * the simdgroup implementation; cooperative matmul changes only the floating
+ * point accumulation order. */
+template <int NR1>
+kernel void kernel_qwen4_moe_mm_mid_nax_t(
+        constant ds4_metal_args_qwen4_moe_mm & args,
+        device const char    *gate_base,
+        device const char    *up_base,
+        device const int32_t *lists,
+        device const int32_t *counts,
+        device const float   *x,
+        device float         *mid,
+        threadgroup char     *shmem [[threadgroup(0)]],
+        uint3 tgpig [[threadgroup_position_in_grid]],
+        ushort tid [[thread_index_in_threadgroup]],
+        ushort tiisg [[thread_index_in_simdgroup]],
+        ushort sgitg [[simdgroup_index_in_threadgroup]]) {
+    constexpr int NR0 = 64, NK = 32;
+    constexpr int NB = NR1 * 4 / 128;
+    const uint rb = tgpig.x, tile0 = tgpig.z, e = tgpig.y;
+    if (e >= args.n_expert) return;
+    const uint count = (uint)counts[e];
+    threadgroup half *Ag = (threadgroup half *)shmem;
+    threadgroup half *Au = (threadgroup half *)(shmem + 4096);
+    threadgroup half *Bs = (threadgroup half *)(shmem + 8192);
+    threadgroup float *Cs = (threadgroup float *)shmem;
+    device const char *gbase = gate_base + (uint64_t)e * args.expert_bytes;
+    device const char *ubase = up_base + (uint64_t)e * args.expert_bytes;
+    device const int32_t *list = lists + (uint64_t)e * args.list_cap;
+    const uint row0 = rb * NR0;
+    const uint nk = args.in_dim / NK;
+    auto tA_g = tensor(Ag, dextents<int32_t, 2>(NK, NR0));
+    auto tA_u = tensor(Au, dextents<int32_t, 2>(NK, NR0));
+    auto tB = tensor(Bs, dextents<int32_t, 2>(NK, NR1));
+    matmul2d<matmul2d_descriptor(NR1, NR0, NK, false, true, false,
+             matmul2d_descriptor::mode::multiply_accumulate), execution_simdgroups<4>> mm;
+    const uint ar = tid / 2, aq = tid % 2;
+    for (uint tile = tile0; tile * NR1 < count; tile += args.tiles_per_launch) {
+        const uint t0 = tile * NR1;
+        const uint n_tile = min((uint)NR1, count - t0);
+        auto cG = mm.template get_destination_cooperative_tensor<decltype(tB), decltype(tA_g), float>();
+        auto cU = mm.template get_destination_cooperative_tensor<decltype(tB), decltype(tA_u), float>();
+#pragma unroll
+        for (uint16_t i = 0; i < cG.get_capacity(); ++i)
+            if (cG.is_valid_element(i)) cG[i] = 0.0f;
+#pragma unroll
+        for (uint16_t i = 0; i < cU.get_capacity(); ++i)
+            if (cU.is_valid_element(i)) cU[i] = 0.0f;
+        device const float *xr[NB];
+        threadgroup half *bdst[NB];
+#pragma unroll
+        for (int b = 0; b < NB; b++) {
+            const uint item = (uint)tid + (uint)b * 128u;
+            const uint tok = item / 4u, kq = item % 4u;
+            const int pair = tok < n_tile ? list[t0 + tok] : -1;
+            xr[b] = pair >= 0 ? x + (uint64_t)((uint)pair / args.n_slots) * args.in_dim + kq * 8u
+                              : (device const float *)0;
+            bdst[b] = Bs + tok * NK + kq * 8u;
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        for (uint kb = 0; kb < nk; kb++) {
+            threadgroup half *dg = Ag + ar * NK + aq * 16;
+            threadgroup half *du = Au + ar * NK + aq * 16;
+            if (row0 + ar < args.out_rows) {
+                qwen4_mm_stage16(gbase + (uint64_t)(row0 + ar) * args.row_bytes,
+                                 kb, aq * 2, args.weight_type, dg);
+                qwen4_mm_stage16(ubase + (uint64_t)(row0 + ar) * args.row_bytes,
+                                 kb, aq * 2, args.weight_type, du);
+            } else {
+                for (uint i = 0; i < 16; i++) { dg[i] = 0.0h; du[i] = 0.0h; }
+            }
+#pragma unroll
+            for (int b = 0; b < NB; b++) {
+                threadgroup half *dst = bdst[b];
+                if (xr[b]) {
+                    const float4 v0 = *(device const float4 *)(xr[b] + kb * NK);
+                    const float4 v1 = *(device const float4 *)(xr[b] + kb * NK + 4);
+                    dst[0] = (half)v0.x; dst[1] = (half)v0.y;
+                    dst[2] = (half)v0.z; dst[3] = (half)v0.w;
+                    dst[4] = (half)v1.x; dst[5] = (half)v1.y;
+                    dst[6] = (half)v1.z; dst[7] = (half)v1.w;
+                } else {
+                    for (uint i = 0; i < 8; i++) dst[i] = 0.0h;
+                }
+            }
+            threadgroup_barrier(mem_flags::mem_threadgroup);
+            auto mB = tB.slice(0, 0);
+            auto mAg = tA_g.slice(0, 0);
+            auto mAu = tA_u.slice(0, 0);
+            mm.run(mB, mAg, cG);
+            mm.run(mB, mAu, cU);
+            threadgroup_barrier(mem_flags::mem_threadgroup);
+        }
+#pragma unroll
+        for (uint16_t i = 0; i < cG.get_capacity(); ++i)
+            if (cG.is_valid_element(i)) cG[i] = qwen4_silu(cG[i]) * cU[i];
+        auto tC = tensor(Cs, dextents<int32_t, 2>(NR0, NR1));
+        cG.store(tC.slice(0, 0));
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        for (uint j = sgitg; j < n_tile; j += 4) {
+            const int pair = list[t0 + j];
+            const uint t = (uint)pair / args.n_slots, slot = (uint)pair % args.n_slots;
+            device float *out = mid + ((uint64_t)t * args.n_out + slot) * args.out_rows + row0;
+            for (uint i = tiisg; i < NR0 && row0 + i < args.out_rows; i += 32)
+                out[i] = Cs[j * NR0 + i];
+        }
+    }
+}
+
+template <int NR1>
+kernel void kernel_qwen4_moe_mm_down_nax_t(
+        constant ds4_metal_args_qwen4_moe_mm & args,
+        device const char    *down_base,
+        device const int32_t *lists,
+        device const int32_t *counts,
+        device const float   *midv,
+        device float         *part,
+        threadgroup char     *shmem [[threadgroup(0)]],
+        uint3 tgpig [[threadgroup_position_in_grid]],
+        ushort tid [[thread_index_in_threadgroup]],
+        ushort tiisg [[thread_index_in_simdgroup]],
+        ushort sgitg [[simdgroup_index_in_threadgroup]]) {
+    constexpr int NR0 = 64, NK = 32;
+    constexpr int NB = NR1 * 4 / 128;
+    const uint rb = tgpig.x, tile0 = tgpig.z, e = tgpig.y;
+    if (e >= args.n_expert) return;
+    const uint count = (uint)counts[e];
+    threadgroup half *As = (threadgroup half *)shmem;
+    threadgroup half *Bs = (threadgroup half *)(shmem + 4096);
+    threadgroup float *Cs = (threadgroup float *)shmem;
+    device const char *dbase = down_base + (uint64_t)e * args.expert_bytes;
+    device const int32_t *list = lists + (uint64_t)e * args.list_cap;
+    const uint row0 = rb * NR0;
+    const uint nk = args.in_dim / NK;
+    auto tA = tensor(As, dextents<int32_t, 2>(NK, NR0));
+    auto tB = tensor(Bs, dextents<int32_t, 2>(NK, NR1));
+    matmul2d<matmul2d_descriptor(NR1, NR0, NK, false, true, false,
+             matmul2d_descriptor::mode::multiply_accumulate), execution_simdgroups<4>> mm;
+    const uint ar = tid / 2, aq = tid % 2;
+    for (uint tile = tile0; tile * NR1 < count; tile += args.tiles_per_launch) {
+        const uint t0 = tile * NR1;
+        const uint n_tile = min((uint)NR1, count - t0);
+        auto cT = mm.template get_destination_cooperative_tensor<decltype(tB), decltype(tA), float>();
+#pragma unroll
+        for (uint16_t i = 0; i < cT.get_capacity(); ++i)
+            if (cT.is_valid_element(i)) cT[i] = 0.0f;
+        device const float *mr[NB];
+        threadgroup half *bdst[NB];
+#pragma unroll
+        for (int b = 0; b < NB; b++) {
+            const uint item = (uint)tid + (uint)b * 128u;
+            const uint tok = item / 4u, kq = item % 4u;
+            const int pair = tok < n_tile ? list[t0 + tok] : -1;
+            mr[b] = pair >= 0
+                ? midv + ((uint64_t)((uint)pair / args.n_slots) * args.n_out +
+                          (uint)pair % args.n_slots) * args.in_dim + kq * 8u
+                : (device const float *)0;
+            bdst[b] = Bs + tok * NK + kq * 8u;
+        }
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        for (uint kb = 0; kb < nk; kb++) {
+            threadgroup half *dd = As + ar * NK + aq * 16;
+            if (row0 + ar < args.out_rows)
+                qwen4_mm_stage16(dbase + (uint64_t)(row0 + ar) * args.row_bytes,
+                                 kb, aq * 2, args.weight_type, dd);
+            else
+                for (uint i = 0; i < 16; i++) dd[i] = 0.0h;
+#pragma unroll
+            for (int b = 0; b < NB; b++) {
+                threadgroup half *dst = bdst[b];
+                if (mr[b]) {
+                    const float4 v0 = *(device const float4 *)(mr[b] + kb * NK);
+                    const float4 v1 = *(device const float4 *)(mr[b] + kb * NK + 4);
+                    dst[0] = (half)v0.x; dst[1] = (half)v0.y;
+                    dst[2] = (half)v0.z; dst[3] = (half)v0.w;
+                    dst[4] = (half)v1.x; dst[5] = (half)v1.y;
+                    dst[6] = (half)v1.z; dst[7] = (half)v1.w;
+                } else {
+                    for (uint i = 0; i < 8; i++) dst[i] = 0.0h;
+                }
+            }
+            threadgroup_barrier(mem_flags::mem_threadgroup);
+            auto mB = tB.slice(0, 0);
+            auto mA = tA.slice(0, 0);
+            mm.run(mB, mA, cT);
+            threadgroup_barrier(mem_flags::mem_threadgroup);
+        }
+        auto tC = tensor(Cs, dextents<int32_t, 2>(NR0, NR1));
+        cT.store(tC.slice(0, 0));
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+        for (uint j = sgitg; j < n_tile; j += 4) {
+            const int pair = list[t0 + j];
+            const uint t = (uint)pair / args.n_slots, slot = (uint)pair % args.n_slots;
+            device float *out = part + ((uint64_t)t * args.n_out + slot) * args.out_rows + row0;
+            for (uint i = tiisg; i < NR0 && row0 + i < args.out_rows; i += 32)
+                out[i] = Cs[j * NR0 + i];
+        }
+    }
+}
+
+#define QWEN4_NAX_MID_SIG constant ds4_metal_args_qwen4_moe_mm &, device const char *, device const char *, device const int32_t *, device const int32_t *, device const float *, device float *, threadgroup char *, uint3, ushort, ushort, ushort
+#define QWEN4_NAX_DOWN_SIG constant ds4_metal_args_qwen4_moe_mm &, device const char *, device const int32_t *, device const int32_t *, device const float *, device float *, threadgroup char *, uint3, ushort, ushort, ushort
+template [[host_name("kernel_qwen4_moe_mm_mid_nax")]] kernel void kernel_qwen4_moe_mm_mid_nax_t<32>(QWEN4_NAX_MID_SIG);
+template [[host_name("kernel_qwen4_moe_mm_mid_nax64")]] kernel void kernel_qwen4_moe_mm_mid_nax_t<64>(QWEN4_NAX_MID_SIG);
+template [[host_name("kernel_qwen4_moe_mm_down_nax")]] kernel void kernel_qwen4_moe_mm_down_nax_t<32>(QWEN4_NAX_DOWN_SIG);
+template [[host_name("kernel_qwen4_moe_mm_down_nax64")]] kernel void kernel_qwen4_moe_mm_down_nax_t<64>(QWEN4_NAX_DOWN_SIG);
+#undef QWEN4_NAX_MID_SIG
+#undef QWEN4_NAX_DOWN_SIG
+#endif
+
 /* --- prefill: dense tiled GEMM for f32/f16/q8_0 weights ----------------- */
 
 struct ds4_metal_args_qwen4_dense_mm {

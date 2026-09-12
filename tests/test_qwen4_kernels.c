@@ -228,6 +228,25 @@ static uint64_t arena_q4_K(arena_t *a, uint64_t rows, uint64_t cols, double **sh
     return off;
 }
 
+/* MXFP4 fixture for dispatch microbenchmarks (17 bytes per 32 weights). */
+static uint64_t arena_mxfp4(arena_t *a, uint64_t rows, uint64_t cols) {
+    const uint64_t blocks = cols / 32u;
+    const uint64_t off = arena_alloc(a, rows * blocks * 17u);
+    uint8_t *w = a->base + off;
+    for (uint64_t r = 0; r < rows; r++) {
+        for (uint64_t b = 0; b < blocks; b++) {
+            uint8_t *blk = w + (r * blocks + b) * 17u;
+            blk[0] = (uint8_t)(120u + ((r + b) % 6u));
+            for (uint32_t i = 0; i < 16u; i++) {
+                const uint8_t lo = (uint8_t)((r * 3u + b * 5u + i) & 15u);
+                const uint8_t hi = (uint8_t)((r * 7u + b + i * 3u) & 15u);
+                blk[1u + i] = (uint8_t)(lo | (hi << 4u));
+            }
+        }
+    }
+    return off;
+}
+
 static const uint8_t ksigns_iq2xs[128] = {
       0, 129, 130,   3, 132,   5,   6, 135, 136,   9,  10, 139,  12, 141, 142,  15,
     144,  17,  18, 147,  20, 149, 150,  23,  24, 153, 154,  27, 156,  29,  30, 159,
@@ -1389,6 +1408,80 @@ static void test_moe_types(arena_t *a, uint32_t NE, uint32_t slots, uint32_t E, 
     free(gate_w); free(up_w); free(down_w); free(sg_w); free(su_w); free(sd_w);
 }
 
+/* Bound cooperative-matmul accumulation drift directly against the retained
+ * simdgroup implementation on the production Q4_K gate/up + MXFP4 down mix. */
+static void test_moe_nax_tiles(arena_t *a) {
+    const uint32_t T = 193, E = 256, F = 256, NE = 4, slots = 2, list_cap = T;
+    const uint64_t mid_n = (uint64_t)T * slots * F;
+    const uint64_t part_n = (uint64_t)T * slots * E;
+    double *shadow;
+    const uint64_t gate_off = arena_q4_K(a, (uint64_t)NE * F, E, &shadow, 0.05f); free(shadow);
+    const uint64_t up_off = arena_q4_K(a, (uint64_t)NE * F, E, &shadow, 0.05f); free(shadow);
+    const uint64_t down_off = arena_mxfp4(a, (uint64_t)NE * E, F);
+    float *x = rand_vec((uint64_t)T * E, 1.0f);
+    int32_t *sel = malloc((uint64_t)T * slots * sizeof(int32_t));
+    for (uint32_t t = 0; t < T; t++) {
+        sel[t * slots] = 0;
+        sel[t * slots + 1] = (int32_t)(1u + t % (NE - 1u));
+    }
+    ds4_gpu_tensor *gx = upload(x, (uint64_t)T * E);
+    ds4_gpu_tensor *gsel = ds4_gpu_tensor_alloc((uint64_t)T * slots * sizeof(int32_t));
+    ds4_gpu_tensor *glists = ds4_gpu_tensor_alloc((uint64_t)NE * list_cap * sizeof(int32_t));
+    ds4_gpu_tensor *gcounts = ds4_gpu_tensor_alloc((uint64_t)NE * sizeof(int32_t));
+    ds4_gpu_tensor *gmid = upload(NULL, mid_n);
+    ds4_gpu_tensor *gpart = upload(NULL, part_n);
+    require_ok(gsel && glists && gcounts && gmid && gpart &&
+               ds4_gpu_tensor_write(gsel, 0, sel, (uint64_t)T * slots * sizeof(int32_t)),
+               "MoE NAX fixture setup");
+    require_ok(ds4_gpu_qwen4_moe_build_lists_tensor(glists, gcounts, gsel, T, slots, NE, list_cap),
+               "MoE NAX routed lists");
+
+    const char *previous = getenv("DS4_QWEN4_MOE_MM_NAX");
+    char *saved = previous ? strdup(previous) : NULL;
+    require_ok(!previous || saved, "save NAX environment");
+    unsetenv("DS4_QWEN4_MOE_MM_NAX");
+    require_ok(ds4_gpu_qwen4_moe_mm_mid_tensor(gmid, gx, glists, gcounts, a->base, a->size,
+                                               gate_off, up_off, 12u, NE, T, slots, slots, E, F, list_cap, 0) &&
+               ds4_gpu_qwen4_moe_mm_down_tensor(gpart, gmid, glists, gcounts, a->base, a->size,
+                                                down_off, 39u, NE, T, slots, slots, F, E, list_cap, 0),
+               "MoE simdgroup control");
+    float *ref_mid = download(gmid, mid_n);
+    float *ref_part = download(gpart, part_n);
+
+    for (uint32_t level = 1; level <= 2; level++) {
+        char value[2] = {(char)('0' + level), '\0'};
+        setenv("DS4_QWEN4_MOE_MM_NAX", value, 1);
+        require_ok(ds4_gpu_qwen4_moe_mm_mid_tensor(gmid, gx, glists, gcounts, a->base, a->size,
+                                                   gate_off, up_off, 12u, NE, T, slots, slots, E, F, list_cap, 0) &&
+                   ds4_gpu_qwen4_moe_mm_down_tensor(gpart, gmid, glists, gcounts, a->base, a->size,
+                                                    down_off, 39u, NE, T, slots, slots, F, E, list_cap, 0),
+                   "MoE NAX candidate");
+        float *got_mid = download(gmid, mid_n);
+        float *got_part = download(gpart, part_n);
+        double worst_mid = 0.0, scale_mid = 1e-6, worst_part = 0.0, scale_part = 1e-6;
+        for (uint64_t i = 0; i < mid_n; i++) {
+            const double d = fabs((double)got_mid[i] - ref_mid[i]);
+            if (d > worst_mid) worst_mid = d;
+            if (fabs(ref_mid[i]) > scale_mid) scale_mid = fabs(ref_mid[i]);
+        }
+        for (uint64_t i = 0; i < part_n; i++) {
+            const double d = fabs((double)got_part[i] - ref_part[i]);
+            if (d > worst_part) worst_part = d;
+            if (fabs(ref_part[i]) > scale_part) scale_part = fabs(ref_part[i]);
+        }
+        require_ok(worst_mid <= 2e-3 * scale_mid, "MoE NAX mid drift bound");
+        require_ok(worst_part <= 2e-3 * scale_part, "MoE NAX down drift bound");
+        printf("  moe NAX level %u vs simdgroup: mid %.3e/%.3e, down %.3e/%.3e\n",
+               level, worst_mid, scale_mid, worst_part, scale_part);
+        free(got_part); free(got_mid);
+    }
+    if (saved) { setenv("DS4_QWEN4_MOE_MM_NAX", saved, 1); free(saved); }
+    else unsetenv("DS4_QWEN4_MOE_MM_NAX");
+    free(ref_part); free(ref_mid); free(sel); free(x);
+    ds4_gpu_tensor_free(gpart); ds4_gpu_tensor_free(gmid); ds4_gpu_tensor_free(gcounts);
+    ds4_gpu_tensor_free(glists); ds4_gpu_tensor_free(gsel); ds4_gpu_tensor_free(gx);
+}
+
 /* MTP input staging: cat rows [rms(e)*g_e | 0] and [0 | rms(R_s)*g_h_s]
  * (full-row or per-stream RMS), then R_out = proj[0] + proj[1+s]. */
 static void test_mtp(arena_t *a, uint32_t E, uint32_t hc) {
@@ -1458,7 +1551,7 @@ static double bench_run(const char *name, bench_fn fn, void *ud, uint32_t reps) 
 
 typedef struct {
     arena_t *a;
-    uint64_t off[12];
+    uint64_t off[15];
     ds4_gpu_tensor *t[43];
     uint32_t n[3];
 } bench_ctx;
@@ -1540,6 +1633,18 @@ static int bench_p_moe_mm(void *ud) {
            ds4_gpu_qwen4_moe_mm_mid_tensor(c->t[22], c->t[18], c->t[20], c->t[21], c->a->base, c->a->size, c->off[8], c->off[9], 8u, 16, 256, 10, 10, 2560, 640, 256, 0) &&
            ds4_gpu_qwen4_moe_mm_down_tensor(c->t[23], c->t[22], c->t[20], c->t[21], c->a->base, c->a->size, c->off[10], 8u, 16, 256, 10, 10, 640, 2560, 256, 0);
 }
+static int bench_p_moe_mm_q4k(void *ud) {
+    bench_ctx *c = ud;
+    const int lists = ds4_gpu_qwen4_moe_build_lists_tensor(c->t[20], c->t[21], c->t[16], 256, 10, 16, 256);
+    const int mid = lists && ds4_gpu_qwen4_moe_mm_mid_tensor(
+        c->t[22], c->t[18], c->t[20], c->t[21], c->a->base, c->a->size,
+        c->off[12], c->off[13], 12u, 16, 256, 10, 10, 2560, 640, 256, 0);
+    const int down = mid && ds4_gpu_qwen4_moe_mm_down_tensor(
+        c->t[23], c->t[22], c->t[20], c->t[21], c->a->base, c->a->size,
+        c->off[14], 39u, 16, 256, 10, 10, 640, 2560, 256, 0);
+    if (!down) fprintf(stderr, "q4k bench stage failed: lists=%d mid=%d down=%d\n", lists, mid, down);
+    return down;
+}
 static int bench_gdn_scan(void *ud) { bench_ctx *c = ud; return ds4_gpu_qwen4_gdn_scan_tensor(c->t[15], c->t[1], c->t[11], c->t[13], c->t[14], 1, 16, 48, 128, NULL, 0u); }
 
 /* QWEN4_BENCH=1: per-dispatch cost of the decode kernels at full-model shapes */
@@ -1568,6 +1673,9 @@ static void bench_dispatch(arena_t *a) {
     c.off[9] = arena_q8_0(a, 16ull * 640, 2560, &sh, 0.05f); free(sh);   /* up */
     c.off[10] = arena_q8_0(a, 16ull * 2560, 640, &sh, 0.05f); free(sh);  /* down */
     c.off[11] = arena_f32(a, 512ull * 2560, &sh, -0.05f, 0.05f); free(sh);
+    c.off[12] = arena_q4_K(a, 16ull * 640, 2560, &sh, 0.05f); free(sh);
+    c.off[13] = arena_q4_K(a, 16ull * 640, 2560, &sh, 0.05f); free(sh);
+    c.off[14] = arena_mxfp4(a, 16ull * 2560, 640);
     c.t[18] = upload(NULL, 256ull * 2560);        /* x for 256 tokens */
     c.t[19] = upload(NULL, 256ull * 10240);       /* wide scratch */
     c.t[1] = upload(NULL, 256ull * 10240);        /* scratch (also the GDN state) */
@@ -1688,6 +1796,7 @@ static void bench_dispatch(arena_t *a) {
     bench_run("q8 gemm 6144x2560 T=256 (DS4)", bench_p_q8_gemm, &c, 20);
     bench_run("q8 gemm 6144x2560 T=256 (dense mm)", bench_p_q8_mm, &c, 20);
     bench_run("moe mm lists+mid+down 16 experts T=256 (all 2560 pairs)", bench_p_moe_mm, &c, 10);
+    bench_run("moe mm q4k lists+mid+down 16 experts T=256", bench_p_moe_mm_q4k, &c, 10);
     {   /* decays in (0,1], betas in (0,1) for the scan benches */
         float *g = malloc(1024 * 48 * 4), *b = malloc(1024 * 48 * 4);
         for (int i = 0; i < 1024 * 48; i++) { g[i] = 0.9f + 0.1f * frand(); b[i] = 0.5f * frand() + 0.25f; }
@@ -1832,6 +1941,7 @@ int main(void) {
     test_moe_types(&arena, 16, 10, 2560, 640, 37, 8u, 2u);
     test_moe(&arena, 16, 10, 2560, 640, 37, 12u);
     test_moe(&arena, 16, 10, 2560, 640, 100, 12u);
+    test_moe_nax_tiles(&arena);
     test_moe(&arena, 16, 10, 2560, 640, 37, 10u);
     test_moe(&arena, 16, 10, 2560, 640, 37, 16u);
     test_moe(&arena, 8, 10, 2560, 640, 1, 0u);

@@ -395,6 +395,18 @@ and is excluded from Metal residency; the resident model is about 71 GiB.
 Q4_0 routed-expert prefill automatically uses the tiled Metal path from 128
 rows upward and keeps the lower-overhead row path for shorter batches.
 
+On Macs with the Metal 4 tensor API, Q2_K/IQ2_XXS/Q4_K/MXFP4 routed-expert
+prefill can be tested with `DS4_QWEN4_MOE_MM_NAX=1` (32-token tiles) or `=2`
+(64-token tiles). The normal simdgroup route remains the default. These kernels
+stage the same half-precision operands but use cooperative tensor matmul, so
+they change floating-point accumulation order and can slightly change logits.
+On an M5 Max with the 77 GiB Q2_K/MXFP4 model, level 1 measured 1,274 versus
+934 prompt tok/s at 2K (+36%) and 1,274 versus 990 prompt tok/s at 8K (+29%);
+greedy decode remained about 43 tok/s. A 767-token local NLL check moved from
+2.59981 to 2.60291, so the faster route is deliberately opt-in pending broader
+quality validation. Set the variable to `0` or leave it unset for the original
+path.
+
 The Q8 file keeps every weight at 8 bits except the QSA indexer projections,
 which stay at the released BF16. The MXFP4 file keeps the routed experts in
 native MXFP4 blocks, the Q4K file requantizes the expert gate/up projections
