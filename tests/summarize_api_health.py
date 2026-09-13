@@ -21,6 +21,14 @@ for folder in sorted(root.iterdir()):
    except ValueError:js.append(False)
   if r['case'].endswith('-edit'):ed.append(bool(re.search(r'#define\s+BUFFER_CAPACITY\s+128\b',r['text']) and 'ring_push' in r['text'] and not re.search(r'\benqueue\b',r['text'])))
  lines.append(f'| {folder.name} | {good}/{len(records)} | {leak} | {sum(js)}/{len(js)} | {sum(ed)}/{len(ed)} |')
+lines+=['','## Consecutive JSON replay','', '| Run | Identical text | Second-request cached tokens |','|---|---|---:|']
+for folder in sorted(root.iterdir()):
+ if not folder.is_dir() or not any(folder.name.endswith(s) for s in ('cache-repeat','main-smoke')):continue
+ files=sorted(folder.glob('[0-9][0-9]-*.json'))
+ if len(files)==2:
+  a,b=[json.loads(f.read_text()) for f in files]
+  cached=(b.get('usage') or {}).get('prompt_tokens_details',{}).get('cached_tokens')
+  lines.append(f'| {folder.name} | {a["text"]==b["text"]} | {cached} |')
 lines+=['','## MTP-on/off exact text comparison','', '| Model | Identical short greedy cases |','|---|---:|']
 for model in ('qwen27-q8','qwen27-q4-64a'):
  a=root/f'{model}-final-chat';b=root/f'{model}-no-mtp'

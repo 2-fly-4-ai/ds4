@@ -1,5 +1,7 @@
 # Smaller-Qwen API protocol repair
 
+Integrated onto main in `9638cfd`, then rebuilt in the normal Desktop checkout. Post-integration server unit tests, tokenizer checks for both quants, and two live Q8 chat JSON requests passed. `/v1/models` was explicitly checked to advertise `qwen`. No remote push was performed.
+
 ## What was wrong
 
 The smaller Qwen backend was omitted from three integration points:

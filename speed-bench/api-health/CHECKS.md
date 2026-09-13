@@ -15,8 +15,17 @@ Validation was performed in an isolated worktree before integration. No quant or
 | qwen27-q4-64a-no-mtp | 5/5 | 0 | 1/1 | 1/1 |
 | qwen27-q8-cache-repeat | 2/2 | 0 | 2/2 | 0/0 |
 | qwen27-q8-final-chat | 13/13 | 0 | 3/3 | 2/2 |
+| qwen27-q8-main-smoke | 2/2 | 0 | 2/2 | 0/0 |
 | qwen27-q8-no-mtp | 5/5 | 0 | 1/1 | 1/1 |
 | qwen27-q8-thinking | 1/1 | 0 | 0/0 | 0/0 |
+
+## Consecutive JSON replay
+
+| Run | Identical text | Second-request cached tokens |
+|---|---|---:|
+| qwen27-q4-64a-cache-repeat | True | 0 |
+| qwen27-q8-cache-repeat | True | 0 |
+| qwen27-q8-main-smoke | True | 0 |
 
 ## MTP-on/off exact text comparison
 
