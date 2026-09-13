@@ -1,6 +1,7 @@
 # M5 FP32 small-Qwen attention optimization
 
-Baseline: main `13517e9`. Hardware: M5 Max 128 GB, existing Automatic power
+Baseline: main `13517e9`. Implementation merged to main as `1093763`.
+Hardware: M5 Max 128 GB, existing Automatic power
 settings. No quant, model weights, KV precision, sampling policy, or MTP depth
 was changed. The production change is confined to the small-Qwen Metal
 attention wrappers used by 27B/35B target and native-MTP execution.
@@ -83,7 +84,12 @@ reverse-order driver completed cleanly with all 12 requests.
 
 Boundary validation also passed on both Q8 models with 1000-token prompts
 and 96-token continuations, crossing the 1024-position dispatch threshold in
-serial and MTP paths. Rebuilt-main smoke results are recorded after merge.
+serial and MTP paths. Main was rebuilt with `make` after fast-forward merge.
+The rebuilt-main smoke then passed 8/8 exact API responses and 4/4 positive
+cache reuse pairs, on both Q8 models at short and 2037-token context with
+native MTP enabled. Raw evidence is in `../api-health/qwen27-q8-attention-main35`
+and `../api-health/qwen27-q8-attention-main27`. All test servers were stopped.
+These eight requests bring the complete API count to 68.
 
 No runtime claims are made here for CUDA, other Apple generations, DeepSeek,
 GLM, Qwen Next, or SSD streaming. Their implementations were not changed by
@@ -92,9 +98,9 @@ this port; the new dispatch is limited to the resident small-Qwen path.
 ## Reproduction
 
 Keep baseline `13517e9` checked out separately: runtime Metal sources must
-belong to the executable under test. `tests/qwen_attn_ab.sh` uses this worktree's
-Git common-directory checkout as baseline; do not compare against an already
-updated main and call that the old baseline.
+belong to the executable under test. Set `QWEN_AB_BASELINE_ROOT` to that built
+checkout for the A/B and long-check drivers. They refuse a different revision
+to prevent accidentally comparing updated main against itself.
 
 Build `tests/qwen_attn_tile_bench`; run normally and with `QWEN_TEST_RANDOM=1`
 (optionally `SAFE=1` for strict Metal math). Build `tests/qwen_fixed_token_probe`
