@@ -157,6 +157,29 @@ int ds4_gpu_qwen_gdn_core_rows_tensor(
         bool                  save_steps);
 void ds4_gpu_qwen_set_gdn_steps(ds4_gpu_tensor *conv_steps, ds4_gpu_tensor *state_steps);
 
+#ifdef __APPLE__
+/* 35B-A3B specialization; snapshots belong to the caller, not the 27B pool. */
+int ds4_gpu_qwen35_gdn_core_rows_tensor(
+        ds4_gpu_tensor       *core,
+        ds4_gpu_tensor       *conv,
+        ds4_gpu_tensor       *state,
+        const ds4_gpu_tensor *qkv,
+        const ds4_gpu_tensor *z,
+        const ds4_gpu_tensor *alpha,
+        const ds4_gpu_tensor *beta,
+        const void           *model_map,
+        uint64_t              model_size,
+        uint64_t              conv_w_off,
+        uint64_t              a_off,
+        uint64_t              dt_off,
+        uint64_t              snorm_off,
+        uint32_t              layer,
+        uint32_t              n_tok,
+        bool                  save_steps,
+        ds4_gpu_tensor       *conv_steps,
+        ds4_gpu_tensor       *state_steps);
+#endif
+
 
 int ds4_gpu_qwen_full_attn_rows_tensor(
         ds4_gpu_tensor       *heads,

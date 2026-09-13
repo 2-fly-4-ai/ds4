@@ -46,6 +46,8 @@
 /tests/test_qwen_prefill_port
 /tests/test_qwen_norm_port
 /tests/test_qwen_chat_tokens
+/tests/test_qwen35_contract
+/tests/test_qwen35_gdn_port
 /tests/test_prompt_prefix
 /tests/test_glm_stream_interleave
 /tests/test_qwen_stream_interleave
