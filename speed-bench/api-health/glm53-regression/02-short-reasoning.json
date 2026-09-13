@@ -1,0 +1,20 @@
+{
+  "wall_s": 6.267262125,
+  "ttft_s": 0.448936625,
+  "text": "**Setting up the calculation**\n\nTotal capacity needed: 120 requests/second.\n\nEach worker handles 20 requests/second, so raw worker count:\n\n120 \u00f7 20 = **6 workers**\n\n**Applying the reserve**\n\nBut we must reserve 25% of *total capacity* for spikes \u2014 meaning only 75% of the workers' capacity can be used for regular traffic. So the usable capacity per worker is effectively:\n\n20 \u00d7 0.75 = 15 requests/second per worker\n\nNow solve:\n\n120 \u00f7 15 = **8 workers**\n\n**Check the result**\n\n- 8 workers \u00d7 20 req/s = 160 req/s total capacity\n- Reserve: 25% \u00d7 160 = 40 req/s held for spikes \u2713\n- Regular traffic: 160 \u2212 40 = 120 req/s \u2713 \u2014 exactly matches the load\n\n**Answer: 8 workers**\n\nNote the trap: naively doing 120 \u00f7 20 = 6 then adding 25% more (6 \u00d7 1.25 = 7.5 \u2192 7.5 workers) gives the wrong answer, because reserving 25% of *capacity* is not the same as adding 25% more workers. With 8 workers",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 70,
+    "completion_tokens": 256,
+    "total_tokens": 326,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 70
+    }
+  },
+  "finish": "length",
+  "done": true,
+  "temperature": 0,
+  "case": "short-reasoning",
+  "thinking": false
+}

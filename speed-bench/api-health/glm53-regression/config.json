@@ -1,0 +1,25 @@
+{
+  "source_phase": "glm-low-scratch",
+  "argv": [
+    "/Users/brianfarley/Desktop/ds4-model-api-health/ds4-server",
+    "-m",
+    "/Users/brianfarley/Desktop/ds4/gguf/GLM-5.3-Flash-Q2-Q4K-Attention-SharedDownQ4K.gguf",
+    "--metal",
+    "--ctx",
+    "1024",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "54056",
+    "--trace",
+    "/Users/brianfarley/Desktop/ds4-model-api-health/speed-bench/api-health/glm53-regression/trace.log",
+    "--mtp-timing",
+    "--mtp-exact-sampling"
+  ],
+  "env_overrides": {
+    "DS4_PROMPT_LOOKUP_LOG": "1",
+    "DS4_QWEN_MTP_PROFILE": "1",
+    "DS4_MTP_TIMING": "1",
+    "DS4_GLM53_PREFILL_CHUNK": "256"
+  }
+}

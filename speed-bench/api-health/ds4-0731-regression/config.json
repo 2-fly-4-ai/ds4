@@ -1,0 +1,22 @@
+{
+  "source_phase": "context-sweep",
+  "argv": [
+    "/Users/brianfarley/Desktop/ds4-model-api-health/ds4-server",
+    "-m",
+    "/Users/brianfarley/Desktop/ds4/gguf/DeepSeek-V4-Flash-IQ2XXS-w2Q2K-AOutQ4K-L27-42-chat-v2-imatrix-0731.gguf",
+    "--metal",
+    "--ctx",
+    "40000",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "54128",
+    "--trace",
+    "/Users/brianfarley/Desktop/ds4-model-api-health/speed-bench/api-health/ds4-0731-regression/trace.log"
+  ],
+  "env_overrides": {
+    "DS4_PROMPT_LOOKUP_LOG": "1",
+    "DS4_QWEN_MTP_PROFILE": "1",
+    "DS4_MTP_TIMING": "1"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "wall_s": 4.4737855,
+  "ttft_s": 0.6624502079999992,
+  "text": "```python\nimport unittest\nfrom typing import Any, Optional\n\n\nclass Node:\n    \"\"\"Doubly linked list node for LRU cache.\"\"\"\n    def __init__(self, key: Any = None, value: Any = None):\n        self.key = key\n        self.value = value\n        self.prev: Optional['Node'] = None\n        self.next: Optional['Node'] = None\n\n\nclass LRUCache:\n    \"\"\"\n    LRU Cache implementation using a doubly linked list and a dictionary.\n    \n    The doubly linked list maintains the order of usage (most recently used at head,\n    least recently used at tail). The dictionary provides O(1) lookup for nodes.\n    \"\"\"\n    \n    def __init__(self, capacity: int):\n        if capacity <= 0:\n            raise ValueError(\"Capacity must be positive\")\n        self.capacity = capacity\n        self.cache: dict[Any, Node] = {}\n        # Dummy head and tail nodes to simplify edge cases\n        self.head = Node()  # Most recently used side\n        self.tail = Node()  # Least recently used side\n        self.head.next = self.tail\n        self.tail.prev = self.head\n    \n    def _",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 68,
+    "completion_tokens": 256,
+    "total_tokens": 324,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 68
+    }
+  },
+  "finish": "length",
+  "done": true,
+  "temperature": 0,
+  "case": "short-code"
+}

@@ -1,0 +1,20 @@
+{
+  "wall_s": 5.808588332999999,
+  "ttft_s": 0.333815125000001,
+  "text": "The salt spray stung Elias\u2019s face as he hauled the last crate of oil up the spiral stairs. The lamp, a monstrous brass beast, was already lit, its beam cutting a pale, trembling path across the black Atlantic. He was sixty-one, and his hands knew the rhythm of the wicks better than his own heartbeat. The storm outside was a screaming, wet fury, but inside the lighthouse, it was just the hum of the flame and the groan of the stone.\n\nHe was about to settle into his chair, a worn leather thing that smelled of pipe smoke and old coffee, when he saw it. A small, damp envelope, sealed with a blob of red wax, resting on the cold iron of the lamp\u2019s base. It hadn\u2019t been there an hour ago. He hadn\u2019t heard a knock, a footstep, or the creak of the door. He picked it up, feeling the slick, cold paper. The wax was cracked, and the seal was a strange, swirling symbol he didn\u2019t recognize.\n\nHe opened it. The paper inside was thick, almost parchment-like, and the handwriting was a tight, elegant scrawl.\n\n*Elias,*\n\n*The storm will break at 2:14 AM. The",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 57,
+    "completion_tokens": 256,
+    "total_tokens": 313,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 57
+    }
+  },
+  "finish": "length",
+  "done": true,
+  "temperature": 0,
+  "case": "short-story",
+  "thinking": false
+}

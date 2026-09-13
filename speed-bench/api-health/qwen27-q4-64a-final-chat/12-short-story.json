@@ -1,0 +1,19 @@
+{
+  "wall_s": 11.206854124999978,
+  "ttft_s": 0.9565456670000003,
+  "text": "The rain didn\u2019t fall; it hung in the air, a grey curtain that smelled of iron and rot. Elias didn\u2019t look up from his logbook. The ink was still wet, the date scrawled in jagged, frantic loops: *October 14, 1892*.\n\nIt was October 15.\n\nA knock at the heavy oak door of the lighthouse keeper\u2019s cottage shattered the silence. Elias didn\u2019t move. He knew who it was. He had been expecting this for three days, ever since the brass telescope on the roof had begun to hum with a frequency that made his teeth ache.\n\nThe door creaked open. Wind whipped into the room, scattering the logbook.\n\n\"You\u2019re late,\" Elias said, his voice rough from disuse. He finally looked up.\n\nStanding in the doorway was a woman. She wore a coat of black rubber, slick with rain, and her face was obscured by a mask of glass and brass tubes. She stepped inside, the door slamming shut behind her with a boom that shook the dust from the rafters.\n\n\"I\u2019m not late,\" she said. Her voice was distorted, amplified by a device strapped to her throat. \"I\u2019m early. By exactly",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 74,
+    "completion_tokens": 256,
+    "total_tokens": 330,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 74
+    }
+  },
+  "finish": "length",
+  "done": true,
+  "temperature": 0.7,
+  "case": "short-story"
+}

@@ -1,0 +1,19 @@
+{
+  "wall_s": 16.207771583999985,
+  "ttft_s": 0.5462665000000015,
+  "text": "The rain didn\u2019t fall; it hammered. It struck the glass of the lantern room like a thousand tiny fists, blurring the horizon into a gray smear of churning Atlantic. Elias wiped the condensation from the lens with a rag that had long since lost its color, his joints popping in protest. He was seventy, and the lighthouse was his only companion, a skeletal finger pointing accusingly at the indifferent sky.\n\nThe radio crackled. It wasn\u2019t the static he was used to, nor the rhythmic drone of the shipping channels. It was a voice, clear as crystal, cutting through the storm with an eerie calmness.\n\n\"Elias. Stop winding the mechanism.\"\n\nElias froze, his hand hovering over the heavy brass crank. He looked around the empty room, the shadows dancing wildly in the beam\u2019s rotation. \"Who is this?\" he whispered, though he knew the mic was open.\n\n\"Check the logbook. Page forty-two. The entry for October 14th.\"\n\nElias frowned. Today was October 14th. The entry was blank. He walked to the desk, the wood groaning under his weight, and pulled the leather-bound book toward him. The pages were yellowed, filled with his",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 70,
+    "completion_tokens": 256,
+    "total_tokens": 326,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 70
+    }
+  },
+  "finish": "length",
+  "done": true,
+  "temperature": 0.7,
+  "case": "short-story"
+}

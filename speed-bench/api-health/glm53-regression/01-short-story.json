@@ -1,0 +1,20 @@
+{
+  "wall_s": 7.042881292,
+  "ttft_s": 0.3934194170000005,
+  "text": "# The Keeper of Point Adelaid\n\nMira Voss had kept the light at Point Adelaid for eleven years, and in eleven years she had learned that the sea spoke in three ways: the crash of breakers, the low moan of fog, and the silence between them. Tonight it spoke in the fourth way\u2014a sound she had no name for, like a bell rung underwater, heard from the inside.\n\nThe message arrived at 3:14 in the morning, printed on the weather teletype that had been obsolete since before she took the post. The machine should have been dead. It should have been rust. But the paper fed through clean and crisp, and the type was sharp as a scalpel.\n\n**TO KEEPER VOSS. STORM FRONT UNREPORTED. SQUALL LINE WILL CROSS YOUR POINT AT 0447. FISHING VESSEL DELPHIN OUT OF HARBOR GRACE, THREE ABOARD, WILL BE IN ITS PATH. THEY WILL NOT HEAR YOUR HORN. LIGHT ONLY. LIGHT WILL SAVE THEM. CONFIRM RECEIPT.**\n\nMira read it twice. Then a third time, standing in the lamplight of the watch room with her hair half undone and",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 57,
+    "completion_tokens": 256,
+    "total_tokens": 313,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 57
+    }
+  },
+  "finish": "length",
+  "done": true,
+  "temperature": 0,
+  "case": "short-story",
+  "thinking": false
+}

@@ -657,6 +657,9 @@ tests/test_prompt_prefix: tests/test_prompt_prefix.o ds4_prompt_prefix.o
 tests/test_snapshot_bytes: tests/test_snapshot_bytes.c ds4.c ds4.h ds4_image.o ds4_distributed.o ds4_tp.o ds4_ssd.o ds4_layer_pack.o rax.o
 	$(CC) $(CFLAGS) -DDS4_NO_GPU -I. -o $@ tests/test_snapshot_bytes.c ds4_image.o ds4_distributed.o ds4_tp.o ds4_ssd.o ds4_layer_pack.o rax.o $(LDLIBS)
 
+tests/test_qwen_chat_tokens: tests/test_qwen_chat_tokens.c ds4.c ds4.h ds4_image.o ds4_distributed.o ds4_tp.o ds4_ssd.o ds4_layer_pack.o rax.o
+	$(CC) $(CFLAGS) -DDS4_NO_GPU -I. -o $@ tests/test_qwen_chat_tokens.c ds4_image.o ds4_distributed.o ds4_tp.o ds4_ssd.o ds4_layer_pack.o rax.o $(LDLIBS)
+
 test: ds4_test ds4_agent_test ds4-eval q4k-dot-test mxfp4-dot-test tests/test_snapshot_bytes \
 	tests/test_layer_pack tests/test_engine_mgpu_placement tests/test_gpu_args \
 	tests/test_deepseek4_vision_image tests/test_deepseek41_spec tests/test_prompt_prefix $(SAMPLING_TEST) ds4 ds4-server ds4-bench ds4-agent
@@ -710,5 +713,5 @@ clean:
 	rm -f tests/test_glm_stream_interleave
 	rm -f tests/test_qwen_stream_interleave
 	$(RM) tests/test_snapshot_bytes
-	$(RM) tests/test_qwen_mtp_port tests/test_qwen_prefill_port tests/test_qwen_norm_port
+	$(RM) tests/test_qwen_mtp_port tests/test_qwen_prefill_port tests/test_qwen_norm_port tests/test_qwen_chat_tokens
 	rm -f ds4 ds4-server ds4-bench ds4-eval ds4-agent ds4_cpu ds4_native ds4_server_test ds4_test ds4_agent_test gguf-tools/quality-testing/score_official gguf-tools/quality-testing/score_official.o speed-bench/metal_decode_schedule_bench speed-bench/metal_prefill_variant_bench speed-bench/*.o tests/test_q4k_dot tests/test_mxfp4_dot tests/test_mxfp4_metal tests/test_mxfp4_rocm tests/test_mxfp4_cuda tests/test_metal_session_batch tests/test_glm53_kda tests/test_glm53_kda_rocm tests/test_glm53_vision_engine tests/test_glm53_vision_prompt tests/test_deepseek4_vision_image tests/test_deepseek41_spec tests/test_prompt_prefix tests/test_gpu_xdev tests/test_gpu_model_cache tests/test_gpu_lookup_cache_strict tests/test_engine_mgpu_refusal tests/test_engine_mgpu_runtime tests/test_engine_correctness tests/test_sampling tests/test_cuda_session_batch tests/test_cuda_mixed_batch tests/*.o *.o tests/cuda_long_context_smoke tests/cuda_long_context_smoke.o tests/test_qwen4_kernels tests/test_qwen4_vision tests/test_ssd_cache

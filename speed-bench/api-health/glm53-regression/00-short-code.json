@@ -1,0 +1,20 @@
+{
+  "wall_s": 5.878087165999999,
+  "ttft_s": 0.414410583,
+  "text": "# LRU Cache Implementation\n\nBelow is a complete LRU cache built with a doubly linked list + dictionary, plus a full unit test suite.\n\n```python\n\"\"\"LRU cache backed by a doubly linked list and a hash map.\"\"\"\n\nfrom __future__ import annotations\n\nfrom typing import Any, Hashable, Optional\n\n\nclass _Node:\n    \"\"\"Doubly linked list node holding a cache entry.\"\"\"\n\n    __slots__ = (\"key\", \"value\", \"prev\", \"next\")\n\n    def __init__(self, key: Hashable, value: Any) -> None:\n        self.key: Hashable = key\n        self.value: Any = value\n        self.prev: Optional[\"_Node\"] = None\n        self.next: Optional[\"_Node\"] = None\n\n    def __repr__(self) -> str:  # pragma: no cover - debugging aid\n        return f\"_Node({self.key!r}, {self.value!r})\"\n\n\nclass LRUCache:\n    \"\"\"\n    Least-Recently-Used cache with O(1) get/put.\n\n    Invariants:\n      - head <-> ... <-> tail (sentinels); head.next is the MRU entry,\n        tail.prev is the LRU entry.\n      - self._map maps",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 56,
+    "completion_tokens": 256,
+    "total_tokens": 312,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 56
+    }
+  },
+  "finish": "length",
+  "done": true,
+  "temperature": 0,
+  "case": "short-code",
+  "thinking": false
+}

@@ -1,0 +1,20 @@
+{
+  "wall_s": 2.8056417499999995,
+  "ttft_s": 0.3309390830000005,
+  "text": "{\n  \"inventory\": [\n    {\n      \"id\": 101,\n      \"name\": \"Widget A\",\n      \"quantity\": 25,\n      \"price\": 19.99\n    },\n    {\n      \"id\": 102,\n      \"name\": \"Widget B\",\n      \"quantity\": 10,\n      \"price\": 29.99\n    },\n    {\n      \"id\": 103,\n      \"name\": \"Widget C\",\n      \"quantity\": 5,\n      \"price\": 39.99\n    }\n  ]\n}",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 62,
+    "completion_tokens": 115,
+    "total_tokens": 177,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 62
+    }
+  },
+  "finish": "stop",
+  "done": true,
+  "temperature": 0,
+  "case": "short-json",
+  "thinking": false
+}

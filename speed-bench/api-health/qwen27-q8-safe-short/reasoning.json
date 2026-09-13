@@ -1,0 +1,17 @@
+{
+  "wall_s": 8.122043999999999,
+  "ttft_s": 0.5619532500000002,
+  "text": "To determine the number of workers needed, we must account for the base load and the reserved capacity for spikes. Here is the step-by-step arithmetic:\n\n### 1. Determine Total Required Capacity\nThe service receives 120 requests per second (RPS). This is the **base load**.\n\nWe are told to **reserve 25% of total capacity** for spikes. This means the base load (120 RPS) must fit within the remaining **75%** of the total capacity.\n\nLet $C$ be the total capacity in RPS.\n$$\n0.75 \\times C = 120\n$$\n\nSolving for $C$:\n$$\nC = \\frac{120}{0.75} = 160 \\text{ RPS}\n$$\n\nSo, the system must have a total capacity of **160 RPS** to handle 120 RPS of base traffic while keeping 25% (40 RPS) reserved for spikes.\n\n### 2. Calculate Number of Workers\nEach worker handles 20 RPS.\n\n$$\n\\text{Number of Workers} = \\frac{\\text{Total Required Capacity}}",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 87,
+    "completion_tokens": 256,
+    "total_tokens": 343,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 87
+    }
+  },
+  "finish": "length",
+  "done": true
+}

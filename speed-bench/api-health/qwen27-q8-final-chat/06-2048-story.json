@@ -1,0 +1,19 @@
+{
+  "wall_s": 20.512994707999994,
+  "ttft_s": 5.514460915999997,
+  "text": "The rain didn\u2019t fall; it hammered against the glass of the lantern room, a relentless drumroll that drowned out the groan of the iron stairs. Elias wiped the condensation from the lens, his breath fogging the cold air. He was alone, as he had been for the last forty years, until the radio crackled.\n\nIt wasn\u2019t the static of the storm. It was a voice, clear and sharp, cutting through the white noise like a knife.\n\n\"Stop the rotation. Now.\"\n\nElias froze, his hand hovering over the manual override lever. \"Who is this? This is the North Point Light. Identify yourself.\"\n\n\"I am you,\" the voice said. There was no malice in it, only a terrifying, exhausted urgency. \"And I am telling you that if you let that beam sweep past the coordinates 44-North, 12-West, the *Aurora* hits the reef. Not the rocks. The reef. The shallow one. The one that isn\u2019t on the charts.\"\n\nElias frowned, looking out into the black void of the ocean. \"The *Aurora* is a cargo ship. She\u2019s three days out. And the reef? There is no reef there",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 2034,
+    "completion_tokens": 256,
+    "total_tokens": 2290,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 2034
+    }
+  },
+  "finish": "length",
+  "done": true,
+  "temperature": 0,
+  "case": "2048-story"
+}

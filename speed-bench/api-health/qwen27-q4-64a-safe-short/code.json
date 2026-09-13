@@ -1,0 +1,17 @@
+{
+  "wall_s": 7.090001958,
+  "ttft_s": 1.0446521250000007,
+  "text": "```python\n\"\"\"\nLRU Cache implementation using a doubly linked list and a dictionary.\nIncludes unit tests covering updates, eviction, and capacity one.\n\"\"\"\n\nimport unittest\n\n\nclass Node:\n    \"\"\"Doubly linked list node.\"\"\"\n    __slots__ = ('key', 'value', 'prev', 'next')\n\n    def __init__(self, key=None, value=None):\n        self.key = key\n        self.value = value\n        self.prev = None\n        self.next = None\n\n\nclass LRUCache:\n    \"\"\"\n    LRU Cache with O(1) get and put operations.\n    Uses a doubly linked list to maintain order and a dictionary for O(1) lookup.\n    \"\"\"\n\n    def __init__(self, capacity: int):\n        if capacity < 1:\n            raise ValueError(\"Capacity must be at least 1\")\n        self.capacity = capacity\n        self.cache = {}  # key -> Node\n        # Dummy head and tail to simplify edge cases\n        self.head = Node()\n        self.tail = Node()\n        self.head.next = self.tail\n        self.tail.prev = self.head\n\n    def _remove(self, node: Node) ->",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 73,
+    "completion_tokens": 256,
+    "total_tokens": 329,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 73
+    }
+  },
+  "finish": "length",
+  "done": true
+}

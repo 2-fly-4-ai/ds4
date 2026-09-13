@@ -7886,6 +7886,12 @@ static void config_validate_model(const ds4_model *m) {
             config_validate_qwen4_model(m);
             return;
         }
+        if (ds4_streq(arch, "qwen35moe")) {
+            /* Do not misdiagnose a valid MoE file as missing DeepSeek keys,
+             * or feed it to the fixed-shape dense Qwen runtime. */
+            ds4_die("qwen35moe is not supported by this build: the Qwen MoE "
+                    "runtime must be ported; this file is not a dense Qwen 27B model");
+        }
     }
     if (model_get_string(m, "general.architecture", &arch) &&
         (ds4_streq(arch, "qwen3") || ds4_streq(arch, "qwen3_5") ||
@@ -46861,6 +46867,7 @@ bool ds4_tokens_starts_with(const ds4_tokens *tokens, const ds4_tokens *prefix) 
 struct ds4_vocab {
     ds4_str *token;
     int n_vocab;
+    bool qwen35_pre;
     int bos_id;
     int eos_id;
     int system_id;
@@ -48360,7 +48367,7 @@ static void bpe_tokenize_text(const ds4_vocab *vocab, const char *text, token_ve
         bpe_tokenize_text_glm4(vocab, text, out);
         return;
     }
-    if (ds4_model_is_qwen4()) {
+    if (ds4_model_is_qwen4() || vocab->qwen35_pre) {
         bpe_tokenize_text_qwen35(vocab, text, out);
         return;
     }
@@ -48453,6 +48460,12 @@ static int vocab_lookup_optional(const ds4_vocab *vocab, const char *text) {
 
 static void vocab_load(ds4_vocab *vocab, const ds4_model *model) {
     memset(vocab, 0, sizeof(*vocab));
+    /* Pre-tokenization belongs to the tokenizer metadata, not the execution
+     * backend: the smaller Qwen35 models use the same splitting as Next. */
+    ds4_str pre = {0};
+    vocab->qwen35_pre = DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_QWEN &&
+        model_get_string(model, "tokenizer.ggml.pre", &pre) &&
+        ds4_streq(pre, "qwen35");
 
     ds4_array_ref tokens;
     ds4_array_ref merges;
@@ -48496,8 +48509,11 @@ static void vocab_load(ds4_vocab *vocab, const ds4_model *model) {
     vocab->im_end_id = -1;
     vocab->endoftext_id = -1;
 
-    if (ds4_model_is_qwen4()) {
-        /* ChatML without BOS; <|endoftext|> is the document separator and a
+    if (ds4_model_is_qwen4() || DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_QWEN) {
+        /* Both Qwen runtimes use ChatML. Falling through to the DeepSeek
+         * compatibility markers leaves im_start/im_end unset, so rendered
+         * role boundaries become ordinary text instead of control tokens.
+         * ChatML without BOS; <|endoftext|> is the document separator and a
          * second generation stop. */
         vocab->im_start_id = vocab_lookup(vocab, "<|im_start|>");
         vocab->im_end_id = vocab_lookup(vocab, "<|im_end|>");
@@ -48683,7 +48699,7 @@ static void encode_chat_prompt(
         const char      *prompt,
         ds4_think_mode   think_mode,
         token_vec       *out) {
-    if (ds4_model_is_qwen4()) {
+    if (ds4_model_is_qwen4() || DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_QWEN) {
         if (vocab->im_start_id < 0 || vocab->im_end_id < 0 ||
             vocab->think_start_id < 0 || vocab->think_end_id < 0) {
             ds4_die("this tokenizer does not provide the Qwen chat markers; use raw prompt tokenization");
@@ -48873,7 +48889,7 @@ void ds4_chat_append_message(ds4_engine *e, ds4_tokens *tokens, const char *role
     if (!role) role = "user";
     if (!content) content = "";
 
-    if (ds4_model_is_qwen4()) {
+    if (ds4_model_is_qwen4() || DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_QWEN) {
         if (!strcmp(role, "tool") || !strcmp(role, "function")) {
             qwen4_chat_open(vocab, "user", tokens);
             bpe_tokenize_text(vocab, "<tool_response>\n", tokens);
@@ -48970,7 +48986,7 @@ void ds4_chat_append_message(ds4_engine *e, ds4_tokens *tokens, const char *role
 }
 
 void ds4_chat_append_assistant_prefix(ds4_engine *e, ds4_tokens *tokens, ds4_think_mode think_mode) {
-    if (ds4_model_is_qwen4()) {
+    if (ds4_model_is_qwen4() || DS4_MODEL_FAMILY == DS4_MODEL_FAMILY_QWEN) {
         qwen4_chat_assistant_prefix(&e->vocab, think_mode, tokens);
         return;
     }

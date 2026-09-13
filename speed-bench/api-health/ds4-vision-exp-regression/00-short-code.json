@@ -1,0 +1,20 @@
+{
+  "wall_s": 5.875999792,
+  "ttft_s": 0.40844725000000004,
+  "text": "Here is a complete Python LRU cache implementation with a doubly linked list, a dictionary, and comprehensive unit tests.\n\n```python\nimport unittest\nfrom collections import OrderedDict\n\n\nclass Node:\n    \"\"\"Node for doubly linked list.\"\"\"\n    def __init__(self, key, value):\n        self.key = key\n        self.value = value\n        self.prev = None\n        self.next = None\n\n\nclass LRUCache:\n    \"\"\"LRU Cache using doubly linked list and dictionary.\"\"\"\n    \n    def __init__(self, capacity):\n        self.capacity = capacity\n        self.cache = {}  # key -> Node\n        self.head = Node(None, None)  # dummy head\n        self.tail = Node(None, None)  # dummy tail\n        self.head.next = self.tail\n        self.tail.prev = self.head\n        self.size = 0\n    \n    def _remove_node(self, node):\n        \"\"\"Remove a node from the linked list.\"\"\"\n        node.prev.next = node.next\n        node.next.prev = node.prev\n    \n    def _add_to_tail(self, node):\n        \"\"\"Add a node to the tail (most recently used).\"\"\"\n        node.prev = self.tail.prev\n        node.next = self.tail\n       ",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 58,
+    "completion_tokens": 256,
+    "total_tokens": 314,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 58
+    }
+  },
+  "finish": "length",
+  "done": true,
+  "temperature": 0,
+  "case": "short-code",
+  "thinking": false
+}

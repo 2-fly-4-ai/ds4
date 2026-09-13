@@ -1,0 +1,17 @@
+{
+  "wall_s": 8.162330208,
+  "ttft_s": 0.7655595830000017,
+  "text": "```python\n\"\"\"\nLRU Cache Implementation using a Doubly Linked List and a Dictionary.\n\nIncludes unit tests covering:\n- Basic get/put\n- Update of existing key\n- Eviction of least recently used item\n- Capacity of one\n\"\"\"\n\nfrom collections import OrderedDict  # Not used, but kept for reference in some implementations\nimport unittest\n\n\nclass Node:\n    \"\"\"A node in the doubly linked list.\"\"\"\n    __slots__ = ('key', 'value', 'prev', 'next')\n\n    def __init__(self, key=None, value=None):\n        self.key = key\n        self.value = value\n        self.prev = None\n        self.next = None\n\n\nclass LRUCache:\n    \"\"\"\n    LRU Cache with O(1) get and put operations.\n    \n    Uses:\n    - A doubly linked list to maintain order of usage (most recent at head, least recent at tail)\n    - A dictionary (hash map) for O(1) lookup of nodes by key\n    \"\"\"\n\n    def __init__(self, capacity: int):\n        if capacity <= 0:\n            raise ValueError(\"Capacity must be a positive integer.\")\n        self.capacity = capacity",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 129,
+    "completion_tokens": 256,
+    "total_tokens": 385,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 129
+    }
+  },
+  "finish": "length",
+  "done": true
+}

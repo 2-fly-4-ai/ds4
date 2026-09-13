@@ -1,0 +1,689 @@
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 4.275 ms, residency requested in 793.517 ms, warmup 4.032 ms (mapped 90220.81 MiB from offset 9.07 MiB)
+ds4: Metal mapped mmaped model as 2 overlapping shared buffers
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 0.01 GiB (raw 0.00 + compressed 0.01) + buffers 0.50 GiB + resident model 88.11 GiB = 88.62 GiB planned
+ds4: memory detail: ctx=1024 prefill_cap=256 raw_kv_rows=0 compressed_kv_rows=1024 backend=metal
+0914 04:13:13 ds4-server: context buffers 521.15 MiB (ctx=1024, backend=metal, prefill_chunk=256, raw_kv_rows=0, compressed_kv_rows=1024)
+ds4: GLM graph using compact DSA KV only; expanded full-attention KV cache is skipped
+ds4: GLM graph allocating compact DSA cache: rows=1024 logical_ctx=1024 kv_layers=45 indexer_layers=11 f16 0.01 GiB
+ds4: GLM compact indexed prefill chunk=256 score_rows=256 score_scratch=0.25 MiB
+0914 04:13:13 ds4-server: tracing session to /Users/brianfarley/Desktop/ds4-model-api-health/speed-bench/api-health/glm53-regression/trace.log
+0914 04:13:13 ds4-server: listening on http://127.0.0.1:54056
+0914 04:13:13 ds4-server: chat ctx=0..56:56 prompt start
+0914 04:13:13 ds4-server: chat ctx=0..56:56 prefill chunk 56/56 (100.0%) chunk=147.74 t/s avg=147.74 t/s 0.379s
+0914 04:13:13 ds4-server: chat ctx=0..56:56 prompt done 0.384s
+ds4: glm mtp cycle: verify2 38.4 ms, head+draft 4.2 ms, reject [save 0.0 forward 38.4 row0-head 1.9 post 2.3] margin 1.1788 (draft 444 ' L' vs true 35821 'RU')
+ds4: glm mtp cycle: verify2 34.9 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 34.9 row0-head 1.7 post 2.8] margin 1.68811 (draft 19442 ' Cache' vs true 19442 ' Cache')
+ds4: glm mtp cycle: verify2 34.9 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 34.9 row0-head 1.7 post 2.8] margin 1.14015 (draft 271 '
+
+' vs true 271 '
+
+')
+ds4: glm mtp cycle: verify2 36.5 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 36.5 row0-head 1.7 post 2.9] margin 2.54622 (draft 374 ' is' vs true 374 ' is')
+ds4: glm mtp cycle: verify2 36.6 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 36.6 row0-head 1.7 post 2.9] margin 2.95377 (draft 4583 ' complete' vs true 4583 ' complete')
+ds4: glm mtp cycle: verify2 36.4 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 36.4 row0-head 1.8 post 2.8] margin 7.13143 (draft 35821 'RU' vs true 35821 'RU')
+ds4: glm mtp cycle: verify2 36.6 ms, head+draft 4.3 ms, reject [save 0.0 forward 36.6 row0-head 1.8 post 2.5] margin 1.53474 (draft 448 ' with' vs true 5798 ' built')
+ds4: glm mtp cycle: verify2 35.7 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.6 row0-head 1.7 post 2.7] margin 1.87377 (draft 448 ' with' vs true 448 ' with')
+ds4: glm mtp confidence skip: margin 0.271328 < 1
+ds4: glm mtp confidence skip: margin 0.302244 < 1
+ds4: glm mtp cycle: verify2 35.7 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 35.7 row0-head 1.7 post 2.9] margin 1.52424 (draft 1140 ' list' vs true 1140 ' list')
+ds4: glm mtp confidence skip: margin 0.40505 < 1
+ds4: glm mtp cycle: verify2 34.9 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 34.9 row0-head 1.7 post 2.8] margin 2.38898 (draft 11 ',' vs true 11 ',')
+ds4: glm mtp cycle: verify2 35.2 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 35.2 row0-head 1.7 post 2.8] margin 1.72776 (draft 264 ' a' vs true 264 ' a')
+ds4: glm mtp confidence skip: margin 0.855234 < 1
+ds4: glm mtp cycle: verify2 35.2 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.2 row0-head 1.7 post 2.7] margin 4.67455 (draft 1273 ' test' vs true 1273 ' test')
+ds4: glm mtp cycle: verify2 35.4 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.4 row0-head 1.7 post 2.7] margin 1.56367 (draft 382 '.
+
+' vs true 382 '.
+
+')
+ds4: glm mtp cycle: verify2 34.6 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 34.6 row0-head 1.8 post 2.7] margin 4.11086 (draft 12663 'python' vs true 12663 'python')
+ds4: glm mtp cycle: verify2 35.1 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 35.1 row0-head 1.7 post 2.7] margin 2.60657 (draft 12593 '"""' vs true 12593 '"""')
+ds4: glm mtp cycle: verify2 34.8 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 34.8 row0-head 1.6 post 2.7] margin 3.61238 (draft 52 'U' vs true 52 'U')
+ds4: glm mtp confidence skip: margin 0.43354 < 1
+ds4: glm mtp cycle: verify2 35.1 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.1 row0-head 1.7 post 2.7] margin 6.86768 (draft 553 ' by' vs true 553 ' by')
+ds4: glm mtp cycle: verify2 35.2 ms, head+draft 4.2 ms, ACCEPT [save 0.0 forward 35.2 row0-head 1.6 post 2.6] margin 3.65557 (draft 93100 ' doubly' vs true 93100 ' doubly')
+ds4: glm mtp cycle: verify2 34.8 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 34.8 row0-head 1.7 post 2.7] margin 7.83056 (draft 1140 ' list' vs true 1140 ' list')
+ds4: glm mtp cycle: verify2 35.2 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 35.2 row0-head 1.8 post 2.5] margin 4.27411 (draft 264 ' a' vs true 264 ' a')
+ds4: glm mtp cycle: verify2 35.1 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.1 row0-head 1.7 post 2.6] margin 4.49489 (draft 2415 ' map' vs true 2415 ' map')
+ds4: glm mtp cycle: verify2 35.1 ms, head+draft 4.0 ms, reject [save 0.0 forward 35.1 row0-head 1.7 post 2.3] margin 2.09543 (draft 12663 'python' vs true 1499 'from')
+ds4: glm mtp confidence skip: margin 0.180569 < 1
+ds4: glm mtp cycle: verify2 34.9 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 34.9 row0-head 1.7 post 2.6] margin 8.64077 (draft 21008 'future' vs true 21008 'future')
+0914 04:13:14 ds4-server: chat ctx=56..106:50 gen=50 decoding chunk=44.62 t/s avg=44.62 t/s 1.121s
+ds4: glm mtp cycle: verify2 35.1 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 35.1 row0-head 1.8 post 2.7] margin 4.75537 (draft 1159 ' import' vs true 1159 ' import')
+ds4: glm mtp cycle: verify2 34.8 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 34.8 row0-head 1.7 post 2.7] margin 2.02475 (draft 271 '
+
+' vs true 271 '
+
+')
+ds4: glm mtp cycle: verify2 35.1 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 35.1 row0-head 1.6 post 2.7] margin 2.05229 (draft 19459 ' typing' vs true 19459 ' typing')
+ds4: glm mtp cycle: verify2 34.8 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 34.8 row0-head 1.8 post 2.7] margin 4.43818 (draft 5765 ' Any' vs true 5765 ' Any')
+ds4: glm mtp confidence skip: margin 0.494734 < 1
+ds4: glm mtp cycle: verify2 35.0 ms, head+draft 3.9 ms, reject [save 0.0 forward 35.0 row0-head 1.6 post 2.3] margin 1.69464 (draft 11 ',' vs true 480 'able')
+ds4: glm mtp cycle: verify2 34.8 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 34.8 row0-head 1.6 post 2.6] margin 2.61973 (draft 11 ',' vs true 11 ',')
+ds4: glm mtp cycle: verify2 34.8 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 34.8 row0-head 1.7 post 2.7] margin 2.65722 (draft 1406 '
+
+
+' vs true 1406 '
+
+
+')
+ds4: glm mtp cycle: verify2 34.8 ms, head+draft 4.1 ms, reject [save 0.0 forward 34.8 row0-head 1.8 post 2.3] margin 2.96116 (draft 6018 ' Node' vs true 716 ' _')
+ds4: glm mtp cycle: verify2 34.9 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 34.9 row0-head 1.7 post 2.7] margin 2.45032 (draft 1955 'Node' vs true 1955 'Node')
+ds4: glm mtp cycle: verify2 35.0 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 35.0 row0-head 1.7 post 2.6] margin 10.7647 (draft 262 '   ' vs true 262 '   ')
+ds4: glm mtp confidence skip: margin 0.042223 < 1
+ds4: glm mtp cycle: verify2 35.6 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 35.6 row0-head 1.7 post 2.8] margin 2.21868 (draft 5482 'oub' vs true 5482 'oub')
+ds4: glm mtp cycle: verify2 34.8 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 34.8 row0-head 1.7 post 2.7] margin 5.87615 (draft 10587 ' linked' vs true 10587 ' linked')
+ds4: glm mtp cycle: verify2 35.0 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 35.0 row0-head 1.7 post 2.7] margin 9.19226 (draft 2436 ' node' vs true 2436 ' node')
+ds4: glm mtp cycle: verify2 34.9 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 34.9 row0-head 1.7 post 2.7] margin 2.14551 (draft 264 ' a' vs true 264 ' a')
+ds4: glm mtp cycle: verify2 35.1 ms, head+draft 4.1 ms, reject [save 0.0 forward 35.1 row0-head 1.7 post 2.3] margin 4.51047 (draft 1376 ' key' vs true 4343 ' entry')
+ds4: glm mtp cycle: verify2 35.3 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.3 row0-head 1.7 post 2.7] margin 1.8685 (draft 29077 '."""
+
+' vs true 29077 '."""
+
+')
+ds4: glm mtp cycle: verify2 34.9 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 34.9 row0-head 1.7 post 2.7] margin 5.83253 (draft 1304 ' __' vs true 1304 ' __')
+ds4: glm mtp cycle: verify2 35.4 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.4 row0-head 1.7 post 2.8] margin 11.1875 (draft 563 '__' vs true 563 '__')
+ds4: glm mtp cycle: verify2 34.7 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 34.7 row0-head 1.7 post 2.7] margin 8.48664 (draft 3489 ' ("' vs true 3489 ' ("')
+ds4: glm mtp cycle: verify2 35.7 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.7 row0-head 1.7 post 2.7] margin 6.46434 (draft 497 '",' vs true 497 '",')
+ds4: glm mtp cycle: verify2 35.0 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.0 row0-head 1.7 post 2.7] margin 7.83184 (draft 957 'value' vs true 957 'value')
+ds4: glm mtp cycle: verify2 35.3 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 35.3 row0-head 1.7 post 2.6] margin 9.39065 (draft 330 ' "' vs true 330 ' "')
+ds4: glm mtp cycle: verify2 34.9 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 34.9 row0-head 1.7 post 2.7] margin 9.08775 (draft 497 '",' vs true 497 '",')
+ds4: glm mtp cycle: verify2 35.3 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.3 row0-head 1.7 post 2.7] margin 4.06391 (draft 3600 'next' vs true 3600 'next')
+ds4: glm mtp cycle: verify2 35.2 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 35.2 row0-head 1.7 post 2.6] margin 9.12336 (draft 262 '   ' vs true 262 '   ')
+ds4: glm mtp cycle: verify2 35.4 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.4 row0-head 1.7 post 2.6] margin 13.9614 (draft 1304 ' __' vs true 1304 ' __')
+0914 04:13:16 ds4-server: chat ctx=106..156:50 gen=100 decoding chunk=46.21 t/s avg=45.40 t/s 2.203s
+ds4: glm mtp cycle: verify2 35.2 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 35.2 row0-head 1.7 post 2.8] margin 4.77619 (draft 3804 '__(' vs true 3804 '__(')
+ds4: glm mtp cycle: verify2 35.3 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 35.3 row0-head 1.8 post 2.7] margin 10.4676 (draft 11 ',' vs true 11 ',')
+ds4: glm mtp cycle: verify2 35.0 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.0 row0-head 1.7 post 2.7] margin 6.95524 (draft 25 ':' vs true 25 ':')
+ds4: glm mtp cycle: verify2 35.0 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 35.0 row0-head 1.6 post 2.6] margin 14.3353 (draft 480 'able' vs true 480 'able')
+ds4: glm mtp cycle: verify2 34.9 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 34.9 row0-head 1.7 post 2.7] margin 8.38475 (draft 897 ' value' vs true 897 ' value')
+ds4: glm mtp cycle: verify2 35.4 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 35.4 row0-head 1.6 post 2.7] margin 10.274 (draft 5765 ' Any' vs true 5765 ' Any')
+ds4: glm mtp cycle: verify2 34.8 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 34.8 row0-head 1.7 post 2.7] margin 5.88282 (draft 1464 ' ->' vs true 1464 ' ->')
+ds4: glm mtp cycle: verify2 35.3 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 35.3 row0-head 1.7 post 2.7] margin 9.24845 (draft 510 ':
+' vs true 510 ':
+')
+ds4: glm mtp cycle: verify2 35.0 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.0 row0-head 1.7 post 2.7] margin 9.49348 (draft 656 ' self' vs true 656 ' self')
+ds4: glm mtp cycle: verify2 35.4 ms, head+draft 4.0 ms, reject [save 0.0 forward 35.4 row0-head 1.7 post 2.3] margin 1.2146 (draft 284 ' =' vs true 25 ':')
+ds4: glm mtp cycle: verify2 35.2 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.2 row0-head 1.7 post 2.7] margin 2.92541 (draft 6531 ' Hash' vs true 6531 ' Hash')
+ds4: glm mtp cycle: verify2 35.3 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.3 row0-head 1.7 post 2.7] margin 7.37179 (draft 284 ' =' vs true 284 ' =')
+ds4: glm mtp cycle: verify2 35.4 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.4 row0-head 1.7 post 2.6] margin 7.44688 (draft 198 '
+' vs true 198 '
+')
+ds4: glm mtp cycle: verify2 34.9 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 34.9 row0-head 1.7 post 2.7] margin 7.13134 (draft 656 ' self' vs true 656 ' self')
+ds4: glm mtp cycle: verify2 35.3 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.3 row0-head 1.7 post 2.7] margin 5.3341 (draft 25 ':' vs true 25 ':')
+ds4: glm mtp cycle: verify2 35.4 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.4 row0-head 1.7 post 2.7] margin 5.91584 (draft 284 ' =' vs true 284 ' =')
+ds4: glm mtp cycle: verify2 35.1 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 35.1 row0-head 1.7 post 2.6] margin 10.9957 (draft 198 '
+' vs true 198 '
+')
+ds4: glm mtp cycle: verify2 35.2 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.2 row0-head 1.7 post 2.7] margin 11.3848 (draft 656 ' self' vs true 656 ' self')
+ds4: glm mtp cycle: verify2 35.6 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.6 row0-head 1.6 post 2.8] margin 7.46596 (draft 25 ':' vs true 25 ':')
+ds4: glm mtp confidence skip: margin 0.304356 < 1
+ds4: glm mtp cycle: verify2 35.3 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.3 row0-head 1.7 post 2.7] margin 10.607 (draft 1955 'Node' vs true 1955 'Node')
+ds4: glm mtp cycle: verify2 35.6 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.6 row0-head 1.7 post 2.7] margin 13.2467 (draft 284 ' =' vs true 284 ' =')
+ds4: glm mtp cycle: verify2 35.5 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.5 row0-head 1.8 post 2.7] margin 7.4595 (draft 198 '
+' vs true 198 '
+')
+ds4: glm mtp cycle: verify2 35.3 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.3 row0-head 1.7 post 2.7] margin 6.6405 (draft 656 ' self' vs true 656 ' self')
+ds4: glm mtp cycle: verify2 35.5 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.5 row0-head 1.7 post 2.7] margin 6.42322 (draft 25 ':' vs true 25 ':')
+ds4: glm mtp cycle: verify2 35.6 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.6 row0-head 1.7 post 2.7] margin 8.83015 (draft 59734 '["_' vs true 59734 '["_')
+0914 04:13:17 ds4-server: chat ctx=156..206:50 gen=150 decoding chunk=49.02 t/s avg=46.54 t/s 3.223s
+ds4: glm mtp cycle: verify2 35.6 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.6 row0-head 1.7 post 2.6] margin 6.46998 (draft 1341 '"]' vs true 1341 '"]')
+ds4: glm mtp cycle: verify2 35.7 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 35.7 row0-head 1.8 post 2.7] margin 11.5689 (draft 2240 ' None' vs true 2240 ' None')
+ds4: glm mtp cycle: verify2 35.3 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.3 row0-head 1.7 post 2.7] margin 7.14583 (draft 262 '   ' vs true 262 '   ')
+ds4: glm mtp cycle: verify2 35.4 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 35.4 row0-head 1.7 post 2.8] margin 4.74728 (draft 1304 ' __' vs true 1304 ' __')
+ds4: glm mtp cycle: verify2 35.8 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.8 row0-head 1.7 post 2.7] margin 7.85375 (draft 3804 '__(' vs true 3804 '__(')
+ds4: glm mtp cycle: verify2 35.6 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.6 row0-head 1.7 post 2.7] margin 9.40261 (draft 8 ')' vs true 8 ')')
+ds4: glm mtp cycle: verify2 35.6 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.6 row0-head 1.8 post 2.7] margin 11.5029 (draft 607 ' str' vs true 607 ' str')
+ds4: glm mtp cycle: verify2 35.6 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.6 row0-head 1.7 post 2.7] margin 7.35799 (draft 220 ' ' vs true 220 ' ')
+ds4: glm mtp cycle: verify2 35.7 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.7 row0-head 1.7 post 2.7] margin 5.55303 (draft 61684 ' pragma' vs true 61684 ' pragma')
+ds4: glm mtp cycle: verify2 35.6 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.6 row0-head 1.7 post 2.7] margin 7.60507 (draft 902 ' no' vs true 902 ' no')
+ds4: glm mtp confidence skip: margin 0.894182 < 1
+ds4: glm mtp cycle: verify2 35.5 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 35.5 row0-head 1.7 post 2.6] margin 1.39677 (draft 27610 ' debugging' vs true 27610 ' debugging')
+ds4: glm mtp cycle: verify2 35.9 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.9 row0-head 1.7 post 2.7] margin 1.78493 (draft 198 '
+' vs true 198 '
+')
+ds4: glm mtp cycle: verify2 35.4 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.4 row0-head 1.7 post 2.8] margin 5.63021 (draft 470 ' return' vs true 470 ' return')
+ds4: glm mtp confidence skip: margin 0.566599 < 1
+ds4: glm mtp cycle: verify2 35.8 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.8 row0-head 1.7 post 2.7] margin 13.4267 (draft 1955 'Node' vs true 1955 'Node')
+ds4: glm mtp cycle: verify2 35.5 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 35.5 row0-head 1.7 post 2.7] margin 1.61559 (draft 721 'self' vs true 721 'self')
+ds4: glm mtp cycle: verify2 35.8 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 35.8 row0-head 1.8 post 2.7] margin 11.605 (draft 0 '!' vs true 0 '!')
+ds4: glm mtp cycle: verify2 35.8 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 35.8 row0-head 1.8 post 2.8] margin 3.94311 (draft 2137 '},' vs true 2137 '},')
+ds4: glm mtp cycle: verify2 35.9 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 35.9 row0-head 1.6 post 2.7] margin 11.6145 (draft 721 'self' vs true 721 'self')
+ds4: glm mtp cycle: verify2 35.4 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 35.4 row0-head 1.7 post 2.6] margin 11.381 (draft 0 '!' vs true 0 '!')
+ds4: glm mtp cycle: verify2 35.8 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.8 row0-head 1.7 post 2.7] margin 10.025 (draft 5410 '})' vs true 5410 '})')
+ds4: glm mtp cycle: verify2 35.3 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.3 row0-head 1.7 post 2.7] margin 9.49447 (draft 1040 'class' vs true 1040 'class')
+ds4: glm mtp cycle: verify2 35.7 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.7 row0-head 1.7 post 2.7] margin 4.63385 (draft 5459 'UC' vs true 5459 'UC')
+ds4: glm mtp cycle: verify2 35.5 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.5 row0-head 1.7 post 2.7] margin 5.27923 (draft 510 ':
+' vs true 510 ':
+')
+ds4: glm mtp confidence skip: margin 0.780663 < 1
+0914 04:13:18 ds4-server: chat ctx=206..256:50 gen=200 decoding chunk=49.66 t/s avg=47.29 t/s 4.230s
+ds4: glm mtp cycle: verify2 35.9 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 35.9 row0-head 1.7 post 2.6] margin 5.06097 (draft 262 '   ' vs true 262 '   ')
+ds4: glm mtp confidence skip: margin 0.00866604 < 1
+ds4: glm mtp cycle: verify2 35.8 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.8 row0-head 1.7 post 2.6] margin 3.35026 (draft 44871 'Recently' vs true 44871 'Recently')
+ds4: glm mtp cycle: verify2 35.8 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.8 row0-head 1.6 post 2.7] margin 5.9216 (draft 22682 'Used' vs true 22682 'Used')
+ds4: glm mtp cycle: verify2 35.7 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.7 row0-head 1.7 post 2.7] margin 3.32054 (draft 448 ' with' vs true 448 ' with')
+ds4: glm mtp cycle: verify2 35.8 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 35.8 row0-head 1.7 post 2.6] margin 3.84214 (draft 7 '(' vs true 7 '(')
+ds4: glm mtp cycle: verify2 35.7 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 35.7 row0-head 1.7 post 2.7] margin 9.70247 (draft 8 ')' vs true 8 ')')
+ds4: glm mtp confidence skip: margin 0.3304 < 1
+ds4: glm mtp cycle: verify2 36.1 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.1 row0-head 1.7 post 2.7] margin 6.7448 (draft 628 'put' vs true 628 'put')
+ds4: glm mtp cycle: verify2 35.7 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.7 row0-head 1.7 post 2.7] margin 5.96412 (draft 262 '   ' vs true 262 '   ')
+ds4: glm mtp cycle: verify2 36.2 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.2 row0-head 1.7 post 2.8] margin 3.596 (draft 54247 'variants' vs true 54247 'variants')
+ds4: glm mtp confidence skip: margin 0.213505 < 1
+ds4: glm mtp cycle: verify2 35.7 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.7 row0-head 1.7 post 2.7] margin 6.78961 (draft 481 ' -' vs true 481 ' -')
+ds4: glm mtp confidence skip: margin 0.0557423 < 1
+ds4: glm mtp confidence skip: margin 0.686526 < 1
+ds4: glm mtp cycle: verify2 36.1 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.1 row0-head 1.7 post 2.7] margin 1.72813 (draft 66346 ' <->' vs true 66346 ' <->')
+ds4: glm mtp cycle: verify2 36.0 ms, head+draft 4.1 ms, reject [save 0.0 forward 36.0 row0-head 1.7 post 2.3] margin 3.65873 (draft 66346 ' <->' vs true 320 ' (')
+ds4: glm mtp cycle: verify2 35.8 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.8 row0-head 1.7 post 2.7] margin 1.90351 (draft 24438 'sent' vs true 24438 'sent')
+ds4: glm mtp cycle: verify2 35.9 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 35.9 row0-head 1.7 post 2.9] margin 5.49956 (draft 2010 'els' vs true 2010 'els')
+ds4: glm mtp confidence skip: margin 0.724066 < 1
+ds4: glm mtp confidence skip: margin 0.886194 < 1
+ds4: glm mtp cycle: verify2 35.9 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.9 row0-head 1.7 post 2.7] margin 3.06002 (draft 374 ' is' vs true 374 ' is')
+ds4: glm mtp cycle: verify2 36.3 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.3 row0-head 1.7 post 2.7] margin 1.68719 (draft 28234 ' MR' vs true 28234 ' MR')
+ds4: glm mtp cycle: verify2 36.3 ms, head+draft 3.9 ms, reject [save 0.0 forward 36.3 row0-head 1.6 post 2.3] margin 2.39037 (draft 345 ',
+' vs true 4343 ' entry')
+ds4: glm mtp cycle: verify2 36.1 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.1 row0-head 1.7 post 2.7] margin 3.87829 (draft 345 ',
+' vs true 345 ',
+')
+ds4: glm mtp cycle: verify2 36.1 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.1 row0-head 1.7 post 2.7] margin 4.98788 (draft 9782 ' tail' vs true 9782 ' tail')
+ds4: glm mtp cycle: verify2 36.0 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.0 row0-head 1.7 post 2.7] margin 10.1654 (draft 374 ' is' vs true 374 ' is')
+ds4: glm mtp cycle: verify2 36.1 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.1 row0-head 1.7 post 2.7] margin 10.8277 (draft 444 ' L' vs true 444 ' L')
+ds4: glm mtp cycle: verify2 36.0 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.0 row0-head 1.7 post 2.7] margin 9.48736 (draft 4343 ' entry' vs true 4343 ' entry')
+ds4: glm mtp confidence skip: margin 0.638548 < 1
+0914 04:13:19 ds4-server: chat ctx=256..306:50 gen=250 decoding chunk=44.88 t/s avg=46.78 t/s 5.344s
+ds4: glm mtp cycle: verify2 36.1 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.1 row0-head 1.7 post 2.7] margin 13.549 (draft 481 ' -' vs true 481 ' -')
+ds4: glm mtp cycle: verify2 35.6 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.6 row0-head 1.7 post 2.7] margin 3.92046 (draft 1436 '._' vs true 1436 '._')
+ds4: glm mtp cycle: verify2 36.1 ms, head+draft 4.1 ms, reject [save 0.0 forward 36.1 row0-head 1.7 post 2.4] margin 1.31797 (draft 8156 '[key' vs true 14034 ' maps')
+ds4: glm mtp confidence skip: margin 0.246754 < 1
+0914 04:13:19 ds4-server: chat ctx=306..312:6 gen=256 decoding chunk=40.16 t/s avg=46.60 t/s 5.493s
+0914 04:13:19 ds4-server: chat ctx=0..56:56 gen=256 finish=length 5.877s
+0914 04:13:19 ds4-server: live kv cache miss live=312 prompt=57 common=10 vision=match reason=token-mismatch
+0914 04:13:19 ds4-server: chat ctx=0..57:57 prompt start
+0914 04:13:19 ds4-server: chat ctx=0..57:57 prefill chunk 57/57 (100.0%) chunk=157.77 t/s avg=157.77 t/s 0.361s
+0914 04:13:19 ds4-server: chat ctx=0..57:57 prompt done 0.364s
+ds4: glm mtp confidence skip: margin 0.934313 < 1
+ds4: glm mtp confidence skip: margin 0.250368 < 1
+ds4: glm mtp cycle: verify2 35.1 ms, head+draft 4.0 ms, reject [save 0.0 forward 35.1 row0-head 1.7 post 2.3] margin 1.18316 (draft 54627 ' Tomorrow' vs true 5126 ' Point')
+ds4: glm mtp confidence skip: margin 0.274131 < 1
+ds4: glm mtp confidence skip: margin 0.103869 < 1
+ds4: glm mtp confidence skip: margin 0.548133 < 1
+ds4: glm mtp cycle: verify2 36.4 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.4 row0-head 1.7 post 2.7] margin 3.79059 (draft 271 '
+
+' vs true 271 '
+
+')
+ds4: glm mtp cycle: verify2 35.0 ms, head+draft 4.1 ms, reject [save 0.0 forward 35.0 row0-head 1.7 post 2.4] margin 1.49499 (draft 279 ' the' vs true 8831 'ira')
+ds4: glm mtp cycle: verify2 35.0 ms, head+draft 4.0 ms, reject [save 0.0 forward 35.0 row0-head 1.7 post 2.3] margin 1.01284 (draft 19813 ' Hal' vs true 647 ' V')
+ds4: glm mtp cycle: verify2 34.7 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 34.7 row0-head 1.8 post 2.8] margin 1.38902 (draft 3662 'oss' vs true 3662 'oss')
+ds4: glm mtp confidence skip: margin 0.157585 < 1
+ds4: glm mtp cycle: verify2 35.0 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 35.0 row0-head 1.7 post 2.7] margin 2.57316 (draft 279 ' the' vs true 279 ' the')
+ds4: glm mtp cycle: verify2 34.7 ms, head+draft 4.0 ms, reject [save 0.0 forward 34.7 row0-head 1.7 post 2.2] margin 4.81009 (draft 2410 ' Ad' vs true 518 ' at')
+ds4: glm mtp cycle: verify2 34.6 ms, head+draft 4.2 ms, ACCEPT [save 0.0 forward 34.6 row0-head 1.6 post 2.6] margin 1.71492 (draft 5126 ' Point' vs true 5126 ' Point')
+ds4: glm mtp cycle: verify2 34.9 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 34.9 row0-head 1.7 post 2.6] margin 8.25296 (draft 301 'el' vs true 301 'el')
+ds4: glm mtp cycle: verify2 34.9 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 34.9 row0-head 1.7 post 2.7] margin 6.8804 (draft 369 ' for' vs true 369 ' for')
+ds4: glm mtp cycle: verify2 34.8 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 34.8 row0-head 1.8 post 2.7] margin 5.72183 (draft 1635 ' years' vs true 1635 ' years')
+ds4: glm mtp cycle: verify2 34.9 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 34.9 row0-head 1.7 post 2.7] margin 5.733 (draft 323 ' and' vs true 323 ' and')
+ds4: glm mtp cycle: verify2 34.9 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 34.9 row0-head 1.7 post 2.9] margin 3.47001 (draft 43958 ' eleven' vs true 43958 ' eleven')
+ds4: glm mtp cycle: verify2 34.9 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 34.9 row0-head 1.7 post 2.7] margin 1.19094 (draft 1340 ' she' vs true 1340 ' she')
+ds4: glm mtp confidence skip: margin 0.918219 < 1
+ds4: glm mtp cycle: verify2 35.0 ms, head+draft 4.0 ms, reject [save 0.0 forward 35.0 row0-head 1.7 post 2.3] margin 1.01488 (draft 279 ' the' vs true 429 ' that')
+ds4: glm mtp cycle: verify2 35.1 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 35.1 row0-head 1.7 post 2.7] margin 3.93963 (draft 279 ' the' vs true 279 ' the')
+ds4: glm mtp confidence skip: margin 0.31876 < 1
+ds4: glm mtp confidence skip: margin 0.652627 < 1
+ds4: glm mtp cycle: verify2 35.0 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 35.0 row0-head 1.8 post 2.7] margin 1.56799 (draft 2326 ' three' vs true 2326 ' three')
+ds4: glm mtp cycle: verify2 34.8 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 34.8 row0-head 1.7 post 2.6] margin 5.95999 (draft 25 ':' vs true 25 ':')
+ds4: glm mtp cycle: verify2 34.9 ms, head+draft 4.0 ms, reject [save 0.0 forward 34.9 row0-head 1.7 post 2.3] margin 2.61645 (draft 30132 ' fog' vs true 9915 ' crash')
+ds4: glm mtp cycle: verify2 34.8 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 34.8 row0-head 1.7 post 2.8] margin 1.62653 (draft 315 ' of' vs true 315 ' of')
+ds4: glm mtp cycle: verify2 34.9 ms, head+draft 4.1 ms, reject [save 0.0 forward 34.9 row0-head 1.7 post 2.3] margin 2.305 (draft 11 ',' vs true 388 'ers')
+ds4: glm mtp cycle: verify2 35.2 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.2 row0-head 1.7 post 2.7] margin 3.27066 (draft 11 ',' vs true 11 ',')
+ds4: glm mtp confidence skip: margin 0.116748 < 1
+ds4: glm mtp cycle: verify2 34.9 ms, head+draft 4.1 ms, reject [save 0.0 forward 34.9 row0-head 1.7 post 2.3] margin 2.33627 (draft 315 ' of' vs true 4544 ' mo')
+ds4: glm mtp cycle: verify2 34.8 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 34.8 row0-head 1.7 post 2.7] margin 2.20096 (draft 276 'an' vs true 276 'an')
+0914 04:13:20 ds4-server: chat ctx=57..107:50 gen=50 decoding chunk=39.99 t/s avg=39.99 t/s 1.250s
+ds4: glm mtp cycle: verify2 35.0 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 35.0 row0-head 1.8 post 2.7] margin 3.57485 (draft 30132 ' fog' vs true 30132 ' fog')
+ds4: glm mtp cycle: verify2 34.8 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 34.8 row0-head 1.7 post 2.7] margin 1.98845 (draft 323 ' and' vs true 323 ' and')
+ds4: glm mtp cycle: verify2 35.1 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 35.1 row0-head 1.6 post 2.7] margin 3.19879 (draft 21114 ' silence' vs true 21114 ' silence')
+ds4: glm mtp cycle: verify2 35.0 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.0 row0-head 1.7 post 2.7] margin 3.30399 (draft 1105 ' them' vs true 1105 ' them')
+ds4: glm mtp cycle: verify2 35.0 ms, head+draft 4.0 ms, reject [save 0.0 forward 35.0 row0-head 1.7 post 2.2] margin 1.0349 (draft 576 ' The' vs true 53852 ' Tonight')
+ds4: glm mtp cycle: verify2 35.3 ms, head+draft 4.1 ms, reject [save 0.0 forward 35.3 row0-head 1.7 post 2.4] margin 1.56212 (draft 1340 ' she' vs true 432 ' it')
+ds4: glm mtp cycle: verify2 34.9 ms, head+draft 4.0 ms, reject [save 0.0 forward 34.9 row0-head 1.7 post 2.3] margin 1.25159 (draft 572 ' was' vs true 12284 ' spoke')
+ds4: glm mtp cycle: verify2 35.0 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 35.0 row0-head 1.6 post 2.7] margin 1.16586 (draft 304 ' in' vs true 304 ' in')
+ds4: glm mtp cycle: verify2 34.9 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 34.8 row0-head 1.7 post 2.7] margin 1.20065 (draft 11731 ' fourth' vs true 11731 ' fourth')
+ds4: glm mtp confidence skip: margin 0.854927 < 1
+ds4: glm mtp cycle: verify2 35.1 ms, head+draft 4.0 ms, reject [save 0.0 forward 35.1 row0-head 1.7 post 2.3] margin 1.41738 (draft 279 ' the' vs true 5112 ' sound')
+ds4: glm mtp cycle: verify2 35.3 ms, head+draft 4.1 ms, reject [save 0.0 forward 35.3 row0-head 1.7 post 2.3] margin 1.28745 (draft 315 ' of' vs true 1340 ' she')
+ds4: glm mtp cycle: verify2 35.1 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 35.1 row0-head 1.8 post 2.7] margin 5.78045 (draft 1030 ' had' vs true 1030 ' had')
+ds4: glm mtp cycle: verify2 35.1 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 35.1 row0-head 1.7 post 2.7] margin 1.48688 (draft 829 ' name' vs true 829 ' name')
+ds4: glm mtp cycle: verify2 35.3 ms, head+draft 4.0 ms, reject [save 0.0 forward 35.3 row0-head 1.7 post 2.3] margin 1.68063 (draft 382 '.
+
+' vs true 11 ',')
+ds4: glm mtp cycle: verify2 35.3 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.3 row0-head 1.7 post 2.7] margin 1.6052 (draft 1075 ' like' vs true 1075 ' like')
+ds4: glm mtp cycle: verify2 34.9 ms, head+draft 4.1 ms, reject [save 0.0 forward 34.9 row0-head 1.8 post 2.3] margin 1.43056 (draft 5567 ' paper' vs true 28319 ' bell')
+ds4: glm mtp confidence skip: margin 0.297987 < 1
+ds4: glm mtp cycle: verify2 34.9 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 34.9 row0-head 1.7 post 2.7] margin 7.86918 (draft 70 'g' vs true 70 'g')
+ds4: glm mtp cycle: verify2 35.3 ms, head+draft 4.0 ms, reject [save 0.0 forward 35.3 row0-head 1.7 post 2.3] margin 3.27988 (draft 382 '.
+
+' vs true 11 ',')
+ds4: glm mtp cycle: verify2 35.3 ms, head+draft 4.2 ms, reject [save 0.0 forward 35.3 row0-head 1.8 post 2.4] margin 4.83308 (draft 1075 ' like' vs true 6617 ' heard')
+ds4: glm mtp confidence skip: margin 0.0241861 < 1
+ds4: glm mtp cycle: verify2 35.1 ms, head+draft 4.0 ms, reject [save 0.0 forward 35.1 row0-head 1.7 post 2.2] margin 1.86956 (draft 4766 ' inside' vs true 279 ' the')
+ds4: glm mtp cycle: verify2 35.2 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 35.2 row0-head 1.8 post 2.8] margin 1.53963 (draft 4766 ' inside' vs true 4766 ' inside')
+ds4: glm mtp confidence skip: margin 0.856991 < 1
+ds4: glm mtp cycle: verify2 35.0 ms, head+draft 4.0 ms, reject [save 0.0 forward 35.0 row0-head 1.7 post 2.3] margin 1.58564 (draft 1340 ' she' vs true 1943 ' message')
+ds4: glm mtp confidence skip: margin 0.365738 < 1
+ds4: glm mtp cycle: verify2 35.0 ms, head+draft 4.1 ms, reject [save 0.0 forward 35.0 row0-head 1.7 post 2.4] margin 2.49496 (draft 389 ' on' vs true 518 ' at')
+ds4: GLM MTP adaptive suspended (6/15, 40.0%); plain decode for 128 tokens
+0914 04:13:22 ds4-server: chat ctx=107..157:50 gen=100 decoding chunk=38.47 t/s avg=39.22 t/s 2.550s
+0914 04:13:23 ds4-server: chat ctx=157..207:50 gen=150 decoding chunk=38.94 t/s avg=39.13 t/s 3.834s
+0914 04:13:24 ds4-server: chat ctx=207..257:50 gen=200 decoding chunk=38.40 t/s avg=38.94 t/s 5.136s
+ds4: GLM MTP adaptive probe resumes after 128 plain tokens
+ds4: glm mtp confidence skip: margin 0.214933 < 1
+ds4: glm mtp confidence skip: margin 0.745874 < 1
+ds4: glm mtp cycle: verify2 37.6 ms, head+draft 4.1 ms, reject [save 0.0 forward 37.6 row0-head 1.8 post 2.4] margin 2.46099 (draft 13 '.' vs true 44921 ' CONF')
+ds4: glm mtp confidence skip: margin 0.50879 < 1
+ds4: glm mtp confidence skip: margin 0.172211 < 1
+ds4: glm mtp cycle: verify2 35.8 ms, head+draft 4.1 ms, reject [save 0.0 forward 35.8 row0-head 1.7 post 2.3] margin 1.16938 (draft 42043 ' RECE' vs true 40 'I')
+ds4: glm mtp cycle: verify2 35.9 ms, head+draft 4.1 ms, reject [save 0.0 forward 35.9 row0-head 1.7 post 2.4] margin 3.31215 (draft 13 '.' vs true 2828 'PT')
+ds4: glm mtp cycle: verify2 36.0 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.0 row0-head 1.8 post 2.8] margin 4.58887 (draft 13 '.' vs true 13 '.')
+ds4: glm mtp confidence skip: margin 0.962779 < 1
+ds4: glm mtp confidence skip: margin 0.883036 < 1
+ds4: glm mtp cycle: verify2 36.3 ms, head+draft 4.1 ms, reject [save 0.0 forward 36.3 row0-head 1.8 post 2.3] margin 1.13987 (draft 43782 ' stared' vs true 1349 ' read')
+ds4: glm mtp confidence skip: margin 0.0498447 < 1
+ds4: glm mtp cycle: verify2 36.1 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.1 row0-head 1.7 post 2.6] margin 3.74099 (draft 10912 ' twice' vs true 10912 ' twice')
+ds4: glm mtp confidence skip: margin 0.191259 < 1
+ds4: glm mtp confidence skip: margin 0.370449 < 1
+ds4: glm mtp confidence skip: margin 0.571539 < 1
+ds4: glm mtp cycle: verify2 36.0 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 36.0 row0-head 1.8 post 2.8] margin 3.38892 (draft 882 ' time' vs true 882 ' time')
+ds4: glm mtp cycle: verify2 36.3 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.3 row0-head 1.7 post 2.7] margin 2.00073 (draft 11254 ' standing' vs true 11254 ' standing')
+ds4: GLM MTP adaptive enabled (4/8, 50.0%)
+ds4: glm mtp cycle: verify2 35.9 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 35.9 row0-head 1.7 post 2.8] margin 1.12904 (draft 279 ' the' vs true 279 ' the')
+ds4: glm mtp cycle: verify2 36.1 ms, head+draft 4.1 ms, reject [save 0.0 forward 36.1 row0-head 1.7 post 2.3] margin 1.83153 (draft 27867 ' lamp' vs true 500 'pl')
+ds4: glm mtp cycle: verify2 36.0 ms, head+draft 4.0 ms, reject [save 0.0 forward 36.0 row0-head 1.7 post 2.3] margin 1.99073 (draft 315 ' of' vs true 491 'ight')
+ds4: glm mtp cycle: verify2 36.1 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.1 row0-head 1.7 post 2.7] margin 3.89182 (draft 315 ' of' vs true 315 ' of')
+ds4: glm mtp cycle: verify2 36.2 ms, head+draft 4.2 ms, reject [save 0.0 forward 36.2 row0-head 1.8 post 2.5] margin 3.62072 (draft 27867 ' lamp' vs true 3736 ' watch')
+ds4: glm mtp confidence skip: margin 0.422782 < 1
+ds4: glm mtp confidence skip: margin 0.121737 < 1
+0914 04:13:26 ds4-server: chat ctx=257..307:50 gen=250 decoding chunk=36.74 t/s avg=38.48 t/s 6.497s
+ds4: glm mtp confidence skip: margin 0.748547 < 1
+ds4: glm mtp confidence skip: margin 0.769422 < 1
+ds4: glm mtp confidence skip: margin 0.0481062 < 1
+ds4: glm mtp confidence skip: margin 0.220776 < 1
+ds4: glm mtp cycle: verify2 36.0 ms, head+draft 4.0 ms, reject [save 0.0 forward 36.0 row0-head 1.8 post 2.3] margin 1.35651 (draft 700 ' out' vs true 323 ' and')
+ds4: glm mtp confidence skip: margin 0.220913 < 1
+0914 04:13:26 ds4-server: chat ctx=307..313:6 gen=256 decoding chunk=33.14 t/s avg=38.34 t/s 6.678s
+0914 04:13:26 ds4-server: chat ctx=0..57:57 gen=256 finish=length 7.042s
+0914 04:13:26 ds4-server: live kv cache miss live=313 prompt=70 common=10 vision=match reason=token-mismatch
+0914 04:13:26 ds4-server: chat ctx=0..70:70 prompt start
+0914 04:13:26 ds4-server: chat ctx=0..70:70 prefill chunk 70/70 (100.0%) chunk=167.49 t/s avg=167.49 t/s 0.418s
+0914 04:13:26 ds4-server: chat ctx=0..70:70 prompt done 0.421s
+ds4: glm mtp confidence skip: margin 0.396729 < 1
+ds4: glm mtp cycle: verify2 34.8 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 34.8 row0-head 1.7 post 2.7] margin 3.95528 (draft 279 ' the' vs true 279 ' the')
+ds4: glm mtp confidence skip: margin 0.803261 < 1
+ds4: glm mtp confidence skip: margin 0.188757 < 1
+ds4: glm mtp confidence skip: margin 0.620029 < 1
+ds4: glm mtp cycle: verify2 35.2 ms, head+draft 4.0 ms, reject [save 0.0 forward 35.2 row0-head 1.8 post 2.3] margin 2.68181 (draft 25 ':' vs true 4362 ' needed')
+ds4: glm mtp cycle: verify2 35.2 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.2 row0-head 1.7 post 2.7] margin 1.29817 (draft 25 ':' vs true 25 ':')
+ds4: glm mtp cycle: verify2 34.7 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 34.7 row0-head 1.7 post 2.7] margin 4.33565 (draft 103005 '120' vs true 103005 '120')
+ds4: glm mtp confidence skip: margin 0.314865 < 1
+ds4: glm mtp cycle: verify2 35.1 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.1 row0-head 1.8 post 2.6] margin 2.25009 (draft 5569 'second' vs true 5569 'second')
+ds4: glm mtp cycle: verify2 34.6 ms, head+draft 4.0 ms, reject [save 0.0 forward 34.6 row0-head 1.7 post 2.3] margin 2.49868 (draft 334 '**' vs true 4854 'Each')
+ds4: glm mtp confidence skip: margin 0.69849 < 1
+ds4: glm mtp cycle: verify2 35.0 ms, head+draft 3.9 ms, reject [save 0.0 forward 35.0 row0-head 1.7 post 2.2] margin 5.27098 (draft 25 ':' vs true 13460 ' handles')
+ds4: glm mtp cycle: verify2 34.6 ms, head+draft 4.0 ms, reject [save 0.0 forward 34.6 row0-head 1.8 post 2.3] margin 5.60165 (draft 25 ':' vs true 220 ' ')
+ds4: glm mtp cycle: verify2 34.9 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 34.9 row0-head 1.7 post 2.6] margin 4.6219 (draft 98360 '20' vs true 98360 '20')
+ds4: glm mtp cycle: verify2 35.4 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 35.4 row0-head 1.7 post 2.8] margin 9.2867 (draft 14 '/' vs true 14 '/')
+ds4: glm mtp confidence skip: margin 0.242283 < 1
+ds4: glm mtp confidence skip: margin 0.545738 < 1
+ds4: glm mtp confidence skip: margin 0.221731 < 1
+ds4: glm mtp cycle: verify2 35.0 ms, head+draft 4.1 ms, reject [save 0.0 forward 35.0 row0-head 1.7 post 2.4] margin 1.27361 (draft 8653 ' capacity' vs true 11858 ' worker')
+ds4: glm mtp cycle: verify2 36.0 ms, head+draft 4.7 ms, ACCEPT [save 0.0 forward 36.0 row0-head 1.8 post 2.9] margin 1.05467 (draft 1760 ' count' vs true 1760 ' count')
+ds4: glm mtp cycle: verify2 36.0 ms, head+draft 4.1 ms, reject [save 0.0 forward 36.0 row0-head 1.7 post 2.4] margin 3.01743 (draft 334 '**' vs true 103005 '120')
+ds4: glm mtp cycle: verify2 35.3 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.3 row0-head 1.7 post 2.7] margin 1.97734 (draft 1683 ' Ã' vs true 1683 ' Ã')
+ds4: glm mtp cycle: verify2 35.3 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 35.3 row0-head 1.7 post 2.7] margin 8.14718 (draft 220 ' ' vs true 220 ' ')
+ds4: glm mtp cycle: verify2 35.3 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 35.3 row0-head 1.7 post 2.8] margin 3.92991 (draft 284 ' =' vs true 284 ' =')
+ds4: glm mtp cycle: verify2 35.4 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 35.4 row0-head 1.7 post 2.9] margin 4.98961 (draft 21 '6' vs true 21 '6')
+ds4: glm mtp cycle: verify2 36.7 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.7 row0-head 1.7 post 2.7] margin 2.44279 (draft 55798 '**
+
+' vs true 55798 '**
+
+')
+ds4: glm mtp cycle: verify2 35.2 ms, head+draft 4.1 ms, reject [save 0.0 forward 35.2 row0-head 1.7 post 2.3] margin 3.10209 (draft 1061 'Res' vs true 2164 'App')
+ds4: glm mtp cycle: verify2 34.9 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 34.9 row0-head 1.7 post 2.7] margin 10.2832 (draft 6711 'lying' vs true 6711 'lying')
+ds4: glm mtp confidence skip: margin 0.180157 < 1
+ds4: glm mtp cycle: verify2 35.2 ms, head+draft 4.1 ms, reject [save 0.0 forward 35.2 row0-head 1.8 post 2.3] margin 3.3175 (draft 8653 ' capacity' vs true 55798 '**
+
+')
+ds4: glm mtp confidence skip: margin 0.0536537 < 1
+ds4: glm mtp confidence skip: margin 0.757914 < 1
+ds4: glm mtp cycle: verify2 35.1 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.1 row0-head 1.7 post 2.7] margin 1.4398 (draft 1969 ' must' vs true 1969 ' must')
+ds4: glm mtp cycle: verify2 35.3 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 35.3 row0-head 1.7 post 2.6] margin 4.11172 (draft 220 ' ' vs true 220 ' ')
+0914 04:13:28 ds4-server: chat ctx=70..120:50 gen=50 decoding chunk=39.31 t/s avg=39.31 t/s 1.272s
+ds4: glm mtp cycle: verify2 34.9 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 34.9 row0-head 1.7 post 2.8] margin 5.7097 (draft 4 '%' vs true 4 '%')
+ds4: glm mtp cycle: verify2 34.9 ms, head+draft 4.0 ms, reject [save 0.0 forward 34.9 row0-head 1.6 post 2.4] margin 2.09488 (draft 2790 ' total' vs true 353 ' *')
+ds4: glm mtp cycle: verify2 35.2 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 35.2 row0-head 1.7 post 2.9] margin 3.40638 (draft 5035 'total' vs true 5035 'total')
+ds4: glm mtp cycle: verify2 35.0 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 35.0 row0-head 1.6 post 2.7] margin 7.77516 (draft 9 '*' vs true 9 '*')
+ds4: glm mtp cycle: verify2 34.8 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 34.8 row0-head 1.7 post 2.6] margin 2.52547 (draft 50327 ' spikes' vs true 50327 ' spikes')
+ds4: glm mtp confidence skip: margin 0.597359 < 1
+ds4: glm mtp confidence skip: margin 0.129309 < 1
+ds4: glm mtp cycle: verify2 35.0 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.0 row0-head 1.7 post 2.6] margin 5.98267 (draft 220 ' ' vs true 220 ' ')
+ds4: glm mtp cycle: verify2 34.9 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 34.9 row0-head 1.7 post 2.7] margin 8.53046 (draft 4 '%' vs true 4 '%')
+ds4: glm mtp cycle: verify2 35.2 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 35.2 row0-head 1.7 post 2.7] margin 3.6615 (draft 279 ' the' vs true 279 ' the')
+ds4: glm mtp confidence skip: margin 0.980003 < 1
+ds4: glm mtp cycle: verify2 35.1 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 35.1 row0-head 1.8 post 2.6] margin 5.87865 (draft 8653 ' capacity' vs true 8653 ' capacity')
+ds4: glm mtp cycle: verify2 35.2 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 35.2 row0-head 1.8 post 2.7] margin 4.40047 (draft 387 ' be' vs true 387 ' be')
+ds4: glm mtp confidence skip: margin 0.17042 < 1
+ds4: glm mtp confidence skip: margin 0.466341 < 1
+ds4: glm mtp cycle: verify2 35.0 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 35.0 row0-head 1.7 post 2.8] margin 1.66948 (draft 9438 ' traffic' vs true 9438 ' traffic')
+ds4: glm mtp confidence skip: margin 0.17206 < 1
+ds4: glm mtp confidence skip: margin 0.488064 < 1
+ds4: glm mtp confidence skip: margin 0.984303 < 1
+ds4: glm mtp confidence skip: margin 0.109951 < 1
+ds4: glm mtp cycle: verify2 35.3 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.3 row0-head 1.7 post 2.7] margin 1.48379 (draft 817 ' per' vs true 817 ' per')
+ds4: glm mtp cycle: verify2 35.0 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.0 row0-head 1.7 post 2.7] margin 1.07613 (draft 374 ' is' vs true 374 ' is')
+ds4: glm mtp cycle: verify2 35.6 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 35.6 row0-head 1.8 post 2.7] margin 4.07997 (draft 1447 ':
+
+' vs true 1447 ':
+
+')
+ds4: glm mtp cycle: verify2 35.1 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 35.1 row0-head 1.7 post 2.7] margin 6.33416 (draft 24692 ' Ã—' vs true 24692 ' Ã—')
+ds4: glm mtp cycle: verify2 35.5 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 35.5 row0-head 1.7 post 2.6] margin 7.81986 (draft 15 '0' vs true 15 '0')
+ds4: glm mtp cycle: verify2 36.7 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 36.7 row0-head 1.8 post 2.9] margin 10.1614 (draft 100899 '75' vs true 100899 '75')
+ds4: glm mtp cycle: verify2 37.2 ms, head+draft 4.7 ms, ACCEPT [save 0.0 forward 37.2 row0-head 1.8 post 2.9] margin 3.37034 (draft 220 ' ' vs true 220 ' ')
+ds4: glm mtp cycle: verify2 35.9 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.9 row0-head 1.7 post 2.7] margin 3.11642 (draft 7388 ' requests' vs true 7388 ' requests')
+ds4: glm mtp cycle: verify2 36.0 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.0 row0-head 1.8 post 2.7] margin 9.75975 (draft 5569 'second' vs true 5569 'second')
+ds4: glm mtp cycle: verify2 36.1 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.1 row0-head 1.7 post 2.8] margin 2.17699 (draft 11858 ' worker' vs true 11858 ' worker')
+0914 04:13:29 ds4-server: chat ctx=120..170:50 gen=100 decoding chunk=45.90 t/s avg=42.35 t/s 2.361s
+ds4: glm mtp confidence skip: margin 0.559402 < 1
+ds4: glm mtp confidence skip: margin 0.910282 < 1
+ds4: glm mtp confidence skip: margin 0.0505772 < 1
+ds4: glm mtp cycle: verify2 35.8 ms, head+draft 4.7 ms, ACCEPT [save 0.0 forward 35.8 row0-head 1.8 post 2.9] margin 4.3052 (draft 103005 '120' vs true 103005 '120')
+ds4: glm mtp cycle: verify2 36.5 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 36.5 row0-head 1.7 post 2.8] margin 10.5122 (draft 115 '·' vs true 115 '·')
+ds4: glm mtp cycle: verify2 37.7 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 37.7 row0-head 1.8 post 2.8] margin 6.4505 (draft 99082 '15' vs true 99082 '15')
+ds4: glm mtp confidence skip: margin 0.137247 < 1
+ds4: glm mtp cycle: verify2 37.1 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 37.1 row0-head 1.8 post 2.8] margin 6.44352 (draft 23 '8' vs true 23 '8')
+ds4: glm mtp cycle: verify2 37.4 ms, head+draft 4.7 ms, ACCEPT [save 0.0 forward 37.4 row0-head 1.8 post 2.9] margin 4.58217 (draft 55798 '**
+
+' vs true 55798 '**
+
+')
+ds4: glm mtp cycle: verify2 37.1 ms, head+draft 4.2 ms, reject [save 0.0 forward 37.1 row0-head 1.8 post 2.5] margin 1.6776 (draft 39908 'Checking' vs true 3973 'Check')
+ds4: glm mtp confidence skip: margin 0.653282 < 1
+ds4: glm mtp cycle: verify2 35.6 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.6 row0-head 1.7 post 2.8] margin 4.44137 (draft 1102 ' result' vs true 1102 ' result')
+ds4: glm mtp cycle: verify2 35.7 ms, head+draft 4.9 ms, ACCEPT [save 0.0 forward 35.7 row0-head 1.8 post 3.1] margin 2.21857 (draft 12 '-' vs true 12 '-')
+ds4: glm mtp cycle: verify2 36.2 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 36.2 row0-head 1.7 post 3.0] margin 12.5479 (draft 23 '8' vs true 23 '8')
+ds4: glm mtp cycle: verify2 37.6 ms, head+draft 4.8 ms, ACCEPT [save 0.0 forward 37.6 row0-head 1.8 post 3.0] margin 6.55044 (draft 24692 ' Ã—' vs true 24692 ' Ã—')
+ds4: glm mtp cycle: verify2 37.9 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 37.9 row0-head 1.8 post 2.7] margin 6.16019 (draft 98360 '20' vs true 98360 '20')
+ds4: glm mtp cycle: verify2 37.2 ms, head+draft 4.2 ms, reject [save 0.0 forward 37.2 row0-head 1.7 post 2.5] margin 2.86907 (draft 14 '/' vs true 2687 '/s')
+ds4: glm mtp cycle: verify2 36.8 ms, head+draft 4.7 ms, ACCEPT [save 0.0 forward 36.8 row0-head 1.8 post 2.9] margin 4.46771 (draft 284 ' =' vs true 284 ' =')
+ds4: glm mtp cycle: verify2 36.3 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 36.3 row0-head 1.7 post 2.9] margin 10.2448 (draft 107271 '160' vs true 107271 '160')
+ds4: glm mtp cycle: verify2 36.5 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.5 row0-head 1.7 post 2.8] margin 8.63341 (draft 2687 '/s' vs true 2687 '/s')
+ds4: glm mtp cycle: verify2 36.1 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.1 row0-head 1.8 post 2.7] margin 6.57906 (draft 8653 ' capacity' vs true 8653 ' capacity')
+ds4: glm mtp cycle: verify2 36.8 ms, head+draft 4.7 ms, ACCEPT [save 0.0 forward 36.8 row0-head 1.8 post 2.9] margin 8.77343 (draft 12 '-' vs true 12 '-')
+ds4: glm mtp confidence skip: margin 0.0306587 < 1
+ds4: glm mtp cycle: verify2 36.5 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.5 row0-head 1.8 post 2.7] margin 6.63153 (draft 220 ' ' vs true 220 ' ')
+ds4: glm mtp cycle: verify2 36.6 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.6 row0-head 1.8 post 2.7] margin 1.74673 (draft 4 '%' vs true 4 '%')
+ds4: glm mtp cycle: verify2 37.0 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 37.0 row0-head 1.7 post 2.8] margin 10.3275 (draft 220 ' ' vs true 220 ' ')
+ds4: glm mtp cycle: verify2 38.1 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 38.1 row0-head 1.7 post 2.8] margin 9.30046 (draft 284 ' =' vs true 284 ' =')
+ds4: glm mtp cycle: verify2 36.8 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.8 row0-head 1.7 post 2.8] margin 9.37228 (draft 99698 '40' vs true 99698 '40')
+ds4: glm mtp cycle: verify2 36.8 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.8 row0-head 1.8 post 2.7] margin 8.85625 (draft 2687 '/s' vs true 2687 '/s')
+0914 04:13:30 ds4-server: chat ctx=170..220:50 gen=150 decoding chunk=44.32 t/s avg=42.99 t/s 3.489s
+ds4: glm mtp confidence skip: margin 0.610823 < 1
+ds4: glm mtp cycle: verify2 36.9 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 36.9 row0-head 1.8 post 2.8] margin 2.05842 (draft 50327 ' spikes' vs true 50327 ' spikes')
+ds4: glm mtp cycle: verify2 36.7 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.7 row0-head 1.8 post 2.8] margin 1.59594 (draft 198 '
+' vs true 198 '
+')
+ds4: glm mtp confidence skip: margin 0.363245 < 1
+ds4: glm mtp confidence skip: margin 0.432444 < 1
+ds4: glm mtp cycle: verify2 36.2 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.2 row0-head 1.7 post 2.7] margin 4.58741 (draft 25 ':' vs true 25 ':')
+ds4: glm mtp cycle: verify2 36.6 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.6 row0-head 1.7 post 2.7] margin 2.32197 (draft 107271 '160' vs true 107271 '160')
+ds4: glm mtp cycle: verify2 36.4 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.4 row0-head 1.7 post 2.6] margin 5.94994 (draft 220 ' ' vs true 220 ' ')
+ds4: glm mtp cycle: verify2 36.8 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.8 row0-head 1.8 post 2.7] margin 6.19254 (draft 284 ' =' vs true 284 ' =')
+ds4: glm mtp cycle: verify2 36.4 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.4 row0-head 1.8 post 2.7] margin 9.56068 (draft 103005 '120' vs true 103005 '120')
+ds4: glm mtp cycle: verify2 36.7 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.7 row0-head 1.8 post 2.7] margin 8.3511 (draft 2687 '/s' vs true 2687 '/s')
+ds4: glm mtp confidence skip: margin 0.982758 < 1
+ds4: glm mtp cycle: verify2 36.4 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.3 row0-head 1.7 post 2.8] margin 3.05227 (draft 6896 ' exactly' vs true 6896 ' exactly')
+ds4: glm mtp cycle: verify2 37.1 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 37.1 row0-head 1.7 post 2.7] margin 6.35356 (draft 279 ' the' vs true 279 ' the')
+ds4: glm mtp confidence skip: margin 0.043869 < 1
+ds4: glm mtp cycle: verify2 36.5 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.5 row0-head 1.7 post 2.7] margin 3.62136 (draft 334 '**' vs true 334 '**')
+ds4: glm mtp cycle: verify2 36.6 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.6 row0-head 1.7 post 2.7] margin 2.73243 (draft 25 ':' vs true 25 ':')
+ds4: glm mtp cycle: verify2 36.8 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.8 row0-head 1.7 post 2.7] margin 8.35019 (draft 23 '8' vs true 23 '8')
+ds4: glm mtp confidence skip: margin 0.790369 < 1
+ds4: glm mtp confidence skip: margin 0.886442 < 1
+ds4: glm mtp cycle: verify2 36.4 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 36.4 row0-head 1.8 post 2.8] margin 1.30737 (draft 279 ' the' vs true 279 ' the')
+ds4: glm mtp cycle: verify2 36.4 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.4 row0-head 1.8 post 2.7] margin 1.06393 (draft 25 ':' vs true 25 ':')
+ds4: glm mtp cycle: verify2 36.6 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.6 row0-head 1.7 post 2.7] margin 3.38679 (draft 3132 'ively' vs true 3132 'ively')
+ds4: glm mtp cycle: verify2 36.4 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.4 row0-head 1.6 post 2.7] margin 4.15793 (draft 220 ' ' vs true 220 ' ')
+ds4: glm mtp cycle: verify2 36.7 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.7 row0-head 1.7 post 2.7] margin 1.01962 (draft 1683 ' Ã' vs true 1683 ' Ã')
+ds4: glm mtp cycle: verify2 36.5 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.5 row0-head 1.8 post 2.7] margin 6.29924 (draft 220 ' ' vs true 220 ' ')
+ds4: glm mtp confidence skip: margin 0.339008 < 1
+ds4: glm mtp cycle: verify2 37.9 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 37.9 row0-head 1.8 post 2.7] margin 11.7807 (draft 220 ' ' vs true 220 ' ')
+ds4: glm mtp confidence skip: margin 0.505365 < 1
+0914 04:13:31 ds4-server: chat ctx=220..270:50 gen=200 decoding chunk=46.13 t/s avg=43.73 t/s 4.573s
+ds4: glm mtp cycle: verify2 38.4 ms, head+draft 4.2 ms, reject [save 0.0 forward 38.4 row0-head 1.7 post 2.4] margin 1.42072 (draft 220 ' ' vs true 7842 ' adding')
+ds4: glm mtp cycle: verify2 37.5 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 37.5 row0-head 1.7 post 2.7] margin 3.36481 (draft 220 ' ' vs true 220 ' ')
+ds4: glm mtp cycle: verify2 37.2 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 37.2 row0-head 1.8 post 2.7] margin 4.80214 (draft 4 '%' vs true 4 '%')
+ds4: glm mtp confidence skip: margin 0.018137 < 1
+ds4: glm mtp cycle: verify2 37.1 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 37.1 row0-head 1.7 post 2.8] margin 4.46725 (draft 21 '6' vs true 21 '6')
+ds4: glm mtp cycle: verify2 37.4 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 37.4 row0-head 1.7 post 2.7] margin 5.28525 (draft 220 ' ' vs true 220 ' ')
+ds4: glm mtp cycle: verify2 36.8 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.8 row0-head 1.7 post 2.7] margin 6.79948 (draft 13 '.' vs true 13 '.')
+ds4: glm mtp cycle: verify2 37.0 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 37.0 row0-head 1.7 post 2.7] margin 2.13625 (draft 284 ' =' vs true 284 ' =')
+ds4: glm mtp cycle: verify2 36.7 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.7 row0-head 1.7 post 2.8] margin 8.37785 (draft 22 '7' vs true 22 '7')
+ds4: glm mtp cycle: verify2 37.0 ms, head+draft 4.7 ms, ACCEPT [save 0.0 forward 37.0 row0-head 1.7 post 3.0] margin 8.93003 (draft 20 '5' vs true 20 '5')
+ds4: glm mtp cycle: verify2 36.7 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.7 row0-head 1.7 post 2.7] margin 1.36225 (draft 220 ' ' vs true 220 ' ')
+ds4: glm mtp cycle: verify2 37.0 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 37.0 row0-head 1.8 post 2.7] margin 1.04677 (draft 13 '.' vs true 13 '.')
+ds4: glm mtp cycle: verify2 36.7 ms, head+draft 4.0 ms, reject [save 0.0 forward 36.7 row0-head 1.7 post 2.3] margin 2.53719 (draft 8 ')' vs true 7337 ' workers')
+ds4: glm mtp cycle: verify2 36.6 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.6 row0-head 1.8 post 2.8] margin 3.76522 (draft 8 ')' vs true 8 ')')
+ds4: glm mtp cycle: verify2 37.1 ms, head+draft 4.1 ms, reject [save 0.0 forward 37.1 row0-head 1.7 post 2.3] margin 1.32824 (draft 4969 ' wrong' vs true 279 ' the')
+ds4: glm mtp cycle: verify2 36.9 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 36.9 row0-head 1.8 post 2.8] margin 4.25725 (draft 4969 ' wrong' vs true 4969 ' wrong')
+ds4: glm mtp confidence skip: margin 0.115843 < 1
+ds4: glm mtp cycle: verify2 36.7 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.7 row0-head 1.7 post 2.8] margin 4.38968 (draft 1576 ' because' vs true 1576 ' because')
+ds4: glm mtp cycle: verify2 36.6 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.6 row0-head 1.7 post 2.8] margin 8.89515 (draft 19468 'erving' vs true 19468 'erving')
+ds4: glm mtp cycle: verify2 36.5 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.5 row0-head 1.7 post 2.7] margin 9.8842 (draft 99446 '25' vs true 99446 '25')
+ds4: glm mtp cycle: verify2 36.7 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.7 row0-head 1.7 post 2.7] margin 2.11148 (draft 315 ' of' vs true 315 ' of')
+ds4: glm mtp confidence skip: margin 0.987316 < 1
+ds4: glm mtp cycle: verify2 36.0 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.0 row0-head 1.6 post 2.7] margin 8.76226 (draft 9 '*' vs true 9 '*')
+ds4: glm mtp cycle: verify2 36.5 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 36.5 row0-head 1.7 post 2.8] margin 5.15243 (draft 537 ' not' vs true 537 ' not')
+ds4: glm mtp cycle: verify2 36.2 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.2 row0-head 1.8 post 2.8] margin 13.8379 (draft 1852 ' same' vs true 1852 ' same')
+ds4: glm mtp cycle: verify2 36.7 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.7 row0-head 1.8 post 2.7] margin 2.54184 (draft 7842 ' adding' vs true 7842 ' adding')
+ds4: glm mtp cycle: verify2 36.4 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.4 row0-head 1.7 post 2.7] margin 10.9186 (draft 99446 '25' vs true 99446 '25')
+ds4: glm mtp cycle: verify2 36.8 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.7 row0-head 1.8 post 2.6] margin 1.54501 (draft 803 ' more' vs true 803 ' more')
+0914 04:13:32 ds4-server: chat ctx=270..320:50 gen=250 decoding chunk=44.63 t/s avg=43.91 t/s 5.693s
+ds4: glm mtp cycle: verify2 36.7 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.7 row0-head 1.8 post 2.8] margin 2.65284 (draft 13 '.' vs true 13 '.')
+ds4: glm mtp cycle: verify2 36.9 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.9 row0-head 1.7 post 2.7] margin 3.85462 (draft 220 ' ' vs true 220 ' ')
+ds4: glm mtp confidence skip: margin 0.776208 < 1
+ds4: glm mtp cycle: verify2 36.6 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.6 row0-head 1.7 post 2.8] margin 3.97224 (draft 11 ',' vs true 11 ',')
+0914 04:13:32 ds4-server: chat ctx=320..326:6 gen=256 decoding chunk=39.36 t/s avg=43.79 t/s 5.846s
+0914 04:13:32 ds4-server: chat ctx=0..70:70 gen=256 finish=length 6.267s
+0914 04:13:32 ds4-server: live kv cache miss live=327 prompt=60 common=10 vision=match reason=token-mismatch
+0914 04:13:32 ds4-server: chat ctx=0..60:60 prompt start
+0914 04:13:33 ds4-server: chat ctx=0..60:60 prefill chunk 60/60 (100.0%) chunk=159.53 t/s avg=159.53 t/s 0.376s
+0914 04:13:33 ds4-server: chat ctx=0..60:60 prompt done 0.379s
+ds4: glm mtp cycle: verify2 37.0 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 37.0 row0-head 1.8 post 2.8] margin 2.04575 (draft 307 'id' vs true 307 'id')
+ds4: glm mtp cycle: verify2 36.9 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.9 row0-head 1.8 post 2.7] margin 5.56606 (draft 220 ' ' vs true 220 ' ')
+ds4: glm mtp confidence skip: margin 0.116316 < 1
+ds4: glm mtp cycle: verify2 36.3 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.3 row0-head 1.8 post 2.7] margin 9.28195 (draft 330 ' "' vs true 330 ' "')
+ds4: glm mtp cycle: verify2 36.5 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.5 row0-head 1.8 post 2.7] margin 6.18745 (draft 788 '":' vs true 788 '":')
+ds4: glm mtp cycle: verify2 36.5 ms, head+draft 4.3 ms, reject [save 0.0 forward 36.5 row0-head 1.7 post 2.5] margin 1.53891 (draft 30967 'inventory' vs true 22262 'Inventory')
+ds4: glm mtp confidence skip: margin 0.947924 < 1
+ds4: glm mtp cycle: verify2 36.0 ms, head+draft 4.1 ms, reject [save 0.0 forward 36.0 row0-head 1.7 post 2.4] margin 1.65574 (draft 497 '",' vs true 5588 ' GL')
+ds4: glm mtp confidence skip: margin 0.187513 < 1
+ds4: glm mtp cycle: verify2 35.5 ms, head+draft 4.0 ms, reject [save 0.0 forward 35.5 row0-head 1.7 post 2.3] margin 4.90471 (draft 12 '-' vs true 102721 '53')
+ds4: glm mtp cycle: verify2 35.5 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.5 row0-head 1.7 post 2.7] margin 1.28518 (draft 12 '-' vs true 12 '-')
+ds4: glm mtp cycle: verify2 35.1 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 35.1 row0-head 1.8 post 2.8] margin 5.22724 (draft 19 '4' vs true 19 '4')
+ds4: glm mtp cycle: verify2 35.6 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 35.6 row0-head 1.8 post 2.8] margin 7.64137 (draft 497 '",' vs true 497 '",')
+ds4: glm mtp cycle: verify2 35.7 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 35.7 row0-head 1.8 post 2.7] margin 5.62318 (draft 13514 'quantity' vs true 13514 'quantity')
+ds4: glm mtp cycle: verify2 35.5 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.5 row0-head 1.7 post 2.8] margin 8.32552 (draft 220 ' ' vs true 220 ' ')
+ds4: glm mtp cycle: verify2 35.5 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 35.5 row0-head 1.8 post 2.8] margin 3.01181 (draft 11 ',' vs true 11 ',')
+ds4: glm mtp cycle: verify2 36.1 ms, head+draft 4.7 ms, ACCEPT [save 0.0 forward 36.1 row0-head 1.8 post 2.9] margin 10.108 (draft 6555 'price' vs true 6555 'price')
+ds4: glm mtp cycle: verify2 36.1 ms, head+draft 4.7 ms, ACCEPT [save 0.0 forward 36.1 row0-head 1.8 post 2.9] margin 6.77718 (draft 220 ' ' vs true 220 ' ')
+ds4: glm mtp cycle: verify2 37.2 ms, head+draft 4.8 ms, ACCEPT [save 0.0 forward 37.2 row0-head 1.8 post 2.9] margin 3.24707 (draft 13 '.' vs true 13 '.')
+ds4: glm mtp cycle: verify2 36.1 ms, head+draft 4.7 ms, ACCEPT [save 0.0 forward 36.1 row0-head 1.7 post 3.0] margin 2.43097 (draft 2137 '},' vs true 2137 '},')
+ds4: glm mtp cycle: verify2 36.0 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.0 row0-head 1.7 post 2.8] margin 12.5438 (draft 307 'id' vs true 307 'id')
+ds4: glm mtp cycle: verify2 35.6 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 35.6 row0-head 1.7 post 2.9] margin 8.5024 (draft 220 ' ' vs true 220 ' ')
+ds4: glm mtp cycle: verify2 36.3 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.3 row0-head 1.8 post 2.7] margin 3.77691 (draft 11 ',' vs true 11 ',')
+ds4: glm mtp cycle: verify2 36.8 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.8 row0-head 1.7 post 2.6] margin 11.865 (draft 606 'name' vs true 606 'name')
+ds4: glm mtp cycle: verify2 35.8 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.8 row0-head 1.7 post 2.7] margin 10.9353 (draft 330 ' "' vs true 330 ' "')
+ds4: glm mtp cycle: verify2 35.3 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.3 row0-head 1.7 post 2.7] margin 5.50036 (draft 5739 ' Item' vs true 5739 ' Item')
+ds4: glm mtp cycle: verify2 36.1 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 36.1 row0-head 1.7 post 2.6] margin 12.6716 (draft 44 'M' vs true 44 'M')
+ds4: glm mtp cycle: verify2 35.5 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.5 row0-head 1.7 post 2.7] margin 16.0455 (draft 12 '-' vs true 12 '-')
+0914 04:13:34 ds4-server: chat ctx=60..110:50 gen=50 decoding chunk=44.30 t/s avg=44.30 t/s 1.129s
+ds4: glm mtp cycle: verify2 35.5 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 35.5 row0-head 1.8 post 2.7] margin 10.2851 (draft 19 '4' vs true 19 '4')
+ds4: glm mtp cycle: verify2 35.4 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.4 row0-head 1.7 post 2.7] margin 8.74641 (draft 497 '",' vs true 497 '",')
+ds4: glm mtp cycle: verify2 36.0 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 36.0 row0-head 1.7 post 2.6] margin 5.3449 (draft 13514 'quantity' vs true 13514 'quantity')
+ds4: glm mtp cycle: verify2 35.5 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 35.5 row0-head 1.7 post 2.6] margin 8.74941 (draft 220 ' ' vs true 220 ' ')
+ds4: glm mtp cycle: verify2 36.3 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.3 row0-head 1.8 post 2.7] margin 4.86966 (draft 11 ',' vs true 11 ',')
+ds4: glm mtp cycle: verify2 35.8 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.8 row0-head 1.7 post 2.7] margin 9.63397 (draft 6555 'price' vs true 6555 'price')
+ds4: glm mtp cycle: verify2 36.0 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.0 row0-head 1.7 post 2.7] margin 6.64575 (draft 220 ' ' vs true 220 ' ')
+ds4: glm mtp cycle: verify2 35.7 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.7 row0-head 1.7 post 2.7] margin 5.74481 (draft 13 '.' vs true 13 '.')
+ds4: glm mtp cycle: verify2 36.6 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.6 row0-head 1.8 post 2.7] margin 4.60256 (draft 2137 '},' vs true 2137 '},')
+ds4: glm mtp cycle: verify2 36.1 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.1 row0-head 1.8 post 2.7] margin 12.5132 (draft 307 'id' vs true 307 'id')
+ds4: glm mtp cycle: verify2 36.4 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.4 row0-head 1.8 post 2.7] margin 6.32147 (draft 220 ' ' vs true 220 ' ')
+ds4: glm mtp cycle: verify2 36.1 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.1 row0-head 1.8 post 2.7] margin 5.19916 (draft 11 ',' vs true 11 ',')
+ds4: glm mtp cycle: verify2 36.6 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.6 row0-head 1.7 post 2.7] margin 10.1152 (draft 606 'name' vs true 606 'name')
+ds4: glm mtp cycle: verify2 36.1 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.1 row0-head 1.7 post 2.7] margin 12.4997 (draft 330 ' "' vs true 330 ' "')
+ds4: glm mtp cycle: verify2 36.4 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.4 row0-head 1.7 post 2.8] margin 4.77389 (draft 5739 ' Item' vs true 5739 ' Item')
+ds4: glm mtp cycle: verify2 36.0 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.0 row0-head 1.7 post 2.7] margin 10.5366 (draft 44 'M' vs true 44 'M')
+ds4: glm mtp cycle: verify2 36.6 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.6 row0-head 1.8 post 2.6] margin 14.0584 (draft 12 '-' vs true 12 '-')
+ds4: glm mtp cycle: verify2 36.4 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.4 row0-head 1.7 post 2.8] margin 8.6966 (draft 19 '4' vs true 19 '4')
+ds4: glm mtp cycle: verify2 36.7 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 36.7 row0-head 1.7 post 2.8] margin 7.90208 (draft 497 '",' vs true 497 '",')
+ds4: glm mtp cycle: verify2 36.3 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 36.3 row0-head 1.8 post 2.8] margin 5.22454 (draft 13514 'quantity' vs true 13514 'quantity')
+ds4: glm mtp cycle: verify2 36.4 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 36.4 row0-head 1.7 post 2.8] margin 8.57017 (draft 220 ' ' vs true 220 ' ')
+ds4: glm mtp cycle: verify2 36.3 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.3 row0-head 1.7 post 2.7] margin 6.25003 (draft 11 ',' vs true 11 ',')
+ds4: glm mtp cycle: verify2 36.7 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.7 row0-head 1.7 post 2.7] margin 7.47374 (draft 6555 'price' vs true 6555 'price')
+ds4: glm mtp cycle: verify2 35.7 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 35.7 row0-head 1.7 post 2.7] margin 5.89012 (draft 220 ' ' vs true 220 ' ')
+ds4: glm mtp cycle: verify2 36.2 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.2 row0-head 1.7 post 2.8] margin 2.97602 (draft 13 '.' vs true 13 '.')
+0914 04:13:35 ds4-server: chat ctx=110..160:50 gen=100 decoding chunk=49.20 t/s avg=46.63 t/s 2.145s
+ds4: glm mtp cycle: verify2 35.9 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 35.9 row0-head 1.7 post 2.7] margin 1.42982 (draft 25361 '}]' vs true 25361 '}]')
+0914 04:13:35 ds4-server: chat ctx=160..163:3 gen=103 decoding chunk=74.35 t/s avg=47.14 t/s 2.185s
+0914 04:13:35 ds4-server: chat ctx=0..60:60 gen=103 finish=stop 2.564s
+0914 04:13:35 ds4-server: live kv cache miss live=163 prompt=404 common=10 vision=match reason=token-mismatch
+0914 04:13:35 ds4-server: chat ctx=0..404:404 prompt start
+0914 04:13:35 ds4-server: chat ctx=0..404:404 prefill chunk 256/404 (63.4%) chunk=379.31 t/s avg=379.31 t/s 0.675s
+0914 04:13:36 ds4-server: chat ctx=0..404:404 prefill chunk 404/404 (100.0%) chunk=234.47 t/s avg=309.31 t/s 1.306s
+0914 04:13:36 ds4-server: chat ctx=0..404:404 prompt done 1.309s
+ds4: glm mtp cycle: verify2 40.1 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 40.0 row0-head 1.8 post 2.7] margin 6.47484 (draft 198 '
+' vs true 198 '
+')
+ds4: glm mtp confidence skip: margin 0.712486 < 1
+ds4: glm mtp cycle: verify2 38.7 ms, head+draft 4.2 ms, reject [save 0.0 forward 38.7 row0-head 1.8 post 2.4] margin 3.90162 (draft 66 'c' vs true 91379 '_CAPACITY')
+ds4: glm mtp cycle: verify2 38.4 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 38.4 row0-head 1.8 post 2.7] margin 1.31432 (draft 220 ' ' vs true 220 ' ')
+ds4: glm mtp cycle: verify2 38.6 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 38.6 row0-head 1.8 post 2.7] margin 3.23472 (draft 198 '
+' vs true 198 '
+')
+ds4: glm mtp cycle: verify2 37.8 ms, head+draft 4.2 ms, reject [save 0.0 forward 37.8 row0-head 1.7 post 2.4] margin 1.13275 (draft 51793 ' BUFFER' vs true 2036 ' struct')
+ds4: glm mtp cycle: verify2 38.0 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 38.0 row0-head 1.7 post 2.7] margin 1.29259 (draft 21474 ' Ring' vs true 21474 ' Ring')
+ds4: glm mtp cycle: verify2 37.6 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 37.6 row0-head 1.7 post 2.6] margin 4.16785 (draft 314 ' {' vs true 314 ' {')
+ds4: glm mtp confidence skip: margin 0.135807 < 1
+ds4: glm mtp cycle: verify2 37.1 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 37.1 row0-head 1.8 post 2.7] margin 5.66407 (draft 26 ';' vs true 26 ';')
+ds4: glm mtp cycle: verify2 36.9 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.9 row0-head 1.7 post 2.7] margin 9.59317 (draft 9782 ' tail' vs true 9782 ' tail')
+ds4: glm mtp cycle: verify2 36.9 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.9 row0-head 1.7 post 2.7] margin 8.26935 (draft 526 ' int' vs true 526 ' int')
+ds4: glm mtp confidence skip: margin 0.694606 < 1
+ds4: glm mtp confidence skip: margin 0.0774918 < 1
+ds4: glm mtp cycle: verify2 37.2 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 37.2 row0-head 1.7 post 2.7] margin 7.72403 (draft 91379 '_CAPACITY' vs true 91379 '_CAPACITY')
+ds4: glm mtp cycle: verify2 36.5 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.5 row0-head 1.7 post 2.6] margin 5.62559 (draft 335 ' }' vs true 335 ' }')
+ds4: glm mtp cycle: verify2 36.7 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.7 row0-head 1.7 post 2.6] margin 6.05486 (draft 4095 'Buffer' vs true 4095 'Buffer')
+ds4: glm mtp cycle: verify2 36.6 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.6 row0-head 1.7 post 2.7] margin 3.67045 (draft 1978 'static' vs true 1978 'static')
+ds4: GLM prompt-lookup drafted=3 matched=0 returned=1 replacement=-1 verify=87.528 ms
+ds4: glm mtp cycle: verify2 37.0 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 37.0 row0-head 1.7 post 2.7] margin 1.34857 (draft 2785 '(R' vs true 2785 '(R')
+ds4: glm mtp cycle: verify2 37.0 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 37.0 row0-head 1.7 post 2.7] margin 7.6027 (draft 4095 'Buffer' vs true 4095 'Buffer')
+ds4: glm mtp confidence skip: margin 0.927296 < 1
+ds4: glm mtp cycle: verify2 37.0 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 37.0 row0-head 1.7 post 2.7] margin 3.88802 (draft 11 ',' vs true 11 ',')
+ds4: glm mtp cycle: verify2 36.8 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.8 row0-head 1.7 post 2.7] margin 4.63045 (draft 897 ' value' vs true 897 ' value')
+ds4: glm mtp cycle: verify2 36.9 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.9 row0-head 1.7 post 2.8] margin 7.65729 (draft 341 ' {
+' vs true 341 ' {
+')
+ds4: glm mtp cycle: verify2 36.5 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.5 row0-head 1.7 post 2.8] margin 5.75251 (draft 3774 ' unsigned' vs true 3774 ' unsigned')
+ds4: glm mtp cycle: verify2 37.1 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 37.1 row0-head 1.7 post 2.7] margin 2.95033 (draft 284 ' =' vs true 284 ' =')
+ds4: glm mtp cycle: verify2 36.8 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.8 row0-head 1.7 post 2.7] margin 2.40345 (draft 7573 'buffer' vs true 7573 'buffer')
+0914 04:13:37 ds4-server: chat ctx=404..454:50 gen=50 decoding chunk=41.25 t/s avg=41.25 t/s 1.212s
+ds4: glm mtp confidence skip: margin 0.497494 < 1
+ds4: glm mtp cycle: verify2 37.5 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 37.5 row0-head 1.7 post 2.7] margin 5.86957 (draft 488 ' +' vs true 488 ' +')
+ds4: glm mtp cycle: verify2 36.9 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.9 row0-head 1.8 post 2.6] margin 1.16484 (draft 16 '1' vs true 16 '1')
+ds4: glm mtp cycle: verify2 37.3 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 37.3 row0-head 1.7 post 2.6] margin 4.95769 (draft 8 ')' vs true 8 ')')
+ds4: glm mtp cycle: verify2 36.7 ms, head+draft 4.3 ms, reject [save 0.0 forward 36.7 row0-head 1.7 post 2.5] margin 2.12514 (draft 220 ' ' vs true 51793 ' BUFFER')
+ds4: glm mtp cycle: verify2 37.0 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 37.0 row0-head 1.8 post 2.7] margin 9.4117 (draft 91379 '_CAPACITY' vs true 91379 '_CAPACITY')
+ds4: glm mtp cycle: verify2 37.3 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 37.3 row0-head 1.7 post 2.7] margin 5.09397 (draft 262 '   ' vs true 262 '   ')
+ds4: glm mtp cycle: verify2 37.0 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 37.0 row0-head 1.7 post 2.7] margin 5.90021 (draft 320 ' (' vs true 320 ' (')
+ds4: glm mtp cycle: verify2 37.0 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 37.0 row0-head 1.7 post 2.6] margin 5.75377 (draft 621 ' ==' vs true 621 ' ==')
+ds4: glm mtp cycle: verify2 37.1 ms, head+draft 4.1 ms, reject [save 0.0 forward 37.1 row0-head 1.7 post 2.4] margin 5.6373 (draft 8 ')' vs true 405 '->')
+ds4: glm mtp confidence skip: margin 0.145802 < 1
+ds4: glm mtp cycle: verify2 37.0 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 37.0 row0-head 1.7 post 2.7] margin 7.79453 (draft 8 ')' vs true 8 ')')
+ds4: glm mtp cycle: verify2 37.4 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 37.4 row0-head 1.7 post 2.8] margin 6.21926 (draft 220 ' ' vs true 220 ' ')
+ds4: glm mtp cycle: verify2 36.7 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 36.7 row0-head 1.8 post 2.7] margin 7.2317 (draft 280 ';
+' vs true 280 ';
+')
+ds4: glm mtp cycle: verify2 37.1 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 37.1 row0-head 1.7 post 2.7] margin 4.45068 (draft 4147 ' buffer' vs true 4147 ' buffer')
+ds4: glm mtp cycle: verify2 36.9 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 36.9 row0-head 1.8 post 2.7] margin 2.99613 (draft 3661 'values' vs true 3661 'values')
+ds4: glm mtp cycle: verify2 37.0 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 37.0 row0-head 1.8 post 2.7] margin 4.65141 (draft 7573 'buffer' vs true 7573 'buffer')
+ds4: glm mtp cycle: verify2 37.1 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 37.1 row0-head 1.7 post 2.6] margin 3.29237 (draft 1983 'head' vs true 1983 'head')
+ds4: glm mtp cycle: verify2 37.6 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 37.6 row0-head 1.7 post 2.7] margin 8.64514 (draft 284 ' =' vs true 284 ' =')
+ds4: glm mtp cycle: verify2 37.3 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 37.3 row0-head 1.7 post 2.7] margin 6.43446 (draft 280 ';
+' vs true 280 ';
+')
+ds4: glm mtp cycle: verify2 37.4 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 37.4 row0-head 1.7 post 2.7] margin 5.67925 (draft 4147 ' buffer' vs true 4147 ' buffer')
+ds4: glm mtp cycle: verify2 37.5 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 37.5 row0-head 1.7 post 2.7] margin 4.27603 (draft 1983 'head' vs true 1983 'head')
+ds4: glm mtp cycle: verify2 37.8 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 37.8 row0-head 1.7 post 2.7] margin 5.58428 (draft 1790 ' next' vs true 1790 ' next')
+ds4: glm mtp cycle: verify2 37.4 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 37.4 row0-head 1.7 post 2.7] margin 5.54562 (draft 262 '   ' vs true 262 '   ')
+ds4: glm mtp cycle: verify2 37.8 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 37.8 row0-head 1.7 post 2.7] margin 5.12733 (draft 220 ' ' vs true 220 ' ')
+ds4: glm mtp cycle: verify2 37.3 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 37.3 row0-head 1.7 post 2.7] margin 7.34224 (draft 280 ';
+' vs true 280 ';
+')
+ds4: glm mtp cycle: verify2 37.8 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 37.8 row0-head 1.7 post 2.8] margin 2.62604 (draft 1978 'static' vs true 1978 'static')
+0914 04:13:38 ds4-server: chat ctx=454..504:50 gen=100 decoding chunk=45.46 t/s avg=43.26 t/s 2.312s
+ds4: glm mtp cycle: verify2 37.5 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 37.5 row0-head 1.7 post 2.7] margin 3.5376 (draft 83181 ' dequeue' vs true 83181 ' dequeue')
+ds4: glm mtp cycle: verify2 37.9 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 37.9 row0-head 1.7 post 2.7] margin 8.5072 (draft 287 'ing' vs true 287 'ing')
+ds4: glm mtp cycle: verify2 37.4 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 37.4 row0-head 1.7 post 2.7] margin 7.78673 (draft 353 ' *' vs true 353 ' *')
+ds4: glm mtp cycle: verify2 38.0 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 38.0 row0-head 1.7 post 2.7] margin 7.96652 (draft 11 ',' vs true 11 ',')
+ds4: glm mtp cycle: verify2 37.9 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 37.9 row0-head 1.8 post 2.8] margin 1.72611 (draft 353 ' *' vs true 353 ' *')
+ds4: glm mtp cycle: verify2 37.9 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 37.9 row0-head 1.8 post 2.7] margin 11.7257 (draft 8 ')' vs true 8 ')')
+ds4: glm mtp cycle: verify2 38.1 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 38.1 row0-head 1.8 post 2.7] margin 4.53139 (draft 262 '   ' vs true 262 '   ')
+ds4: glm mtp cycle: verify2 38.4 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 38.4 row0-head 1.8 post 2.7] margin 6.65583 (draft 320 ' (' vs true 320 ' (')
+ds4: glm mtp confidence skip: margin 0.633274 < 1
+ds4: glm mtp cycle: verify2 37.9 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 37.9 row0-head 1.8 post 2.7] margin 6.98704 (draft 14576 'tail' vs true 14576 'tail')
+ds4: glm mtp cycle: verify2 37.9 ms, head+draft 4.6 ms, ACCEPT [save 0.0 forward 37.9 row0-head 1.8 post 2.8] margin 3.56784 (draft 4147 ' buffer' vs true 4147 ' buffer')
+ds4: glm mtp cycle: verify2 38.0 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 38.0 row0-head 1.8 post 2.7] margin 4.17786 (draft 1983 'head' vs true 1983 'head')
+ds4: glm mtp cycle: verify2 38.2 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 38.2 row0-head 1.7 post 2.7] margin 7.74518 (draft 470 ' return' vs true 470 ' return')
+ds4: glm mtp cycle: verify2 37.9 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 37.9 row0-head 1.8 post 2.6] margin 5.90186 (draft 15 '0' vs true 15 '0')
+ds4: glm mtp cycle: verify2 38.4 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 38.4 row0-head 1.7 post 2.6] margin 6.03407 (draft 262 '   ' vs true 262 '   ')
+ds4: glm mtp cycle: verify2 38.1 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 38.1 row0-head 1.7 post 2.6] margin 4.29643 (draft 957 'value' vs true 957 'value')
+ds4: glm mtp cycle: verify2 38.3 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 38.3 row0-head 1.7 post 2.7] margin 4.33008 (draft 4147 ' buffer' vs true 4147 ' buffer')
+ds4: glm mtp cycle: verify2 38.0 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 38.0 row0-head 1.7 post 2.7] margin 5.94335 (draft 3661 'values' vs true 3661 'values')
+ds4: glm mtp cycle: verify2 38.2 ms, head+draft 4.3 ms, ACCEPT [save 0.0 forward 38.2 row0-head 1.7 post 2.6] margin 6.98835 (draft 7573 'buffer' vs true 7573 'buffer')
+ds4: glm mtp cycle: verify2 38.2 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 38.2 row0-head 1.8 post 2.8] margin 5.57106 (draft 14576 'tail' vs true 14576 'tail')
+ds4: glm mtp cycle: verify2 38.6 ms, head+draft 4.7 ms, ACCEPT [save 0.0 forward 38.6 row0-head 1.8 post 2.9] margin 7.57095 (draft 262 '   ' vs true 262 '   ')
+ds4: glm mtp cycle: verify2 38.2 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 38.2 row0-head 1.7 post 2.8] margin 2.08283 (draft 405 '->' vs true 405 '->')
+ds4: glm mtp cycle: verify2 38.7 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 38.7 row0-head 1.8 post 2.7] margin 4.72359 (draft 284 ' =' vs true 284 ' =')
+ds4: glm mtp cycle: verify2 38.4 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 38.4 row0-head 1.7 post 2.8] margin 5.72224 (draft 7573 'buffer' vs true 7573 'buffer')
+ds4: glm mtp cycle: verify2 38.7 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 38.7 row0-head 1.7 post 2.7] margin 4.63422 (draft 14576 'tail' vs true 14576 'tail')
+ds4: glm mtp cycle: verify2 38.1 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 38.1 row0-head 1.8 post 2.8] margin 7.42048 (draft 220 ' ' vs true 220 ' ')
+0914 04:13:39 ds4-server: chat ctx=504..554:50 gen=150 decoding chunk=45.68 t/s avg=44.03 t/s 3.406s
+ds4: glm mtp cycle: verify2 39.1 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 39.1 row0-head 1.8 post 2.7] margin 6.26203 (draft 84 'u' vs true 84 'u')
+ds4: GLM prompt-lookup drafted=3 matched=3 returned=4 replacement=-1 verify=63.815 ms
+ds4: GLM prompt-lookup drafted=3 matched=3 returned=4 replacement=-1 verify=65.096 ms
+ds4: glm mtp cycle: verify2 38.4 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 38.4 row0-head 1.8 post 2.7] margin 2.21524 (draft 532 '}
+' vs true 532 '}
+')
+ds4: glm mtp cycle: verify2 38.7 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 38.7 row0-head 1.7 post 2.8] margin 2.21212 (draft 19288 '`
+
+' vs true 19288 '`
+
+')
+ds4: glm mtp confidence skip: margin 0.386699 < 1
+ds4: glm mtp confidence skip: margin 0.173908 < 1
+ds4: glm mtp cycle: verify2 37.8 ms, head+draft 4.0 ms, reject [save 0.0 forward 37.8 row0-head 1.7 post 2.3] margin 1.61551 (draft 279 ' the' vs true 1172 ' only')
+ds4: glm mtp cycle: verify2 38.0 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 38.0 row0-head 1.8 post 2.8] margin 1.48274 (draft 279 ' the' vs true 279 ' the')
+ds4: glm mtp confidence skip: margin 0.279287 < 1
+ds4: glm mtp confidence skip: margin 0.363863 < 1
+ds4: glm mtp cycle: verify2 37.8 ms, head+draft 4.4 ms, ACCEPT [save 0.0 forward 37.8 row0-head 1.7 post 2.8] margin 2.74018 (draft 902 ' no' vs true 902 ' no')
+ds4: glm mtp cycle: verify2 38.1 ms, head+draft 4.1 ms, reject [save 0.0 forward 38.1 row0-head 1.8 post 2.3] margin 1.23098 (draft 13 '.' vs true 476 ' or')
+ds4: glm mtp confidence skip: margin 0.873153 < 1
+ds4: glm mtp cycle: verify2 37.5 ms, head+draft 4.5 ms, ACCEPT [save 0.0 forward 37.5 row0-head 1.7 post 2.9] margin 3.30162 (draft 13 '.' vs true 13 '.')
+0914 04:13:40 ds4-server: chat ctx=554..583:29 gen=179 decoding chunk=44.76 t/s avg=44.15 t/s 4.054s
+0914 04:13:40 ds4-server: chat ctx=0..404:404 gen=179 finish=stop 5.363s
+0914 04:13:40 ds4-server: shutdown requested, draining requests
+ds4: prompt-lookup summary: attempts=4 no_match=0 first_miss=1 verify_passes=3 drafted=9 committed=6 accept=66.7% tokens/pass=2.00 scan=0.00 ms total gate_skips=64 gate_partials=1 gate_ambiguous=0 parity_replays=0

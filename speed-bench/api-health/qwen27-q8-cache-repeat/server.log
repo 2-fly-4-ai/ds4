@@ -1,0 +1,37 @@
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 0.799 ms, residency requested in 3242.804 ms, warmup 7.398 ms (mapped 27690.98 MiB from offset 10.49 MiB)
+ds4: Metal mapped mmaped model as 1 overlapping shared buffers
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 0.25 GiB (raw 0.25 + compressed 0.00) + buffers 0.00 GiB + resident model 27.04 GiB = 27.29 GiB planned
+ds4: memory detail: ctx=4096 prefill_cap=4096 raw_kv_rows=4096 compressed_kv_rows=3 backend=metal
+0914 04:17:56 ds4-server: context buffers 256.10 MiB (ctx=4096, backend=metal, prefill_chunk=4096, raw_kv_rows=4096, compressed_kv_rows=3)
+0914 04:17:56 ds4-server: tracing session to /Users/brianfarley/Desktop/ds4-model-api-health/speed-bench/api-health/qwen27-q8-cache-repeat/trace.log
+0914 04:17:56 ds4-server: listening on http://127.0.0.1:54399
+0914 04:17:57 ds4-server: chat ctx=0..73:73 prompt start
+ds4: n-row n=73 encode=3.2 wait=574.9 ms ok=1 fail=- il=0
+0914 04:17:57 ds4-server: chat ctx=0..73:73 prefill chunk 73/73 (100.0%) chunk=119.22 t/s avg=119.22 t/s 0.612s
+0914 04:17:57 ds4-server: hot prompt rewind snapshot unavailable at 73 tokens
+0914 04:17:57 ds4-server: chat ctx=0..73:73 prompt done 0.612s
+ds4: using MTP head sidecar /Users/brianfarley/Desktop/ds4/gguf/qwen-small-quality/mtp-Qwen3.8-27B-Q4_64A.gguf
+ds4: n-row n=5 encode=1.2 wait=73.5 ms ok=1 fail=- il=0
+ds4: n-row n=5 encode=0.7 wait=73.7 ms ok=1 fail=- il=0
+ds4: n-row n=5 encode=0.7 wait=73.0 ms ok=1 fail=- il=0
+ds4: n-row n=5 encode=0.7 wait=72.2 ms ok=1 fail=- il=0
+ds4: n-row n=5 encode=1.2 wait=72.5 ms ok=1 fail=- il=0
+0914 04:17:59 ds4-server: chat ctx=73..123:50 gen=50 decoding chunk=32.89 t/s avg=32.89 t/s 1.520s
+0914 04:17:59 ds4-server: chat ctx=123..138:15 gen=65 decoding chunk=34.51 t/s avg=33.25 t/s 1.955s
+0914 04:17:59 ds4-server: chat ctx=0..73:73 gen=65 finish=stop 2.568s
+0914 04:17:59 ds4-server: live prefix rewind from 139 to 72 requires rebuild
+0914 04:17:59 ds4-server: live kv cache miss live=139 prompt=73 common=73 vision=match reason=token-mismatch
+0914 04:17:59 ds4-server: chat ctx=0..73:73 prompt start
+0914 04:18:00 ds4-server: chat ctx=0..73:73 prefill chunk 73/73 (100.0%) chunk=171.12 t/s avg=171.12 t/s 0.427s
+0914 04:18:00 ds4-server: hot prompt rewind snapshot unavailable at 73 tokens
+0914 04:18:00 ds4-server: chat ctx=0..73:73 prompt done 0.427s
+0914 04:18:01 ds4-server: chat ctx=73..123:50 gen=50 decoding chunk=35.73 t/s avg=35.73 t/s 1.400s
+0914 04:18:01 ds4-server: chat ctx=123..138:15 gen=65 decoding chunk=35.37 t/s avg=35.64 t/s 1.824s
+0914 04:18:01 ds4-server: chat ctx=0..73:73 gen=65 finish=stop 2.250s
+0914 04:18:01 ds4-server: shutdown requested, draining requests
+ds4: Qwen NextN session drafted=166 accepted=90 (54.2%)
+ds4: Metal cleanup discarded 71 live tensor handles

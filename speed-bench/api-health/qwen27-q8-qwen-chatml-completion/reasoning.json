@@ -1,0 +1,17 @@
+{
+  "wall_s": 7.719533874999998,
+  "ttft_s": 0.7647573749999985,
+  "text": "Let me work through this step by step.\n\n**1. Determine the effective capacity per worker after reserving 25% for spikes**\n\nThe problem says to reserve 25% of *total capacity* for spikes. This means only 75% of the total worker capacity should be used for the steady-state 120 req/s.\n\nSo the usable capacity per worker is:\n- 20 req/s \u00d7 0.75 = 15 req/s per worker (effective)\n\n**2. Calculate the number of workers needed**\n\nWorkers needed = 120 req/s \u00f7 15 req/s per worker = **8 workers**\n\n**3. Check the result**\n\n- 8 workers \u00d7 20 req/s = 160 req/s total raw capacity\n- 25% reserved for spikes: 160 \u00d7 0.25 = 40 req/s held in reserve\n- Usable capacity: 160 \u2212 40 = 120 req/s \u2713\n- This exactly matches the steady-state demand of 120 req/s.\n\n**Answer: 8 workers are needed.**\n\nThe arithmetic checks out: 8",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 147,
+    "completion_tokens": 256,
+    "total_tokens": 403,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 147
+    }
+  },
+  "finish": "length",
+  "done": true
+}

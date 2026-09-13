@@ -1,0 +1,17 @@
+{
+  "wall_s": 11.575009165999997,
+  "ttft_s": 0.788195040999998,
+  "text": "The fog was so thick it felt like breathing wet wool. Elias Thorne, keeper of the Blackwood Point Light, wiped the condensation from the brass lens with a rag that had long since lost its color. He was halfway through his third cup of cold coffee when the radio crackled.\n\nIt wasn\u2019t the static of the storm. It was a voice, clear as a bell, cutting through the whiteout.\n\n\u201cElias. Stop the rotation.\u201d\n\nElias froze. The heavy iron wheel of the lighthouse groaned as he let go of the handle. The beam, a massive slice of yellow light, halted in mid-sweep, pointing directly out into the void.\n\n\u201cWho is this?\u201d Elias shouted into the receiver, his voice trembling. \u201cThis is a restricted frequency.\u201d\n\n\u201cIt\u2019s me,\u201d the voice said. There was a strange, metallic echo to it, as if the speaker were miles away, or perhaps centuries. \u201cIt\u2019s me, Elias. From tomorrow.\u201d\n\nElias laughed, a dry, brittle sound. \u201cTomorrow? I\u2019m alone up here, mate. The supply boat won\u2019t come until Thursday.\u201d\n\n\u201cListen to me. The storm isn\u2019t just weather. It\u2019s a breach. At 0",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 130,
+    "completion_tokens": 256,
+    "total_tokens": 386,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 130
+    }
+  },
+  "finish": "length",
+  "done": true
+}

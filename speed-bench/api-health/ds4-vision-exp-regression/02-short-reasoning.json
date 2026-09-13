@@ -1,0 +1,20 @@
+{
+  "wall_s": 5.869832125000002,
+  "ttft_s": 0.3735494579999994,
+  "text": "To determine the number of workers needed, we follow these steps:\n\n**1. Calculate total required capacity (including the reserve):**  \n- The service receives **120 requests per second**.  \n- We must reserve **25% of total capacity** for spikes. This means the actual capacity must be **125%** of the incoming load (100% for normal traffic + 25% reserve).  \n- Required capacity = 120 requests/sec \u00d7 1.25 = **150 requests/sec**.\n\n**2. Determine capacity per worker:**  \n- Each worker handles **20 requests per second**.\n\n**3. Calculate the number of workers:**  \n- Workers needed = Required capacity \u00f7 Capacity per worker  \n- 150 \u00f7 20 = **7.5 workers**.\n\n**4. Round up to the nearest whole number:**  \n- Since we cannot have a fraction of a worker, we round up to **8 workers**.\n\n**Arithmetic check:**  \n- 8 workers \u00d7 20 requests/sec = **160 requests/sec** total capacity.  \n- Reserve capacity = 160 \u2212 120 = **40 requests/sec**, which is **33.3%** of the incoming load (40 \u00f7 120 = 0.333).  \n- This exceeds the required 25% reserve",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 71,
+    "completion_tokens": 256,
+    "total_tokens": 327,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 71
+    }
+  },
+  "finish": "length",
+  "done": true,
+  "temperature": 0,
+  "case": "short-reasoning",
+  "thinking": false
+}

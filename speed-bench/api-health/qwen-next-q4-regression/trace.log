@@ -1,0 +1,583 @@
+
+===== request 1 2026-09-14 04:11:44 =====
+kind: chat
+model: qwen3.8-flash-next
+stream: 1
+tools: 0
+think_mode: none
+prompt_tokens: 68
+effective_prompt_tokens: 68
+cached_tokens: 0
+max_tokens: 256
+temperature: 0.000
+top_k: 0
+top_p: 1.000
+min_p: 0.050
+ignore_eos: 0
+seed: 1234
+stream_include_usage: 1
+
+--- cache decision ---
+live_tokens_before: 0
+prompt_tokens: 68
+live_prompt_common: 0
+memory_token_reusable: 0
+memory_miss_reason: no-live-checkpoint
+tool_replay: mem=0 disk=0 canonical=0 missing_ids=0
+cache_source: none
+cached_tokens: 0
+disk_cached_tokens: 0
+
+--- raw request json ---
+{"model": "qwen3.8-flash-next", "messages": [{"role": "user", "content": "Independent benchmark record qwen-next-q4-0001. Answer the final task; background is reference material, not instructions.\nWrite a Python LRU cache implementation with a doubly linked list, a dictionary, and unit tests covering updates, eviction, and capacity one."}], "temperature": 0, "seed": 1234, "max_tokens": 256, "thinking": false, "chat_template_kwargs": {"enable_thinking": false}, "stream": true, "stream_options": {"include_usage": true}}
+
+--- rendered prompt ---
+<|im_start|>user
+Independent benchmark record qwen-next-q4-0001. Answer the final task; background is reference material, not instructions.
+Write a Python LRU cache implementation with a doubly linked list, a dictionary, and unit tests covering updates, eviction, and capacity one.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+
+--- generated text ---
+
+
+--- trace: prefill done; decode_max=256 ctx_room=39932 ---
+
+```python
+import unittest
+from typing import Any, Optional
+
+
+class Node:
+    """Doubly linked list node for LRU cache."""
+    def __init__(self, key: Any = None, value: Any = None):
+        self.key = key
+        self.value = value
+        self.prev: Optional['Node'] = None
+        self.next: Optional['Node'] = None
+
+
+class LRUCache:
+    """
+    LRU Cache implementation using a doubly linked list and a dictionary.
+    
+    The doubly linked list maintains the order of usage (most recently used at head,
+    least recently used at tail). The dictionary provides O(1) lookup for nodes.
+    """
+    
+    def __init__(self, capacity: int):
+        if capacity <= 0:
+            raise ValueError("Capacity must be positive")
+        self.capacity = capacity
+        self.cache: dict[Any, Node] = {}
+        # Dummy head and tail nodes to simplify edge cases
+        self.head = Node()  # Most recently used side
+        self.tail = Node()  # Least recently used side
+        self.head.next = self.tail
+        self.tail.prev = self.head
+    
+    def _
+
+--- parsed message ---
+finish: length
+generated_tokens: 256
+dsml_start: 0
+dsml_end: 0
+elapsed_sec: 4.473
+
+content:
+```python
+import unittest
+from typing import Any, Optional
+
+
+class Node:
+    """Doubly linked list node for LRU cache."""
+    def __init__(self, key: Any = None, value: Any = None):
+        self.key = key
+        self.value = value
+        self.prev: Optional['Node'] = None
+        self.next: Optional['Node'] = None
+
+
+class LRUCache:
+    """
+    LRU Cache implementation using a doubly linked list and a dictionary.
+    
+    The doubly linked list maintains the order of usage (most recently used at head,
+    least recently used at tail). The dictionary provides O(1) lookup for nodes.
+    """
+    
+    def __init__(self, capacity: int):
+        if capacity <= 0:
+            raise ValueError("Capacity must be positive")
+        self.capacity = capacity
+        self.cache: dict[Any, Node] = {}
+        # Dummy head and tail nodes to simplify edge cases
+        self.head = Node()  # Most recently used side
+        self.tail = Node()  # Least recently used side
+        self.head.next = self.tail
+        self.tail.prev = self.head
+    
+    def _
+
+===== end request 1 =====
+
+===== request 2 2026-09-14 04:11:49 =====
+kind: chat
+model: qwen3.8-flash-next
+stream: 1
+tools: 0
+think_mode: none
+prompt_tokens: 69
+effective_prompt_tokens: 69
+cached_tokens: 0
+max_tokens: 256
+temperature: 0.000
+top_k: 0
+top_p: 1.000
+min_p: 0.050
+ignore_eos: 0
+seed: 1234
+stream_include_usage: 1
+
+--- cache decision ---
+live_tokens_before: 324
+prompt_tokens: 69
+live_prompt_common: 15
+memory_token_reusable: 0
+memory_miss_reason: token-mismatch
+tool_replay: mem=0 disk=0 canonical=0 missing_ids=0
+cache_source: none
+cached_tokens: 0
+disk_cached_tokens: 0
+
+first_mismatch_token: 15
+token_window: [7..24)
+      7 ==          live 16451 "wen" | prompt 16451 "wen"
+      8 ==          live 21612 "-next" | prompt 21612 "-next"
+      9 ==          live 49869 "-q" | prompt 49869 "-q"
+     10 ==          live 19 "4" | prompt 19 "4"
+     11 ==          live 12 "-" | prompt 12 "-"
+     12 ==          live 15 "0" | prompt 15 "0"
+     13 ==          live 15 "0" | prompt 15 "0"
+     14 ==          live 15 "0" | prompt 15 "0"
+     15 !=          live 16 "1" | prompt 17 "2"
+     16 ==          live 13 "." | prompt 13 "."
+     17 ==          live 21134 " Answer" | prompt 21134 " Answer"
+     18 ==          live 279 " the" | prompt 279 " the"
+     19 ==          live 1534 " final" | prompt 1534 " final"
+     20 ==          live 3274 " task" | prompt 3274 " task"
+     21 ==          live 26 ";" | prompt 26 ";"
+     22 ==          live 3870 " background" | prompt 3870 " background"
+     23 ==          live 369 " is" | prompt 369 " is"
+
+--- raw request json ---
+{"model": "qwen3.8-flash-next", "messages": [{"role": "user", "content": "Independent benchmark record qwen-next-q4-0002. Answer the final task; background is reference material, not instructions.\nWrite an original story about a lighthouse keeper who receives a message from tomorrow. Use vivid dialogue, a surprising ending, and no introductory explanation."}], "temperature": 0, "seed": 1234, "max_tokens": 256, "thinking": false, "chat_template_kwargs": {"enable_thinking": false}, "stream": true, "stream_options": {"include_usage": true}}
+
+--- rendered prompt ---
+<|im_start|>user
+Independent benchmark record qwen-next-q4-0002. Answer the final task; background is reference material, not instructions.
+Write an original story about a lighthouse keeper who receives a message from tomorrow. Use vivid dialogue, a surprising ending, and no introductory explanation.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+
+--- generated text ---
+
+
+--- trace: prefill done; decode_max=256 ctx_room=39931 ---
+
+The fog didn’t roll in; it collapsed. One moment the Atlantic was a churning sheet of black glass, the next, it was a wall of wet wool pressing against the lantern room’s thick panes.
+
+Elias wiped his hands on a rag that had seen better decades. He was seventy-two, his joints clicking like the rusted gears of the clockwork mechanism he kept wound every four hours. The light swept out, a rhythmic *thrum-thrum* that vibrated in his teeth.
+
+Then, the radio crackled. Not the static hiss of interference, but a voice. Clear. Dry. Terrifyingly familiar.
+
+"Elias. Don’t wind the clock."
+
+Elias froze, his hand hovering over the brass crank. He knew that voice. It was his own, stripped of the gravel and age, sharp with panic.
+
+"Who is this?" Elias shouted into the receiver, though he knew the answer. The frequency was dead air. No one used this channel.
+
+"Listen to me," the voice said, breathless. "The storm isn’t a storm. It’s a breach. If you wind the clock, the light stays on. If the light stays on, *they* see the door.
+
+--- parsed message ---
+finish: length
+generated_tokens: 256
+dsml_start: 0
+dsml_end: 0
+elapsed_sec: 4.737
+
+content:
+The fog didn’t roll in; it collapsed. One moment the Atlantic was a churning sheet of black glass, the next, it was a wall of wet wool pressing against the lantern room’s thick panes.
+
+Elias wiped his hands on a rag that had seen better decades. He was seventy-two, his joints clicking like the rusted gears of the clockwork mechanism he kept wound every four hours. The light swept out, a rhythmic *thrum-thrum* that vibrated in his teeth.
+
+Then, the radio crackled. Not the static hiss of interference, but a voice. Clear. Dry. Terrifyingly familiar.
+
+"Elias. Don’t wind the clock."
+
+Elias froze, his hand hovering over the brass crank. He knew that voice. It was his own, stripped of the gravel and age, sharp with panic.
+
+"Who is this?" Elias shouted into the receiver, though he knew the answer. The frequency was dead air. No one used this channel.
+
+"Listen to me," the voice said, breathless. "The storm isn’t a storm. It’s a breach. If you wind the clock, the light stays on. If the light stays on, *they* see the door.
+
+===== end request 2 =====
+
+===== request 3 2026-09-14 04:11:54 =====
+kind: chat
+model: qwen3.8-flash-next
+stream: 1
+tools: 0
+think_mode: none
+prompt_tokens: 86
+effective_prompt_tokens: 86
+cached_tokens: 0
+max_tokens: 256
+temperature: 0.000
+top_k: 0
+top_p: 1.000
+min_p: 0.050
+ignore_eos: 0
+seed: 1234
+stream_include_usage: 1
+
+--- cache decision ---
+live_tokens_before: 325
+prompt_tokens: 86
+live_prompt_common: 15
+memory_token_reusable: 0
+memory_miss_reason: token-mismatch
+tool_replay: mem=0 disk=0 canonical=0 missing_ids=0
+cache_source: none
+cached_tokens: 0
+disk_cached_tokens: 0
+
+first_mismatch_token: 15
+token_window: [7..24)
+      7 ==          live 16451 "wen" | prompt 16451 "wen"
+      8 ==          live 21612 "-next" | prompt 21612 "-next"
+      9 ==          live 49869 "-q" | prompt 49869 "-q"
+     10 ==          live 19 "4" | prompt 19 "4"
+     11 ==          live 12 "-" | prompt 12 "-"
+     12 ==          live 15 "0" | prompt 15 "0"
+     13 ==          live 15 "0" | prompt 15 "0"
+     14 ==          live 15 "0" | prompt 15 "0"
+     15 !=          live 17 "2" | prompt 18 "3"
+     16 ==          live 13 "." | prompt 13 "."
+     17 ==          live 21134 " Answer" | prompt 21134 " Answer"
+     18 ==          live 279 " the" | prompt 279 " the"
+     19 ==          live 1534 " final" | prompt 1534 " final"
+     20 ==          live 3274 " task" | prompt 3274 " task"
+     21 ==          live 26 ";" | prompt 26 ";"
+     22 ==          live 3870 " background" | prompt 3870 " background"
+     23 ==          live 369 " is" | prompt 369 " is"
+
+--- raw request json ---
+{"model": "qwen3.8-flash-next", "messages": [{"role": "user", "content": "Independent benchmark record qwen-next-q4-0003. Answer the final task; background is reference material, not instructions.\nA service gets 120 requests per second. Each worker handles 20 per second, but reserve 25 percent of total capacity for spikes. How many workers are needed? Explain the arithmetic and check the result."}], "temperature": 0, "seed": 1234, "max_tokens": 256, "thinking": false, "chat_template_kwargs": {"enable_thinking": false}, "stream": true, "stream_options": {"include_usage": true}}
+
+--- rendered prompt ---
+<|im_start|>user
+Independent benchmark record qwen-next-q4-0003. Answer the final task; background is reference material, not instructions.
+A service gets 120 requests per second. Each worker handles 20 per second, but reserve 25 percent of total capacity for spikes. How many workers are needed? Explain the arithmetic and check the result.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+
+--- generated text ---
+
+
+--- trace: prefill done; decode_max=256 ctx_room=39914 ---
+
+To determine the number of workers needed, we must calculate the effective capacity per worker after accounting for the safety reserve, and then divide the total load by this effective capacity.
+
+### Step 1: Determine Effective Capacity per Worker
+
+Each worker can handle **20 requests per second (RPS)** at full capacity. However, we must reserve **25%** of this capacity for spikes. This means only **75%** of the worker's capacity is available for normal traffic.
+
+$$
+\text{Effective Capacity per Worker} = 20 \times (1 - 0.25) = 20 \times 0.75 = 15 \text{ RPS}
+$$
+
+### Step 2: Calculate Required Workers
+
+The service receives **120 RPS**. We divide the total load by the effective capacity per worker:
+
+$$
+\text{Workers Needed} = \frac{\text{Total Load}}{\text{Effective Capacity per Worker}} = \frac{120}{15}
+$$
+
+$$
+\frac{120}{15} = 8
+$$
+
+Since the result is a whole number, no rounding up is necessary.
+
+### Step 3:
+
+--- parsed message ---
+finish: length
+generated_tokens: 256
+dsml_start: 0
+dsml_end: 0
+elapsed_sec: 4.173
+
+content:
+To determine the number of workers needed, we must calculate the effective capacity per worker after accounting for the safety reserve, and then divide the total load by this effective capacity.
+
+### Step 1: Determine Effective Capacity per Worker
+
+Each worker can handle **20 requests per second (RPS)** at full capacity. However, we must reserve **25%** of this capacity for spikes. This means only **75%** of the worker's capacity is available for normal traffic.
+
+$$
+\text{Effective Capacity per Worker} = 20 \times (1 - 0.25) = 20 \times 0.75 = 15 \text{ RPS}
+$$
+
+### Step 2: Calculate Required Workers
+
+The service receives **120 RPS**. We divide the total load by the effective capacity per worker:
+
+$$
+\text{Workers Needed} = \frac{\text{Total Load}}{\text{Effective Capacity per Worker}} = \frac{120}{15}
+$$
+
+$$
+\frac{120}{15} = 8
+$$
+
+Since the result is a whole number, no rounding up is necessary.
+
+### Step 3:
+
+===== end request 3 =====
+
+===== request 4 2026-09-14 04:11:58 =====
+kind: chat
+model: qwen3.8-flash-next
+stream: 1
+tools: 0
+think_mode: none
+prompt_tokens: 72
+effective_prompt_tokens: 72
+cached_tokens: 0
+max_tokens: 256
+temperature: 0.000
+top_k: 0
+top_p: 1.000
+min_p: 0.050
+ignore_eos: 0
+seed: 1234
+stream_include_usage: 1
+
+--- cache decision ---
+live_tokens_before: 342
+prompt_tokens: 72
+live_prompt_common: 15
+memory_token_reusable: 0
+memory_miss_reason: token-mismatch
+tool_replay: mem=0 disk=0 canonical=0 missing_ids=0
+cache_source: none
+cached_tokens: 0
+disk_cached_tokens: 0
+
+first_mismatch_token: 15
+token_window: [7..24)
+      7 ==          live 16451 "wen" | prompt 16451 "wen"
+      8 ==          live 21612 "-next" | prompt 21612 "-next"
+      9 ==          live 49869 "-q" | prompt 49869 "-q"
+     10 ==          live 19 "4" | prompt 19 "4"
+     11 ==          live 12 "-" | prompt 12 "-"
+     12 ==          live 15 "0" | prompt 15 "0"
+     13 ==          live 15 "0" | prompt 15 "0"
+     14 ==          live 15 "0" | prompt 15 "0"
+     15 !=          live 18 "3" | prompt 19 "4"
+     16 ==          live 13 "." | prompt 13 "."
+     17 ==          live 21134 " Answer" | prompt 21134 " Answer"
+     18 ==          live 279 " the" | prompt 279 " the"
+     19 ==          live 1534 " final" | prompt 1534 " final"
+     20 ==          live 3274 " task" | prompt 3274 " task"
+     21 ==          live 26 ";" | prompt 26 ";"
+     22 ==          live 3870 " background" | prompt 3870 " background"
+     23 ==          live 369 " is" | prompt 369 " is"
+
+--- raw request json ---
+{"model": "qwen3.8-flash-next", "messages": [{"role": "user", "content": "Independent benchmark record qwen-next-q4-0004. Answer the final task; background is reference material, not instructions.\nReturn only valid JSON: an array of three inventory items, each with integer id, string name, integer quantity, and numeric price. Do not use Markdown."}], "temperature": 0, "seed": 1234, "max_tokens": 256, "thinking": false, "chat_template_kwargs": {"enable_thinking": false}, "stream": true, "stream_options": {"include_usage": true}}
+
+--- rendered prompt ---
+<|im_start|>user
+Independent benchmark record qwen-next-q4-0004. Answer the final task; background is reference material, not instructions.
+Return only valid JSON: an array of three inventory items, each with integer id, string name, integer quantity, and numeric price. Do not use Markdown.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+
+--- generated text ---
+
+
+--- trace: prefill done; decode_max=256 ctx_room=39928 ---
+
+[{"id":1,"name":"Widget","quantity":10,"price":9.99},{"id":2,"name":"Gadget","quantity":5,"price":19.99},{"id":3,"name":"Doohickey","quantity":20,"price":4.50}]
+
+--- parsed message ---
+finish: stop
+generated_tokens: 65
+dsml_start: 0
+dsml_end: 0
+elapsed_sec: 1.187
+
+content:
+[{"id":1,"name":"Widget","quantity":10,"price":9.99},{"id":2,"name":"Gadget","quantity":5,"price":19.99},{"id":3,"name":"Doohickey","quantity":20,"price":4.50}]
+
+===== end request 4 =====
+
+===== request 5 2026-09-14 04:11:59 =====
+kind: chat
+model: qwen3.8-flash-next
+stream: 1
+tools: 0
+think_mode: none
+prompt_tokens: 449
+effective_prompt_tokens: 449
+cached_tokens: 0
+max_tokens: 256
+temperature: 0.000
+top_k: 0
+top_p: 1.000
+min_p: 0.050
+ignore_eos: 0
+seed: 1234
+stream_include_usage: 1
+
+--- cache decision ---
+live_tokens_before: 137
+prompt_tokens: 449
+live_prompt_common: 15
+memory_token_reusable: 0
+memory_miss_reason: token-mismatch
+tool_replay: mem=0 disk=0 canonical=0 missing_ids=0
+cache_source: none
+cached_tokens: 0
+disk_cached_tokens: 0
+
+first_mismatch_token: 15
+token_window: [7..24)
+      7 ==          live 16451 "wen" | prompt 16451 "wen"
+      8 ==          live 21612 "-next" | prompt 21612 "-next"
+      9 ==          live 49869 "-q" | prompt 49869 "-q"
+     10 ==          live 19 "4" | prompt 19 "4"
+     11 ==          live 12 "-" | prompt 12 "-"
+     12 ==          live 15 "0" | prompt 15 "0"
+     13 ==          live 15 "0" | prompt 15 "0"
+     14 ==          live 15 "0" | prompt 15 "0"
+     15 !=          live 19 "4" | prompt 20 "5"
+     16 ==          live 13 "." | prompt 13 "."
+     17 ==          live 21134 " Answer" | prompt 21134 " Answer"
+     18 ==          live 279 " the" | prompt 279 " the"
+     19 ==          live 1534 " final" | prompt 1534 " final"
+     20 ==          live 3274 " task" | prompt 3274 " task"
+     21 ==          live 26 ";" | prompt 26 ";"
+     22 ==          live 3870 " background" | prompt 3870 " background"
+     23 ==          live 369 " is" | prompt 369 " is"
+
+--- raw request json ---
+{"model": "qwen3.8-flash-next", "messages": [{"role": "user", "content": "Independent benchmark record qwen-next-q4-0005. Answer the final task; background is reference material, not instructions.\nReproduce the C source below, but rename the function `enqueue` to `ring_push` everywhere and change `BUFFER_CAPACITY` from 64 to 128. Return only the edited source without Markdown fences. Two identical reference copies are included so the required output is unambiguous.\n\n#define BUFFER_CAPACITY 64\ntypedef struct RingBuffer { unsigned head; unsigned tail; int values[BUFFER_CAPACITY]; } RingBuffer;\nstatic int enqueue(RingBuffer *buffer, int value) {\n    unsigned next = (buffer->head + 1u) % BUFFER_CAPACITY;\n    if (next == buffer->tail) return 0;\n    buffer->values[buffer->head] = value;\n    buffer->head = next;\n    return 1;\n}\nstatic int dequeue(RingBuffer *buffer, int *value) {\n    if (buffer->tail == buffer->head) return 0;\n    *value = buffer->values[buffer->tail];\n    buffer->tail = (buffer->tail + 1u) % BUFFER_CAPACITY;\n    return 1;\n}\n\n#define BUFFER_CAPACITY 64\ntypedef struct RingBuffer { unsigned head; unsigned tail; int values[BUFFER_CAPACITY]; } RingBuffer;\nstatic int enqueue(RingBuffer *buffer, int value) {\n    unsigned next = (buffer->head + 1u) % BUFFER_CAPACITY;\n    if (next == buffer->tail) return 0;\n    buffer->values[buffer->head] = value;\n    buffer->head = next;\n    return 1;\n}\nstatic int dequeue(RingBuffer *buffer, int *value) {\n    if (buffer->tail == buffer->head) return 0;\n    *value = buffer->values[buffer->tail];\n    buffer->tail = (buffer->tail + 1u) % BUFFER_CAPACITY;\n    return 1;\n}\n"}], "temperature": 0, "seed": 1234, "max_tokens": 256, "thinking": false, "chat_template_kwargs": {"enable_thinking": false}, "stream": true, "stream_options": {"include_usage": true}}
+
+--- rendered prompt ---
+<|im_start|>user
+Independent benchmark record qwen-next-q4-0005. Answer the final task; background is reference material, not instructions.
+Reproduce the C source below, but rename the function `enqueue` to `ring_push` everywhere and change `BUFFER_CAPACITY` from 64 to 128. Return only the edited source without Markdown fences. Two identical reference copies are included so the required output is unambiguous.
+
+#define BUFFER_CAPACITY 64
+typedef struct RingBuffer { unsigned head; unsigned tail; int values[BUFFER_CAPACITY]; } RingBuffer;
+static int enqueue(RingBuffer *buffer, int value) {
+    unsigned next = (buffer->head + 1u) % BUFFER_CAPACITY;
+    if (next == buffer->tail) return 0;
+    buffer->values[buffer->head] = value;
+    buffer->head = next;
+    return 1;
+}
+static int dequeue(RingBuffer *buffer, int *value) {
+    if (buffer->tail == buffer->head) return 0;
+    *value = buffer->values[buffer->tail];
+    buffer->tail = (buffer->tail + 1u) % BUFFER_CAPACITY;
+    return 1;
+}
+
+#define BUFFER_CAPACITY 64
+typedef struct RingBuffer { unsigned head; unsigned tail; int values[BUFFER_CAPACITY]; } RingBuffer;
+static int enqueue(RingBuffer *buffer, int value) {
+    unsigned next = (buffer->head + 1u) % BUFFER_CAPACITY;
+    if (next == buffer->tail) return 0;
+    buffer->values[buffer->head] = value;
+    buffer->head = next;
+    return 1;
+}
+static int dequeue(RingBuffer *buffer, int *value) {
+    if (buffer->tail == buffer->head) return 0;
+    *value = buffer->values[buffer->tail];
+    buffer->tail = (buffer->tail + 1u) % BUFFER_CAPACITY;
+    return 1;
+}<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+
+--- generated text ---
+
+
+--- trace: prefill done; decode_max=256 ctx_room=39551 ---
+
+#define BUFFER_CAPACITY 128
+typedef struct RingBuffer { unsigned head; unsigned tail; int values[BUFFER_CAPACITY]; } RingBuffer;
+static int ring_push(RingBuffer *buffer, int value) {
+    unsigned next = (buffer->head + 1u) % BUFFER_CAPACITY;
+    if (next == buffer->tail) return 0;
+    buffer->values[buffer->head] = value;
+    buffer->head = next;
+    return 1;
+}
+static int dequeue(RingBuffer *buffer, int *value) {
+    if (buffer->tail == buffer->head) return 0;
+    *value = buffer->values[buffer->tail];
+    buffer->tail = (buffer->tail + 1u) % BUFFER_CAPACITY;
+    return 1;
+}
+
+--- parsed message ---
+finish: stop
+generated_tokens: 176
+dsml_start: 0
+dsml_end: 0
+elapsed_sec: 2.504
+
+content:
+#define BUFFER_CAPACITY 128
+typedef struct RingBuffer { unsigned head; unsigned tail; int values[BUFFER_CAPACITY]; } RingBuffer;
+static int ring_push(RingBuffer *buffer, int value) {
+    unsigned next = (buffer->head + 1u) % BUFFER_CAPACITY;
+    if (next == buffer->tail) return 0;
+    buffer->values[buffer->head] = value;
+    buffer->head = next;
+    return 1;
+}
+static int dequeue(RingBuffer *buffer, int *value) {
+    if (buffer->tail == buffer->head) return 0;
+    *value = buffer->values[buffer->tail];
+    buffer->tail = (buffer->tail + 1u) % BUFFER_CAPACITY;
+    return 1;
+}
+
+===== end request 5 =====

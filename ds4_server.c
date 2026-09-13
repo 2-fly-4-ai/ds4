@@ -1251,7 +1251,10 @@ static bool model_alias_enables_thinking(const char *model) {
 }
 
 static server_model_syntax server_model_syntax_for_engine(ds4_engine *engine) {
-    if (ds4_engine_is_qwen4(engine)) return SERVER_MODEL_SYNTAX_QWEN;
+    /* Both Qwen backends speak ChatML; the small-model backend must not
+     * inherit DeepSeek role markers merely because it is not Qwen Next. */
+    if (ds4_engine_is_qwen4(engine) || ds4_engine_is_qwen(engine))
+        return SERVER_MODEL_SYNTAX_QWEN;
     if (ds4_engine_is_deepseek41(engine)) return SERVER_MODEL_SYNTAX_DEEPSEEK41;
     return ds4_engine_is_glm_dsa(engine) ?
            SERVER_MODEL_SYNTAX_GLM : SERVER_MODEL_SYNTAX_DEEPSEEK;
@@ -1259,6 +1262,7 @@ static server_model_syntax server_model_syntax_for_engine(ds4_engine *engine) {
 
 static const char *server_model_id_from_engine(ds4_engine *engine) {
     if (ds4_engine_is_qwen4(engine)) return "qwen3.8-flash-next";
+    if (ds4_engine_is_qwen(engine)) return "qwen";
     if (ds4_engine_is_glm53(engine)) return "glm-5.3-flash";
     if (ds4_engine_is_glm_dsa(engine)) return "glm-5.2";
     if (ds4_engine_is_deepseek41(engine)) return "deepseek-v4.1-flash";
@@ -1268,7 +1272,7 @@ static const char *server_model_id_from_engine(ds4_engine *engine) {
 
 static bool server_model_alias_known(const char *id) {
     return id &&
-           (!strcmp(id, "deepseek-v4-flash") ||
+           (!strcmp(id, "qwen") || !strcmp(id, "deepseek-v4-flash") ||
             !strcmp(id, "deepseek-v4.1-flash") ||
             !strcmp(id, "deepseek-v4.1-flash-chat") ||
             !strcmp(id, "deepseek-v4.1-flash-reasoner") ||
@@ -15143,6 +15147,8 @@ static bool send_models(server *s, int fd) {
         append_model_json(&b, s, "qwen3.8-flash-next-chat");
         buf_putc(&b, ',');
         append_model_json(&b, s, "qwen3.8-flash-next-reasoner");
+    } else if (ds4_engine_is_qwen(s->engine)) {
+        append_model_json(&b, s, server_model_id_from_engine(s->engine));
     } else if (ds4_engine_is_glm53(s->engine)) {
         append_model_json(&b, s, "glm-5.3-flash");
         buf_putc(&b, ',');
@@ -18225,6 +18231,9 @@ static void test_deepseek41_prompt_and_dsml_contract(void) {
 }
 
 static void test_model_alias_thinking_controls(void) {
+    TEST_ASSERT(server_model_alias_known("qwen"));
+    TEST_ASSERT(!model_alias_disables_thinking("qwen"));
+    TEST_ASSERT(!model_alias_enables_thinking("qwen"));
     TEST_ASSERT(model_alias_disables_thinking("deepseek-chat"));
     TEST_ASSERT(model_alias_disables_thinking("glm-5.2-chat"));
     TEST_ASSERT(model_alias_disables_thinking("glm-5.2-no-think"));

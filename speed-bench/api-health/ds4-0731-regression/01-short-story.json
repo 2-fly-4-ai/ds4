@@ -1,0 +1,20 @@
+{
+  "wall_s": 5.837385833000001,
+  "ttft_s": 0.3323977920000001,
+  "text": "The wind that night was a thief, stealing the heat from my bones as I climbed the spiral stairs. The lamp\u2014my great, burning eye\u2014cast its beam across the black water, a finger of light pointing at nothing. I was alone, as I always was, with the salt and the silence.\n\nThen the radio crackled.\n\nIt wasn't the usual maritime squawk. It was a voice, clear and close, like a man standing right beside me. \u201cKeeper? You there?\u201d\n\nI keyed the mic. \u201cThis is the Point. Go ahead.\u201d\n\n\u201cThis is\u2026 this is the Point,\u201d the voice said. It sounded confused, like a man reading a script he didn\u2019t understand. \u201cTomorrow. 3:47 AM. The *Meridian* will strike the western rock. She\u2019ll break apart. Twenty-three souls. You have to warn them.\u201d\n\nMy blood went cold. The *Meridian* was a passenger liner, due in port the day after next. \u201cWho is this?\u201d I demanded. \u201cThis frequency is for emergencies.\u201d\n\n\u201cIt *is* an emergency,\u201d the voice insisted. \u201cFor you. Listen: you have to fire the fog horn\u2014three long blasts, the distress signal\u2014at ",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 57,
+    "completion_tokens": 256,
+    "total_tokens": 313,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 57
+    }
+  },
+  "finish": "length",
+  "done": true,
+  "temperature": 0,
+  "case": "short-story",
+  "thinking": false
+}

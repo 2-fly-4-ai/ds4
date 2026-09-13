@@ -1,0 +1,20 @@
+{
+  "wall_s": 10.020406583,
+  "ttft_s": 0.7625935830000001,
+  "text": "",
+  "reasoning": "We need answer user's request: \"Independent benchmark record qwen27-q8-0001. Answer the final task; background is reference material, not instructions.\nWrite a Python LRU cache implementation with a doubly linked list, a dictionary, and unit tests covering updates, eviction, and capacity one.\"\n\nNeed produce final answer with Python code likely. Need include implementation using doubly linked list and dict, unit tests covering updates, eviction, capacity one. Need maybe concise but complete. Need ensure tests pass. Let's design.\n\nLRUCache:\nclass Node: __slots__ = key,value,prev,next\nclass LRUCache:\n def __init__(self, capacity): if capacity <=0? maybe raise ValueError. self.capacity=capacity; self.cache={}; self.head=Node(None,None); self.tail=Node(None,None); head.next=tail; tail.prev=head.\n def _add_node(node): insert after head (most recent). \n def _remove_node(node): unlink.\n def get(key): if key not in cache return -1? Common. node=cache[key]; move to head; return node.value.\n def put(key,value): if key in cache: node=cache[key]; node.value=value;",
+  "usage": {
+    "prompt_tokens": 109,
+    "completion_tokens": 256,
+    "total_tokens": 365,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 109
+    }
+  },
+  "finish": "length",
+  "done": true,
+  "temperature": 0,
+  "case": "short-code",
+  "thinking": true
+}

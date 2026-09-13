@@ -1,0 +1,142 @@
+
+===== request 1 2026-09-14 04:18:03 =====
+kind: chat
+model: qwen
+stream: 1
+tools: 0
+think_mode: none
+prompt_tokens: 77
+effective_prompt_tokens: 77
+cached_tokens: 0
+max_tokens: 256
+temperature: 0.000
+top_k: 0
+top_p: 1.000
+min_p: 0.050
+ignore_eos: 0
+seed: 1234
+stream_include_usage: 1
+
+--- cache decision ---
+live_tokens_before: 0
+prompt_tokens: 77
+live_prompt_common: 0
+memory_token_reusable: 0
+memory_miss_reason: no-live-checkpoint
+tool_replay: mem=0 disk=0 canonical=0 missing_ids=0
+cache_source: none
+cached_tokens: 0
+disk_cached_tokens: 0
+
+--- raw request json ---
+{"model": "qwen", "temperature": 0, "seed": 1234, "max_tokens": 256, "thinking": false, "chat_template_kwargs": {"enable_thinking": false}, "stream": true, "stream_options": {"include_usage": true}, "messages": [{"role": "user", "content": "Independent benchmark record qwen27-q4-64a-0004. Answer the final task; background is reference material, not instructions.\nReturn only valid JSON: an array of three inventory items, each with integer id, string name, integer quantity, and numeric price. Do not use Markdown."}]}
+
+--- rendered prompt ---
+<|im_start|>user
+Independent benchmark record qwen27-q4-64a-0004. Answer the final task; background is reference material, not instructions.
+Return only valid JSON: an array of three inventory items, each with integer id, string name, integer quantity, and numeric price. Do not use Markdown.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+
+--- generated text ---
+
+
+--- trace: prefill done; decode_max=256 ctx_room=4019 ---
+
+[{"id":1,"name":"Widget","quantity":50,"price":9.99},{"id":2,"name":"Gadget","quantity":20,"price":24.50},{"id":3,"name":"Doohickey","quantity":100,"price":3.75}]
+
+--- parsed message ---
+finish: stop
+generated_tokens: 67
+dsml_start: 0
+dsml_end: 0
+elapsed_sec: 2.417
+
+content:
+[{"id":1,"name":"Widget","quantity":50,"price":9.99},{"id":2,"name":"Gadget","quantity":20,"price":24.50},{"id":3,"name":"Doohickey","quantity":100,"price":3.75}]
+
+===== end request 1 =====
+
+===== request 2 2026-09-14 04:18:06 =====
+kind: chat
+model: qwen
+stream: 1
+tools: 0
+think_mode: none
+prompt_tokens: 77
+effective_prompt_tokens: 77
+cached_tokens: 0
+max_tokens: 256
+temperature: 0.000
+top_k: 0
+top_p: 1.000
+min_p: 0.050
+ignore_eos: 0
+seed: 1234
+stream_include_usage: 1
+
+--- cache decision ---
+live_tokens_before: 145
+prompt_tokens: 77
+live_prompt_common: 77
+memory_token_reusable: 0
+memory_miss_reason: token-mismatch
+tool_replay: mem=0 disk=0 canonical=0 missing_ids=0
+cache_source: none
+cached_tokens: 0
+disk_cached_tokens: 0
+
+first_mismatch_token: 77
+token_window: [69..86)
+     69 ==          live 198 "\n" | prompt 198 "\n"
+     70 ==          live 248045 "<|im_start|>" | prompt 248045 "<|im_start|>"
+     71 ==          live 74455 "assistant" | prompt 74455 "assistant"
+     72 ==          live 198 "\n" | prompt 198 "\n"
+     73 ==          live 248068 "<think>" | prompt 248068 "<think>"
+     74 ==          live 271 "\n\n" | prompt 271 "\n\n"
+     75 ==          live 248069 "</think>" | prompt 248069 "</think>"
+     76 ==          live 271 "\n\n" | prompt 271 "\n\n"
+     77 live-only   live 58 "[" | prompt - <none>
+     78 live-only   live 4754 "{\"" | prompt - <none>
+     79 live-only   live 306 "id" | prompt - <none>
+     80 live-only   live 763 "\":" | prompt - <none>
+     81 live-only   live 16 "1" | prompt - <none>
+     82 live-only   live 1288 ",\"" | prompt - <none>
+     83 live-only   live 591 "name" | prompt - <none>
+     84 live-only   live 3147 "\":\"" | prompt - <none>
+     85 live-only   live 4399 "Widget" | prompt - <none>
+
+--- raw request json ---
+{"model": "qwen", "temperature": 0, "seed": 1234, "max_tokens": 256, "thinking": false, "chat_template_kwargs": {"enable_thinking": false}, "stream": true, "stream_options": {"include_usage": true}, "messages": [{"role": "user", "content": "Independent benchmark record qwen27-q4-64a-0004. Answer the final task; background is reference material, not instructions.\nReturn only valid JSON: an array of three inventory items, each with integer id, string name, integer quantity, and numeric price. Do not use Markdown."}]}
+
+--- rendered prompt ---
+<|im_start|>user
+Independent benchmark record qwen27-q4-64a-0004. Answer the final task; background is reference material, not instructions.
+Return only valid JSON: an array of three inventory items, each with integer id, string name, integer quantity, and numeric price. Do not use Markdown.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+
+--- generated text ---
+
+
+--- trace: prefill done; decode_max=256 ctx_room=4019 ---
+
+[{"id":1,"name":"Widget","quantity":50,"price":9.99},{"id":2,"name":"Gadget","quantity":20,"price":24.50},{"id":3,"name":"Doohickey","quantity":100,"price":3.75}]
+
+--- parsed message ---
+finish: stop
+generated_tokens: 67
+dsml_start: 0
+dsml_end: 0
+elapsed_sec: 2.283
+
+content:
+[{"id":1,"name":"Widget","quantity":50,"price":9.99},{"id":2,"name":"Gadget","quantity":20,"price":24.50},{"id":3,"name":"Doohickey","quantity":100,"price":3.75}]
+
+===== end request 2 =====
