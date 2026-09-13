@@ -420,6 +420,48 @@ kernel void kernel_qwen_attn_decode_rows(
     heads[row_off + h * args.head_dim + d] = out;
 }
 
+// One SIMD group computes one position, amortizing the two barriers across
+// eight positions. KV stays FP32, with chronological online softmax and the
+// original eight 32-wide dot reductions. This serves scalar and verifier rows.
+kernel void kernel_qwen_attn_decode_tiled(constant ds4_qwen_fullattn_rows_args &a [[buffer(0)]],
+ device const float *q [[buffer(1)]], device const float *k [[buffer(2)]],
+ device const float *v [[buffer(3)]], device const float *g [[buffer(4)]],
+ device float *out [[buffer(5)]], uint3 group [[threadgroup_position_in_grid]],
+ uint d [[thread_index_in_threadgroup]]) {
+ uint h=group.x, row=group.y, kh=h/(a.n_head/a.n_head_kv), stride=a.n_head_kv*256;
+ uint off=(row*a.n_head+h)*256, base=a.layer*a.cap*stride;
+ uint sg=d/32, lane=d&31;
+ float query[8];for(uint z=0;z<8;z++)query[z]=q[off+z*32+lane];
+ float m=-1e30f,l=0,acc=0;threadgroup float scores[8];
+ for(uint start=0;start<=a.pos0+row;start+=8){
+  uint count=min(8u,a.pos0+row+1-start);
+  if(sg<count){
+   float parts[8];
+   for(uint z=0;z<8;z++){
+    float p=query[z]*k[base+(start+sg)*stride+kh*256+z*32+lane];
+    p+=simd_shuffle_xor(p,1u);p+=simd_shuffle_xor(p,2u);
+    p+=simd_shuffle_xor(p,4u);p+=simd_shuffle_xor(p,8u);p+=simd_shuffle_xor(p,16u);
+    parts[z]=p;
+   }
+   {
+    // Register-local partials otherwise permit fast-math to reassociate the
+    // sum differently from the reference's threadgroup-memory partials.
+    #pragma clang fp reassociate(off)
+    if(lane==0)scores[sg]=(parts[0]+parts[1]+parts[2]+parts[3]+parts[4]+parts[5]+parts[6]+parts[7])*(1.0f/sqrt(256.0f));
+   }
+  }
+  threadgroup_barrier(mem_flags::mem_threadgroup);
+  for(uint j=0;j<count;j++){
+   float score=scores[j];
+   float next=max(m,score),al=exp(m-next),be=exp(score-next);
+   l=l*al+be;acc=acc*al+be*v[base+(start+j)*stride+kh*256+d];m=next;
+  }
+  threadgroup_barrier(mem_flags::mem_threadgroup);
+ }
+ float result=acc/(l>1e-8f?l:1.0f);
+ if(a.gated)result*=1.0f/(1.0f+exp(-g[off+d]));out[off+d]=result;
+}
+
 struct ds4_qwen_q6k_args {
     uint32_t in_dim;
     uint32_t out_dim;

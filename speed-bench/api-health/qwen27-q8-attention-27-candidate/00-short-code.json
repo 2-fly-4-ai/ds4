@@ -1,0 +1,20 @@
+{
+  "wall_s": 7.7471947089999995,
+  "ttft_s": 0.615930125,
+  "text": "```python\n\"\"\"\nLRU Cache implementation using a doubly linked list and a dictionary.\nIncludes unit tests covering updates, eviction, and capacity one.\n\"\"\"\n\nimport unittest\n\n\nclass DLinkedNode:\n    \"\"\"Doubly linked list node.\"\"\"\n    __slots__ = ('key', 'value', 'prev', 'next')\n\n    def __init__(self, key=0, value=0):\n        self.key = key\n        self.value = value\n        self.prev = None\n        self.next = None\n\n\nclass LRUCache:\n    \"\"\"\n    LRU Cache with O(1) get and put operations.\n    \n    Uses a doubly linked list to maintain order (most recently used at head)\n    and a dictionary for O(1) key lookup.\n    \"\"\"\n\n    def __init__(self, capacity: int):\n        if capacity <= 0:\n            raise ValueError(\"Capacity must be positive\")\n        self.capacity = capacity\n        self.cache = {}  # key -> DLinkedNode\n\n        # Dummy head and tail nodes to simplify edge cases\n        self.head = DLinkedNode()\n        self.tail = DLinkedNode()\n        self.head.next = self.tail\n",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 69,
+    "completion_tokens": 256,
+    "total_tokens": 325,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 69
+    }
+  },
+  "finish": "length",
+  "done": true,
+  "temperature": 0,
+  "case": "short-code",
+  "thinking": false
+}

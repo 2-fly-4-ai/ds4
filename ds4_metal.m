@@ -20971,7 +20971,11 @@ int ds4_gpu_qwen_full_attn_rows_tensor(
                                                  head_dim, n_head_kv * n_tok, 1e-6f)) return 0;
     }
     id<MTLComputePipelineState> rope_p = ds4_gpu_get_pipeline("kernel_qwen_rope_rotate_half_rows");
-    id<MTLComputePipelineState> attn_p = ds4_gpu_get_pipeline("kernel_qwen_attn_decode_rows");
+    // Verified wins are at longer context on M5. Short requests showed no
+    // reproducible whole-model benefit; preserve their existing dispatch.
+    id<MTLComputePipelineState> attn_p = ds4_gpu_get_pipeline(
+        ds4_gpu_device_is_m5_apple_silicon() && pos0 >= 1024 ? "kernel_qwen_attn_decode_tiled"
+                                          : "kernel_qwen_attn_decode_rows");
     if (!rope_p || !attn_p) return 0;
     {
         int owned = 0;
@@ -21070,7 +21074,9 @@ int ds4_gpu_qwen_full_attn_tensor(
                                                  head_dim, n_head_kv, 1e-6f)) return 0;
     }
     id<MTLComputePipelineState> rope_p = ds4_gpu_get_pipeline("kernel_qwen_rope_rotate_half");
-    id<MTLComputePipelineState> attn_p = ds4_gpu_get_pipeline("kernel_qwen_attn_decode");
+    id<MTLComputePipelineState> attn_p = ds4_gpu_get_pipeline(
+        ds4_gpu_device_is_m5_apple_silicon() && pos >= 1024 ? "kernel_qwen_attn_decode_tiled"
+                                          : "kernel_qwen_attn_decode");
     if (!rope_p || !attn_p) return 0;
     {
         int owned = 0;
@@ -21101,8 +21107,8 @@ int ds4_gpu_qwen_full_attn_tensor(
         id<MTLCommandBuffer> cb = ds4_gpu_command_buffer(&owned);
         if (!cb) return 0;
         struct {
-            uint32_t n_head, n_head_kv, head_dim, pos, layer, cap, gated;
-        } aargs = { n_head, n_head_kv, head_dim, pos, layer, cap, gated };
+            uint32_t n_head, n_head_kv, head_dim, pos, layer, cap, gated, n_tok;
+        } aargs = { n_head, n_head_kv, head_dim, pos, layer, cap, gated, 1 };
         id<MTLComputeCommandEncoder> enc = ds4_gpu_compute_encoder(cb);
         [enc setComputePipelineState:attn_p];
         [enc setBytes:&aargs length:sizeof(aargs) atIndex:0];

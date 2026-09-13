@@ -1,0 +1,67 @@
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 0.671 ms, residency requested in 195.901 ms, warmup 3.167 ms (mapped 27690.98 MiB from offset 10.49 MiB)
+ds4: Metal mapped mmaped model as 1 overlapping shared buffers
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 0.25 GiB (raw 0.25 + compressed 0.00) + buffers 0.00 GiB + resident model 27.04 GiB = 27.29 GiB planned
+ds4: memory detail: ctx=4096 prefill_cap=4096 raw_kv_rows=4096 compressed_kv_rows=3 backend=metal
+0914 06:50:09 ds4-server: context buffers 256.10 MiB (ctx=4096, backend=metal, prefill_chunk=4096, raw_kv_rows=4096, compressed_kv_rows=3)
+0914 06:50:09 ds4-server: tracing session to /Users/brianfarley/Desktop/ds4-qwen-f32-attention/speed-bench/api-health/qwen27-q8-attention-27-base-gated/trace.log
+0914 06:50:09 ds4-server: listening on http://127.0.0.1:56863
+0914 06:50:09 ds4-server: chat ctx=0..1368:1368 prompt start
+ds4: n-row n=256 encode=1.2 wait=479.2 ms ok=1 fail=- il=0
+0914 06:50:10 ds4-server: chat ctx=0..1368:1368 prefill chunk 256/1368 (18.7%) chunk=516.52 t/s avg=516.52 t/s 0.496s
+ds4: n-row n=256 encode=0.7 wait=470.1 ms ok=1 fail=- il=0
+0914 06:50:10 ds4-server: chat ctx=0..1368:1368 prefill chunk 512/1368 (37.4%) chunk=543.74 t/s avg=529.78 t/s 0.966s
+ds4: n-row n=256 encode=0.6 wait=525.8 ms ok=1 fail=- il=0
+0914 06:50:11 ds4-server: chat ctx=0..1368:1368 prefill chunk 768/1368 (56.1%) chunk=486.28 t/s avg=514.44 t/s 1.493s
+ds4: n-row n=256 encode=0.6 wait=567.7 ms ok=1 fail=- il=0
+0914 06:50:11 ds4-server: chat ctx=0..1368:1368 prefill chunk 1024/1368 (74.9%) chunk=450.42 t/s avg=496.79 t/s 2.061s
+ds4: n-row n=256 encode=0.7 wait=607.8 ms ok=1 fail=- il=0
+0914 06:50:12 ds4-server: chat ctx=0..1368:1368 prefill chunk 1280/1368 (93.6%) chunk=420.66 t/s avg=479.44 t/s 2.670s
+ds4: n-row n=88 encode=0.9 wait=542.1 ms ok=1 fail=- il=0
+0914 06:50:12 ds4-server: chat ctx=0..1368:1368 prefill chunk 1368/1368 (100.0%) chunk=161.95 t/s avg=425.75 t/s 3.213s
+0914 06:50:12 ds4-server: chat ctx=0..1368:1368 prompt done 3.242s
+ds4: using MTP head sidecar /Users/brianfarley/Desktop/ds4/gguf/qwen-small-quality/mtp-Qwen3.8-27B-Q4_64A.gguf
+0914 06:50:14 ds4-server: chat ctx=1368..1418:50 gen=50 decoding chunk=24.59 t/s avg=24.59 t/s 2.034s
+0914 06:50:16 ds4-server: chat ctx=1418..1468:50 gen=100 decoding chunk=41.10 t/s avg=30.77 t/s 3.250s
+0914 06:50:17 ds4-server: chat ctx=1468..1518:50 gen=150 decoding chunk=34.22 t/s avg=31.84 t/s 4.711s
+0914 06:50:19 ds4-server: chat ctx=1518..1568:50 gen=200 decoding chunk=29.44 t/s avg=31.20 t/s 6.410s
+0914 06:50:20 ds4-server: chat ctx=1568..1618:50 gen=250 decoding chunk=33.77 t/s avg=31.68 t/s 7.890s
+0914 06:50:20 ds4-server: chat ctx=1618..1624:6 gen=256 decoding chunk=32.21 t/s avg=31.70 t/s 8.077s
+0914 06:50:20 ds4-server: chat ctx=0..1368:1368 gen=256 finish=length 11.319s
+0914 06:50:20 ds4-server: live kv cache miss live=1624 prompt=2034 common=16 vision=match reason=token-mismatch
+0914 06:50:20 ds4-server: chat ctx=0..2034:2034 prompt start
+0914 06:50:21 ds4-server: chat ctx=0..2034:2034 prefill chunk 256/2034 (12.6%) chunk=532.01 t/s avg=532.01 t/s 0.481s
+0914 06:50:22 ds4-server: chat ctx=0..2034:2034 prefill chunk 512/2034 (25.2%) chunk=472.53 t/s avg=500.51 t/s 1.023s
+0914 06:50:22 ds4-server: chat ctx=0..2034:2034 prefill chunk 768/2034 (37.8%) chunk=457.42 t/s avg=485.27 t/s 1.583s
+0914 06:50:23 ds4-server: chat ctx=0..2034:2034 prefill chunk 1024/2034 (50.3%) chunk=433.97 t/s avg=471.34 t/s 2.173s
+0914 06:50:23 ds4-server: chat ctx=0..2034:2034 prefill chunk 1280/2034 (62.9%) chunk=409.91 t/s avg=457.63 t/s 2.797s
+0914 06:50:24 ds4-server: chat ctx=0..2034:2034 prefill chunk 1536/2034 (75.5%) chunk=386.44 t/s avg=443.99 t/s 3.460s
+0914 06:50:25 ds4-server: chat ctx=0..2034:2034 prefill chunk 1792/2034 (88.1%) chunk=363.61 t/s avg=430.40 t/s 4.164s
+0914 06:50:26 ds4-server: chat ctx=0..2034:2034 prefill chunk 2034/2034 (100.0%) chunk=237.26 t/s avg=392.40 t/s 5.184s
+0914 06:50:26 ds4-server: chat ctx=0..2034:2034 prompt done 5.226s
+0914 06:50:28 ds4-server: chat ctx=2034..2084:50 gen=50 decoding chunk=18.27 t/s avg=18.27 t/s 2.736s
+0914 06:50:31 ds4-server: chat ctx=2084..2134:50 gen=100 decoding chunk=19.51 t/s avg=18.87 t/s 5.299s
+0914 06:50:34 ds4-server: chat ctx=2134..2184:50 gen=150 decoding chunk=17.71 t/s avg=18.47 t/s 8.122s
+0914 06:50:37 ds4-server: chat ctx=2184..2234:50 gen=200 decoding chunk=16.12 t/s avg=17.82 t/s 11.224s
+0914 06:50:40 ds4-server: chat ctx=2234..2284:50 gen=250 decoding chunk=18.21 t/s avg=17.90 t/s 13.969s
+0914 06:50:40 ds4-server: chat ctx=2284..2290:6 gen=256 decoding chunk=13.52 t/s avg=17.76 t/s 14.413s
+0914 06:50:40 ds4-server: chat ctx=0..2034:2034 gen=256 finish=length 19.639s
+0914 06:50:40 ds4-server: live kv cache miss live=2290 prompt=2037 common=16 vision=match reason=token-mismatch
+0914 06:50:40 ds4-server: chat ctx=0..2037:2037 prompt start
+0914 06:50:41 ds4-server: chat ctx=0..2037:2037 prefill chunk 256/2037 (12.6%) chunk=529.19 t/s avg=529.19 t/s 0.484s
+0914 06:50:41 ds4-server: chat ctx=0..2037:2037 prefill chunk 512/2037 (25.1%) chunk=463.19 t/s avg=494.00 t/s 1.036s
+0914 06:50:42 ds4-server: chat ctx=0..2037:2037 prefill chunk 768/2037 (37.7%) chunk=441.38 t/s avg=475.12 t/s 1.616s
+0914 06:50:42 ds4-server: chat ctx=0..2037:2037 prefill chunk 1024/2037 (50.3%) chunk=421.90 t/s avg=460.59 t/s 2.223s
+0914 06:50:43 ds4-server: chat ctx=0..2037:2037 prefill chunk 1280/2037 (62.8%) chunk=398.38 t/s avg=446.64 t/s 2.866s
+0914 06:50:44 ds4-server: chat ctx=0..2037:2037 prefill chunk 1536/2037 (75.4%) chunk=375.09 t/s avg=432.88 t/s 3.548s
+0914 06:50:44 ds4-server: chat ctx=0..2037:2037 prefill chunk 1792/2037 (88.0%) chunk=354.36 t/s avg=419.60 t/s 4.271s
+0914 06:50:45 ds4-server: chat ctx=0..2037:2037 prefill chunk 2037/2037 (100.0%) chunk=235.09 t/s avg=383.41 t/s 5.313s
+0914 06:50:45 ds4-server: chat ctx=0..2037:2037 prompt done 5.321s
+0914 06:50:47 ds4-server: chat ctx=2037..2087:50 gen=50 decoding chunk=29.92 t/s avg=29.92 t/s 1.671s
+0914 06:50:48 ds4-server: chat ctx=2087..2102:15 gen=65 decoding chunk=31.70 t/s avg=30.32 t/s 2.144s
+0914 06:50:48 ds4-server: chat ctx=0..2037:2037 gen=65 finish=stop 7.465s
+0914 06:50:48 ds4-server: shutdown requested, draining requests
+ds4: Qwen NextN session drafted=826 accepted=369 (44.7%)

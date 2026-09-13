@@ -11,6 +11,13 @@ static void run_model(const char *path) {
  head.enorm=&wrong_norm;check(!qwen_mtp_is_valid(&head),"reject wrong-width sidecar");
  ds4_tokens prompt={0},other={0};char err[512]={0};
  encode_chat_prompt(&e->vocab,NULL,"Write a Python function to merge two sorted lists. Explain its time complexity.",DS4_THINK_NONE,&prompt);
+ int test_context=getenv("QWEN_TEST_CONTEXT")?atoi(getenv("QWEN_TEST_CONTEXT")):0;
+ if(test_context>prompt.len){
+  check(test_context<=3840,"bounded test context");int original=prompt.len;
+  prompt.v=realloc(prompt.v,test_context*sizeof(*prompt.v));check(prompt.v!=NULL,"extended prompt");
+  for(int i=original;i<test_context;i++)prompt.v[i]=prompt.v[i%original];
+  prompt.len=prompt.cap=test_context;
+ }
  encode_chat_prompt(&e->vocab,NULL,"Tell a story about a lost sailor.",DS4_THINK_NONE,&other);
  ds4_session *s=NULL,*b=NULL;check(!ds4_session_create(&s,e,4096),"session");
  check(!ds4_session_sync(s,&prompt,err,sizeof(err)),err);

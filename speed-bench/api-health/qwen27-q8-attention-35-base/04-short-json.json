@@ -1,0 +1,20 @@
+{
+  "wall_s": 1.105361375000001,
+  "ttft_s": 0.3103321670000003,
+  "text": "[{\"id\": 1, \"name\": \"Wireless Mouse\", \"quantity\": 50, \"price\": 29.99}, {\"id\": 2, \"name\": \"Mechanical Keyboard\", \"quantity\": 30, \"price\": 89.50}, {\"id\": 3, \"name\": \"USB-C Hub\", \"quantity\": 100, \"price\": 45.00}]",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 73,
+    "completion_tokens": 95,
+    "total_tokens": 168,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 73
+    }
+  },
+  "finish": "stop",
+  "done": true,
+  "temperature": 0,
+  "case": "short-json",
+  "thinking": false
+}

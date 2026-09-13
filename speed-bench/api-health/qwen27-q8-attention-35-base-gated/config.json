@@ -1,0 +1,22 @@
+{
+  "source_phase": "qwen-chatml-completion",
+  "argv": [
+    "/Users/brianfarley/Desktop/ds4/ds4-server",
+    "-m",
+    "/Users/brianfarley/Desktop/ds4/gguf/qwen-small-quality/35b-mtp/Qwen3.6-35B-A3B-Q8_0.gguf",
+    "--metal",
+    "--ctx",
+    "4096",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "56848",
+    "--trace",
+    "/Users/brianfarley/Desktop/ds4-qwen-f32-attention/speed-bench/api-health/qwen27-q8-attention-35-base-gated/trace.log"
+  ],
+  "env_overrides": {
+    "DS4_PROMPT_LOOKUP_LOG": "1",
+    "DS4_QWEN_MTP_PROFILE": "1",
+    "DS4_MTP_TIMING": "1"
+  }
+}

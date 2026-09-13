@@ -1,0 +1,20 @@
+{
+  "wall_s": 0.8863620419999947,
+  "ttft_s": 0.049739874999993106,
+  "text": "[{\"id\": 1, \"name\": \"Widget\", \"quantity\": 100, \"price\": 9.99}, {\"id\": 2, \"name\": \"Gadget\", \"quantity\": 50, \"price\": 19.99}, {\"id\": 3, \"name\": \"Doohickey\", \"quantity\": 200, \"price\": 4.99}]",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 2037,
+    "completion_tokens": 91,
+    "total_tokens": 2128,
+    "prompt_tokens_details": {
+      "cached_tokens": 2037,
+      "cache_write_tokens": 0
+    }
+  },
+  "finish": "stop",
+  "done": true,
+  "temperature": 0,
+  "case": "2048-json",
+  "thinking": false
+}

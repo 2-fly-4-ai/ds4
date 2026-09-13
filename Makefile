@@ -386,6 +386,9 @@ tests/test_qwen_mtp_port: tests/test_qwen_mtp_port.c tests/test_ds4_hot_rewind.c
 tests/qwen_fixed_token_probe: tests/qwen_fixed_token_probe.c ds4.h $(CORE_OBJS)
 	$(CC) $(CFLAGS) -I. -o $@ $< $(CORE_OBJS) $(METAL_LDLIBS)
 
+tests/qwen_attn_tile_bench: tests/qwen_attn_tile_bench.m metal/qwen_gdn.metal
+	$(CC) -O2 -fobjc-arc -framework Foundation -framework Metal $< -o $@
+
 tests/test_qwen_small_runtime: tests/test_qwen_small_runtime.c ds4.c ds4.h ds4_gpu.h ds4_image.o ds4_distributed.o ds4_tp.o ds4_ssd.o ds4_metal.o ds4_layer_pack.o
 	$(CC) $(CFLAGS) -fno-finite-math-only -I. -o $@ $< ds4_image.o ds4_distributed.o ds4_tp.o ds4_ssd.o ds4_metal.o ds4_layer_pack.o $(METAL_LDLIBS)
 

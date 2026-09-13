@@ -67,3 +67,4 @@ __pycache__/
 /tests/test_qwen_small_runtime
 /tests/test_qwen35_moe_port
 /tests/qwen_fixed_token_probe
+/tests/qwen_attn_tile_bench

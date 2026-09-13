@@ -1,0 +1,20 @@
+{
+  "wall_s": 12.028298416999998,
+  "ttft_s": 0.10234562500000166,
+  "text": "The rain didn\u2019t fall; it hammered. It struck the glass of the lantern room with the rhythmic violence of a thousand tiny fists, blurring the horizon into a smear of charcoal and slate. Elias wiped the condensation from the lens, his breath fogging the cold air, when the radio crackled.\n\nIt wasn\u2019t the static of the storm. It was a voice, clear as a bell, cutting through the white noise.\n\n\"Stop the rotation, Elias. Now.\"\n\nElias froze, his hand hovering over the heavy iron wheel. He looked at the radio, then at the dark, churning sea. \"Who is this? This is a restricted frequency.\"\n\n\"You\u2019re not listening,\" the voice said. It was his own voice, but older, raspy, stripped of the youthful vigor he still possessed. \"The ship. The *Aethelgard*. It\u2019s not coming from the east. It\u2019s coming from the north. If you keep the light rotating, you\u2019ll blind the pilot. He\u2019ll miss the reef. He\u2019ll hit the rocks.\"\n\nElias\u2019s heart hammered against his ribs, a frantic bird in a cage. \"That\u2019s impossible. The *Aethelgard* is scheduled for the eastern channel",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 70,
+    "completion_tokens": 256,
+    "total_tokens": 326,
+    "prompt_tokens_details": {
+      "cached_tokens": 70,
+      "cache_write_tokens": 0
+    }
+  },
+  "finish": "length",
+  "done": true,
+  "temperature": 0,
+  "case": "short-story",
+  "thinking": false
+}
