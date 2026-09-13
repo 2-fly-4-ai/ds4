@@ -52,3 +52,14 @@ for model in ('qwen27-q8','qwen27-q4-64a','qwen-next-q4','glm53','ds4-0731','ds4
     completed = sum(r.get('done') and bool(r.get('text') or r.get('reasoning')) for r in records)
     rates = [(r['usage']['completion_tokens']-1)/max(r['wall_s']-r['ttft_s'],1e-6) for r in records if r.get('usage') and r['usage']['completion_tokens']>1]
     print(f'| {model} | {completed}/{len(records)} | {matched}/{len(pairs)} | {statistics.median(rates):.2f} |')
+
+print('\n## Rebuilt main smoke checks\n')
+for prefix,label,baseline in [('qwen27-q8','main35-verified','35b-on'),('qwen27-q8','main27-verified','port-on'),('qwen27-q4-64a','main27-verified','port-on')]:
+    folder=root/f'{prefix}-{label}'
+    files=[folder/f'{i:02d}-short-json.json' for i in range(2)]
+    if not all(f.exists() for f in files): continue
+    a,b=[json.loads(f.read_text()) for f in files]
+    old=json.loads((root/f'{prefix}-{baseline}'/'06-short-json.json').read_text())
+    assert a['done'] and b['done'] and a['text']==b['text']==old['text']
+    assert b['usage']['prompt_tokens_details']['cached_tokens']>0
+    print(f'- {prefix} {label}: exact candidate/cold/repeat output; positive cache reuse; PASS.')

@@ -1,0 +1,54 @@
+cc -O3 -ffast-math -g -mcpu=native -Wall -Wextra -std=c99 -c -o ds4.o ds4.c
+cc -O3 -ffast-math -g -mcpu=native -Wall -Wextra -fobjc-arc -c -o ds4_metal.o ds4_metal.m
+ds4.c:19089:20: warning: unused variable 'n_head' [-Wunused-variable]
+ 19089 |     const uint32_t n_head = DS4_N_HEAD;
+       |                    ^~~~~~
+In file included from ds4.c:47270:
+./ds4_dflash2.inc:815:11: warning: unused variable 'succ' [-Wunused-variable]
+  815 |     float succ[256];
+      |           ^~~~
+ds4.c:50361:13: warning: variable 'n_generated' set but not used [-Wunused-but-set-variable]
+ 50361 |         int n_generated = 0;
+       |             ^
+ds4.c:4460:13: warning: unused function 'deepseek41_engram_inject_reference' [-Wunused-function]
+ 4460 | static void deepseek41_engram_inject_reference(
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ds4.c:4573:13: warning: unused function 'ds4_vec_dot_q4_64a_q8_K' [-Wunused-function]
+ 4573 | static void ds4_vec_dot_q4_64a_q8_K(int n, float *s, const block_q4_64a *x, const block_q8_K *y) {
+      |             ^~~~~~~~~~~~~~~~~~~~~~~
+ds4.c:5207:13: warning: unused function 'tensor_type_is_q4_64a' [-Wunused-function]
+ 5207 | static bool tensor_type_is_q4_64a(uint32_t type) {
+      |             ^~~~~~~~~~~~~~~~~~~~~
+ds4.c:5211:13: warning: unused function 'tensor_type_is_q2_64a' [-Wunused-function]
+ 5211 | static bool tensor_type_is_q2_64a(uint32_t type) {
+      |             ^~~~~~~~~~~~~~~~~~~~~
+ds4.c:18794:24: warning: unused variable 'g_qwen_global_mu' [-Wunused-variable]
+ 18794 | static pthread_mutex_t g_qwen_global_mu = PTHREAD_MUTEX_INITIALIZER;
+       |                        ^~~~~~~~~~~~~~~~
+ds4.c:19956:12: warning: unused function 'qwen_hybrid_metal_forward_token' [-Wunused-function]
+ 19956 | static int qwen_hybrid_metal_forward_token(
+       |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ds4.c:19977:12: warning: unused function 'qwen_hybrid_snap_gdn' [-Wunused-function]
+ 19977 | static int qwen_hybrid_snap_gdn(void) {
+       |            ^~~~~~~~~~~~~~~~~~~~
+ds4.c:19985:12: warning: unused function 'qwen_hybrid_restore_gdn_snap' [-Wunused-function]
+ 19985 | static int qwen_hybrid_restore_gdn_snap(void) {
+       |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ds4.c:20400:13: warning: unused function 'qwen_metal_prefill' [-Wunused-function]
+ 20400 | static void qwen_metal_prefill(float *logits, const ds4_model *model, const ds4_weights *weights, const token_vec *prompt) {
+       |             ^~~~~~~~~~~~~~~~~~
+ds4.c:20773:12: warning: unused function 'qwen_metal_forward_token_with_hidden' [-Wunused-function]
+ 20773 | static int qwen_metal_forward_token_with_hidden(float *logits_out, float *hidden_out, const ds4_model *model, const ds4_weights *weights, int token, uint32_t pos) {
+       |            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from ds4.c:47270:
+./ds4_dflash2.inc:735:13: warning: unused function 'dflash2_topk16' [-Wunused-function]
+  735 | static void dflash2_topk16(const float *logits, uint32_t n_vocab, uint32_t k, int *idx, float *val) {
+      |             ^~~~~~~~~~~~~~
+ds4_metal.m:19562:44: warning: unused variable 'q4_classic_pipe2' [-Wunused-variable]
+ 19562 |         static id<MTLComputePipelineState> q4_classic_pipe2;
+       |                                            ^~~~~~~~~~~~~~~~
+1 warning generated.
+14 warnings generated.
+cc -O3 -ffast-math -g -mcpu=native -Wall -Wextra -std=c99 -o ds4 ds4_cli.o ds4_help.o ds4_prompt_prefix.o linenoise.o ds4_gpu_args.o ds4.o ds4_image.o ds4_distributed.o ds4_tp.o ds4_ssd.o ds4_metal.o ds4_layer_pack.o -lm -pthread -framework Foundation -framework Metal
+cc -O3 -ffast-math -g -mcpu=native -Wall -Wextra -std=c99 -o ds4-server ds4_server.o ds4_help.o ds4_kvstore.o rax.o ds4_gpu_args.o ds4.o ds4_image.o ds4_distributed.o ds4_tp.o ds4_ssd.o ds4_metal.o ds4_layer_pack.o -lm -pthread -framework Foundation -framework Metal
+cc -O3 -ffast-math -g -mcpu=native -Wall -Wextra -std=c99 -o ds4_test ds4_test.o ds4_help.o ds4_kvstore.o rax.o ds4.o ds4_image.o ds4_distributed.o ds4_tp.o ds4_ssd.o ds4_metal.o ds4_layer_pack.o -lm -pthread -framework Foundation -framework Metal

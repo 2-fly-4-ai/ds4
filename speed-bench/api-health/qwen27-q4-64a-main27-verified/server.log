@@ -1,0 +1,36 @@
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 0.360 ms, residency requested in 1550.502 ms, warmup 3.117 ms (mapped 14664.73 MiB from offset 10.49 MiB)
+ds4: Metal mapped mmaped model as 1 overlapping shared buffers
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 0.25 GiB (raw 0.25 + compressed 0.00) + buffers 0.00 GiB + resident model 14.32 GiB = 14.57 GiB planned
+ds4: memory detail: ctx=4096 prefill_cap=4096 raw_kv_rows=4096 compressed_kv_rows=3 backend=metal
+0914 06:07:38 ds4-server: context buffers 256.10 MiB (ctx=4096, backend=metal, prefill_chunk=4096, raw_kv_rows=4096, compressed_kv_rows=3)
+0914 06:07:38 ds4-server: tracing session to /Users/brianfarley/Desktop/ds4/speed-bench/api-health/qwen27-q4-64a-main27-verified/trace.log
+0914 06:07:38 ds4-server: listening on http://127.0.0.1:56179
+0914 06:07:39 ds4-server: chat ctx=0..77:77 prompt start
+ds4: n-row n=16 encode=1.5 wait=284.1 ms ok=1 fail=- il=0
+0914 06:07:39 ds4-server: chat ctx=0..77:77 prefill chunk 16/77 (20.8%) chunk=51.88 t/s avg=51.88 t/s 0.308s
+ds4: n-row n=16 encode=0.6 wait=191.1 ms ok=1 fail=- il=0
+0914 06:07:39 ds4-server: chat ctx=0..77:77 prefill chunk 32/77 (41.6%) chunk=83.40 t/s avg=63.97 t/s 0.500s
+ds4: n-row n=16 encode=0.6 wait=191.4 ms ok=1 fail=- il=0
+0914 06:07:39 ds4-server: chat ctx=0..77:77 prefill chunk 48/77 (62.3%) chunk=83.32 t/s avg=69.34 t/s 0.692s
+ds4: n-row n=16 encode=0.6 wait=193.1 ms ok=1 fail=- il=0
+0914 06:07:39 ds4-server: chat ctx=0..77:77 prefill chunk 64/77 (83.1%) chunk=82.57 t/s avg=72.23 t/s 0.886s
+ds4: n-row n=13 encode=0.7 wait=192.1 ms ok=1 fail=- il=0
+0914 06:07:40 ds4-server: chat ctx=0..77:77 prefill chunk 77/77 (100.0%) chunk=67.32 t/s avg=71.35 t/s 1.079s
+0914 06:07:40 ds4-server: chat ctx=0..77:77 prompt done 1.091s
+ds4: using MTP head sidecar /Users/brianfarley/Desktop/ds4/gguf/qwen-small-quality/mtp-Qwen3.8-27B-Q4_64A.gguf
+ds4: n-row n=5 encode=1.1 wait=67.0 ms ok=1 fail=- il=0
+0914 06:07:41 ds4-server: chat ctx=77..127:50 gen=50 decoding chunk=43.88 t/s avg=43.88 t/s 1.139s
+0914 06:07:41 ds4-server: chat ctx=127..144:17 gen=67 decoding chunk=41.68 t/s avg=43.30 t/s 1.547s
+0914 06:07:41 ds4-server: chat ctx=0..77:77 gen=67 finish=stop 2.638s
+0914 06:07:41 ds4-server: live kv cache rewind-hit live=145 prompt=77 common=77 reused=77
+0914 06:07:41 ds4-server: chat ctx=77..77:0 prompt start
+0914 06:07:41 ds4-server: chat ctx=77..77:0 prompt done 0.004s
+0914 06:07:42 ds4-server: chat ctx=77..127:50 gen=50 decoding chunk=44.46 t/s avg=44.46 t/s 1.125s
+0914 06:07:43 ds4-server: chat ctx=127..144:17 gen=67 decoding chunk=43.66 t/s avg=44.25 t/s 1.514s
+0914 06:07:43 ds4-server: chat ctx=77..77:0 gen=67 finish=stop 1.518s
+0914 06:07:43 ds4-server: shutdown requested, draining requests
+ds4: Qwen NextN session drafted=150 accepted=98 (65.3%)

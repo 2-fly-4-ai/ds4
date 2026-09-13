@@ -3,6 +3,11 @@
 2026-09-14. Focused port based on main `7f69f18`; no wholesale upstream merge
 and no quantization changes. Final local validation passed before integration.
 
+Integrated into main as `9839567`. Main was rebuilt and its server unit tests
+and six final API requests passed: candidate/cold/repeat outputs matched for
+35B Q8, 27B Q8 and 27B Q4, with positive prompt-cache reuse. No server was left
+running. The port worktree contains no unmerged implementation changes.
+
 ## Implementation
 
 - Qwen3.6-35B-A3B Q8: 40 trunk layers, 32-value-head GDN, 16/2 full-attention

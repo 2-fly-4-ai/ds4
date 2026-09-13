@@ -46,3 +46,9 @@ Cold/repeat output equality with positive cache reuse: 60/60 pairs.
 | ds4-0731 | 5/5 | 5/5 | 41.94 |
 | ds4-vision-exp | 5/5 | 5/5 | 41.87 |
 | ds41-ssd-safe | 5/5 | 5/5 | 12.79 |
+
+## Rebuilt main smoke checks
+
+- qwen27-q8 main35-verified: exact candidate/cold/repeat output; positive cache reuse; PASS.
+- qwen27-q8 main27-verified: exact candidate/cold/repeat output; positive cache reuse; PASS.
+- qwen27-q4-64a main27-verified: exact candidate/cold/repeat output; positive cache reuse; PASS.
