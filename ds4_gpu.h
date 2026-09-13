@@ -158,6 +158,8 @@ int ds4_gpu_qwen_gdn_core_rows_tensor(
 void ds4_gpu_qwen_set_gdn_steps(ds4_gpu_tensor *conv_steps, ds4_gpu_tensor *state_steps);
 
 #ifdef __APPLE__
+/* Select small-Qwen attention geometry before its pool is initialized. */
+int ds4_gpu_qwen_set_attention_shape(uint32_t heads, uint32_t kv_heads);
 /* 35B-A3B specialization; snapshots belong to the caller, not the 27B pool. */
 int ds4_gpu_qwen35_gdn_core_rows_tensor(
         ds4_gpu_tensor       *core,

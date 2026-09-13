@@ -1,0 +1,20 @@
+{
+  "wall_s": 3.2332582500000004,
+  "ttft_s": 0.14940816699999981,
+  "text": "The brass bell of the chronometer didn\u2019t tick; it hummed, a low, vibrating thrum that Elias felt in his molars. He wiped the salt spray from the lens of the Great Light, his rag leaving streaks in the condensation. Outside, the Atlantic was a churning black void, but inside the lantern room, the air smelled of ozone and old paper.\n\nOn the pedestal, where the logbook should have been, sat a single sheet of paper. It wasn\u2019t wet. It wasn\u2019t damp. It was dry, crisp, and smelled faintly of burnt toast.\n\nElias picked it up. The handwriting was his own, but jagged, hurried, as if written by a hand shaking from cold or terror.\n\n*Don\u2019t light the lamp at 03:00. The fog isn\u2019t fog. It\u2019s them. If you light it, they find the island. Burn the wick. Hide in the cellar. Wait for the tide to turn. \u2013 E.*\n\nElias stared at the clock. The second hand swept past the twelve. 02:58.\n\n\"Ridiculous,\" he muttered, though his voice lacked conviction. He was a man of routine, of oil",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 84,
+    "completion_tokens": 256,
+    "total_tokens": 340,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 84
+    }
+  },
+  "finish": "length",
+  "done": true,
+  "temperature": 0,
+  "case": "short-story",
+  "thinking": false
+}

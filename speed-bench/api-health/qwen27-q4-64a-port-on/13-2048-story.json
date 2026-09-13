@@ -1,0 +1,20 @@
+{
+  "wall_s": 14.178951915999988,
+  "ttft_s": 0.13124141599999462,
+  "text": "The rain didn\u2019t fall; it hammered the glass of the lantern room, a relentless drumroll that drowned out the hum of the generator. Elias wiped the condensation from the lens, his breath pluming in the cold air, when the radio crackled. It wasn\u2019t the static of the storm, nor the usual maritime chatter. It was a voice, clear as a bell, speaking with the same gravelly timbre as his own.\n\n\"Stop the rotation, Elias.\"\n\nElias froze, his hand hovering over the manual override lever. \"Who is this? This is a private frequency.\"\n\n\"It\u2019s me. Or rather, it\u2019s you. Three days from now.\" The voice sighed, a sound of profound exhaustion. \"Listen to me. Do not let the supply boat dock at the jetty at 0400 hours. If you do, the hull breaches. The water comes in. You die.\"\n\nElias stared at the black water lapping against the rocks below. The *Gull*, the weekly supply vessel, was due at dawn. \"This is a prank. I\u2019m going to cut the power.\"\n\n\"You can\u2019t. The backup generator is on the lower deck. If you cut the main power, the lights",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 2038,
+    "completion_tokens": 256,
+    "total_tokens": 2294,
+    "prompt_tokens_details": {
+      "cached_tokens": 2038,
+      "cache_write_tokens": 0
+    }
+  },
+  "finish": "length",
+  "done": true,
+  "temperature": 0,
+  "case": "2048-story",
+  "thinking": false
+}

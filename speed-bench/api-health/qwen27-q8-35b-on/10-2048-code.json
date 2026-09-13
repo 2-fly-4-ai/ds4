@@ -1,0 +1,20 @@
+{
+  "wall_s": 9.560974709000003,
+  "ttft_s": 5.976320625000003,
+  "text": "```python\nclass Node:\n    \"\"\"Doubly linked list node to store key-value pairs.\"\"\"\n    def __init__(self, key=None, value=None):\n        self.key = key\n        self.value = value\n        self.prev = None\n        self.next = None\n\n\nclass LRUCache:\n    \"\"\"\n    LRU Cache implementation using a doubly linked list and a dictionary.\n    \n    The dictionary maps keys to nodes for O(1) access.\n    The doubly linked list maintains the order of usage, with the most recently\n    used item at the head and the least recently used item at the tail.\n    \"\"\"\n    \n    def __init__(self, capacity: int):\n        if capacity <= 0:\n            raise ValueError(\"Capacity must be positive\")\n        self.capacity = capacity\n        self.cache = {}  # key -> Node\n        \n        # Dummy head and tail nodes to simplify edge cases\n        self.head = Node()  # Head points to the most recently used\n        self.tail = Node()  # Tail points to the least recently used\n        \n        # Initialize the doubly linked list with head and tail connected\n        self.head.next = self.tail\n        self.tail.prev = self.head",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 1368,
+    "completion_tokens": 256,
+    "total_tokens": 1624,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 1368
+    }
+  },
+  "finish": "length",
+  "done": true,
+  "temperature": 0,
+  "case": "2048-code",
+  "thinking": false
+}

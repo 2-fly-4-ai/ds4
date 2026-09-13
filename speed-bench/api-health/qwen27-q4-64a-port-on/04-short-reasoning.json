@@ -1,0 +1,20 @@
+{
+  "wall_s": 7.748310707999998,
+  "ttft_s": 1.3332280830000016,
+  "text": "To determine the number of workers needed, we must first calculate the total required capacity, accounting for the spike reserve, and then divide that by the capacity of a single worker.\n\n### Step 1: Calculate Total Required Capacity\n\nThe service receives 120 requests per second (RPS). We need to reserve 25% of the **total capacity** for spikes. This means the 120 RPS represents only 75% of the total capacity (since 100% - 25% = 75%).\n\nLet $C$ be the total capacity in RPS.\n$$0.75 \\times C = 120$$\n\nSolving for $C$:\n$$C = \\frac{120}{0.75}$$\n$$C = 160 \\text{ RPS}$$\n\nSo, the system must be capable of handling 160 RPS in total to allow for the 25% spike reserve.\n\n### Step 2: Calculate Number of Workers\n\nEach worker handles 20 RPS. Let $N$ be the number of workers.\n$$N = \\frac{\\text{Total Required Capacity}}{\\text{Capacity",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 91,
+    "completion_tokens": 256,
+    "total_tokens": 347,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 91
+    }
+  },
+  "finish": "length",
+  "done": true,
+  "temperature": 0,
+  "case": "short-reasoning",
+  "thinking": false
+}

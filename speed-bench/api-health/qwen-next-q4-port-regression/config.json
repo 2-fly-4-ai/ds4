@@ -1,0 +1,26 @@
+{
+  "source_phase": "context-sweep",
+  "argv": [
+    "/Users/brianfarley/Desktop/ds4-qwen35-runtime/ds4-server",
+    "-m",
+    "/Users/brianfarley/Desktop/ds4/gguf/qwen38-q4k-tensor/Qwen3.8-Flash-Next-Q4KImatrixExperts-MXFP4Down-BF16Emb-BF16Control-Q8GDN-Q8QSA-Q8Shared-Q8Out-MTP.gguf",
+    "--metal",
+    "--ctx",
+    "40000",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "55735",
+    "--trace",
+    "/Users/brianfarley/Desktop/ds4-qwen35-runtime/speed-bench/api-health/qwen-next-q4-port-regression/trace.log",
+    "--ple",
+    "/Users/brianfarley/Desktop/ds4/gguf/qwen38-q4k-tensor/Qwen3.8-Flash-Next-PLE-Q4_1.gguf",
+    "--mtp-timing"
+  ],
+  "env_overrides": {
+    "DS4_PROMPT_LOOKUP_LOG": "1",
+    "DS4_QWEN_MTP_PROFILE": "1",
+    "DS4_MTP_TIMING": "1",
+    "DS4_QWEN4_MOE_MM_NAX": "1"
+  }
+}

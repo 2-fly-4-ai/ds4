@@ -1,0 +1,20 @@
+{
+  "wall_s": 4.561994332999998,
+  "ttft_s": 0.3207925419999995,
+  "text": "To determine the number of workers needed, we must calculate the effective capacity per worker after accounting for the safety reserve, and then divide the total load by this effective capacity.\n\n### Step 1: Determine Effective Capacity per Worker\n\nEach worker can handle **20 requests per second (RPS)** at full capacity. However, we must reserve **25%** of this capacity for spikes. This means only **75%** of the worker's capacity is available for normal traffic.\n\n$$\n\\text{Effective Capacity per Worker} = 20 \\times (1 - 0.25) = 20 \\times 0.75 = 15 \\text{ RPS}\n$$\n\n### Step 2: Calculate Required Workers\n\nThe service receives **120 RPS**. We divide the total load by the effective capacity per worker:\n\n$$\n\\text{Workers Needed} = \\frac{\\text{Total Load}}{\\text{Effective Capacity per Worker}} = \\frac{120}{15}\n$$\n\n$$\n\\frac{120}{15} = 8\n$$\n\nSince the result is a whole number, no rounding up is necessary.\n\n### Step 3:",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 86,
+    "completion_tokens": 256,
+    "total_tokens": 342,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 86
+    }
+  },
+  "finish": "length",
+  "done": true,
+  "temperature": 0,
+  "case": "short-reasoning",
+  "thinking": false
+}

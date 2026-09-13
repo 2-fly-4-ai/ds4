@@ -20912,6 +20912,13 @@ int ds4_gpu_matmul_affine2_g64_tensor(
     }
 }
 
+static uint32_t g_small_qwen_heads=24, g_small_qwen_kv_heads=4;
+int ds4_gpu_qwen_set_attention_shape(uint32_t heads,uint32_t kv_heads) {
+    if (!((heads==24 && kv_heads==4)||(heads==16 && kv_heads==2))) return 0;
+    g_small_qwen_heads=heads; g_small_qwen_kv_heads=kv_heads;
+    return 1;
+}
+
 int ds4_gpu_qwen_full_attn_rows_tensor(
         ds4_gpu_tensor       *heads,
         ds4_gpu_tensor       *q,
@@ -20931,7 +20938,7 @@ int ds4_gpu_qwen_full_attn_rows_tensor(
         uint32_t              layer,
         uint32_t              cap,
         uint32_t              n_tok) {
-    const uint32_t n_head = 24, n_head_kv = 4, head_dim = 256;
+    const uint32_t n_head = g_small_qwen_heads, n_head_kv = g_small_qwen_kv_heads, head_dim = 256;
     const uint64_t kv_bytes = (uint64_t)n_head_kv * head_dim * sizeof(float);
     if (!heads || !q || !k || !v || !gate || !k_cache || !v_cache) return 0;
     if (n_tok == 0 || pos0 + n_tok > cap) return 0;
@@ -21030,7 +21037,7 @@ int ds4_gpu_qwen_full_attn_tensor(
         uint32_t              pos,
         uint32_t              layer,
         uint32_t              cap) {
-    const uint32_t n_head = 24, n_head_kv = 4, head_dim = 256;
+    const uint32_t n_head = g_small_qwen_heads, n_head_kv = g_small_qwen_kv_heads, head_dim = 256;
     const uint64_t kv_bytes = (uint64_t)n_head_kv * head_dim * sizeof(float);
     if (!heads || !q || !k || !v || !gate || !k_cache || !v_cache) return 0;
     if (pos >= cap) return 0;

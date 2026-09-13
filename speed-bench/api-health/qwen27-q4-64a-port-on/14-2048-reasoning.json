@@ -1,0 +1,20 @@
+{
+  "wall_s": 34.072087374999995,
+  "ttft_s": 26.077496333,
+  "text": "To determine the number of workers needed, we must first calculate the total required capacity, accounting for the spike reserve, and then divide that by the capacity of a single worker.\n\n**Step 1: Calculate the base capacity required**\nThe service receives 120 requests per second.\n$$ \\text{Base Capacity} = 120 \\text{ requests/second} $$\n\n**Step 2: Account for the spike reserve**\nThe problem states to reserve 25% of the *total capacity* for spikes. This means the 120 requests per second represent only 75% of the total capacity (since 100% - 25% = 75%).\n\nLet $C$ be the total capacity.\n$$ 0.75 \\times C = 120 $$\n\nSolving for $C$:\n$$ C = \\frac{120}{0.75} $$\n$$ C = 160 \\text{ requests/second} $$\n\nSo, the system must be capable of handling 160 requests per second in total to ensure that 25% (40 requests/second) is reserved for spikes while still handling the current",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 2020,
+    "completion_tokens": 256,
+    "total_tokens": 2276,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 2020
+    }
+  },
+  "finish": "length",
+  "done": true,
+  "temperature": 0,
+  "case": "2048-reasoning",
+  "thinking": false
+}

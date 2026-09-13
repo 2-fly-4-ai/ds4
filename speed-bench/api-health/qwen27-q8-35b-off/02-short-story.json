@@ -1,0 +1,20 @@
+{
+  "wall_s": 3.3656272090000003,
+  "ttft_s": 0.3137483339999996,
+  "text": "The salt crusted on Elias\u2019s eyelashes like frozen tears. For forty years, the Blackwood Light had been his only companion, a solitary finger of granite pointing accusingly at the gray, heaving Atlantic. The storm outside was not merely weather; it was a living thing, screaming against the glass, trying to claw its way into the warmth of the lantern room.\n\nThen, the bell rang.\n\nIt wasn\u2019t the foghorn. It was the old brass telegraph bell, rusted shut since the radio days of the 1970s. Elias froze, his rag hovering over the Fresnel lens. The sound was sharp, metallic, and impossible.\n\n*Clang.*\n\nHe dropped the rag. \"Who\u2019s there?\" His voice cracked, unused to speaking above a whisper.\n\n*Clang. Clang.*\n\nElias scrambled down the spiral stairs, his boots slipping on the wet iron rungs. He burst into the control room, heart hammering against his ribs like a trapped bird. The room was empty, save for the humming generators and the smell of ozone. But on the desk, where no paper had been for decades, lay a single sheet of heavy, cream-colored stock.\n\nIt was dry. Impossibly",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 70,
+    "completion_tokens": 256,
+    "total_tokens": 326,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 70
+    }
+  },
+  "finish": "length",
+  "done": true,
+  "temperature": 0,
+  "case": "short-story",
+  "thinking": false
+}

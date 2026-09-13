@@ -18,10 +18,14 @@ args[args.index('--port')+1]=str(port)
 args[args.index('--trace')+1]=str(out/'trace.log')
 env={k:v for k,v in os.environ.items() if not k.startswith('DS4_')}
 env.update(c['env_overrides'])
+if os.environ.get('HEALTH_MODEL_FILE'):
+ args[args.index('-m')+1]=os.environ['HEALTH_MODEL_FILE']
+ env.pop('DS4_QWEN_MTP_HEAD',None)
 if os.environ.get('HEALTH_MTP_OFF'):env['DS4_QWEN_NEXTN_DRAFT']='0'
 (out/'config.json').write_text(json.dumps(dict(source_phase=phase,argv=args,env_overrides={k:v for k,v in env.items() if k.startswith('DS4_')}),indent=2))
 with (out/'server.log').open('w') as log:
- p=subprocess.Popen(args,cwd=ROOT,env=env,stdout=log,stderr=log)
+ # Metal sources belong to the selected binary, including reference builds.
+ p=subprocess.Popen(args,cwd=Path(args[0]).parent,env=env,stdout=log,stderr=log)
  stop=threading.Event();fail=[]
  threading.Thread(target=guard,args=(p,stop,fail,memory()['swap_gib']),daemon=True).start()
  try:
@@ -41,6 +45,7 @@ with (out/'server.log').open('w') as log:
          for task in os.environ.get('HEALTH_TASKS','code,story,reasoning,json,edit').split(',')]
   if os.environ.get('HEALTH_EXTRA'):
    tasks += [('short-json',0),('short-code',0.7),('short-story',0.7)]
+  tasks=[item for item in tasks for _ in range(int(os.environ.get('HEALTH_REPEAT','1')))]
   for index,(task,temperature) in enumerate(tasks):
    body=json.loads((source/f'{task}.request.json').read_text())
    if 'prompt' in body and os.environ.get('HEALTH_CHAT'):

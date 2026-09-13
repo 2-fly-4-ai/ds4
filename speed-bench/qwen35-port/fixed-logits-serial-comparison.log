@@ -1,0 +1,5 @@
+Fixed-token comparison: rows=32 vocab=248320 exact_values=2695/7946240 matching_argmax=32/32 max_abs_error=0.509293556 peak=37.4831848 scaled_error=0.0135872541
+Traceback (most recent call last):
+  File "/Users/brianfarley/Desktop/ds4-qwen35-runtime/tests/compare_qwen_fixed_logits.py", line 23, in <module>
+    assert max_error<=1e-4*max(1,peak), 'logit error exceeds scaled FP32 reference tolerance'
+AssertionError: logit error exceeds scaled FP32 reference tolerance

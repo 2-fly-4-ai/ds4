@@ -1,0 +1,20 @@
+{
+  "wall_s": 3.4940868750000003,
+  "ttft_s": 0.3981157500000001,
+  "text": "Here is a complete implementation of an LRU (Least Recently Used) Cache in Python. It uses a `dict` for $O(1)$ lookups and a `DoublyLinkedList` to maintain the order of usage, ensuring $O(1)$ insertion, deletion, and access.\n\n### Implementation\n\n```python\nimport unittest\nfrom collections import OrderedDict\n\n# --- Doubly Linked List Node ---\nclass Node:\n    def __init__(self, key=None, value=None):\n        self.key = key\n        self.value = value\n        self.prev = None\n        self.next = None\n\n# --- Doubly Linked List ---\nclass DoublyLinkedList:\n    def __init__(self):\n        # Dummy head and tail to simplify edge cases\n        self.head = Node()\n        self.tail = Node()\n        self.head.next = self.tail\n        self.tail.prev = self.head\n        self.size = 0\n\n    def add_to_front(self, node):\n        \"\"\"Add a node right after the head (most recently used).\"\"\"\n        node.prev = self.head\n        node.next = self.head.next\n        self.head.next.prev = node\n        self.head.next = node\n        self.size +=",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 83,
+    "completion_tokens": 256,
+    "total_tokens": 339,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 83
+    }
+  },
+  "finish": "length",
+  "done": true,
+  "temperature": 0,
+  "case": "short-code",
+  "thinking": false
+}

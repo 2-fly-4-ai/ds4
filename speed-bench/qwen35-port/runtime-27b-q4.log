@@ -1,0 +1,19 @@
+ds4: warming mapped tensor pages: 14.32 GiB
+ds4: warmed tensor pages in 1.772s (checksum=118778210)
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 0.438 ms, residency requested in 60.260 ms, warmup 2.346 ms (mapped 14664.73 MiB from offset 10.49 MiB)
+ds4: Metal mapped mmaped model as 1 overlapping shared buffers
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 0.25 GiB (raw 0.25 + compressed 0.00) + buffers 0.00 GiB + resident model 14.32 GiB = 14.57 GiB planned
+ds4: memory detail: ctx=4096 prefill_cap=4096 raw_kv_rows=4096 compressed_kv_rows=3 backend=metal
+ds4: n-row n=16 encode=1.0 wait=262.3 ms ok=1 fail=- il=0
+ds4: n-row n=11 encode=0.8 wait=191.0 ms ok=1 fail=- il=0
+ds4: n-row n=16 encode=0.9 wait=191.7 ms ok=1 fail=- il=0
+ds4: n-row n=4 encode=0.7 wait=53.7 ms ok=1 fail=- il=0
+ds4: using MTP head sidecar /Users/brianfarley/Desktop/ds4/gguf/qwen-small-quality/mtp-Qwen3.8-27B-Q4_64A.gguf
+ds4: n-row n=5 encode=0.8 wait=65.6 ms ok=1 fail=- il=0
+ds4: n-row n=5 encode=0.6 wait=65.9 ms ok=1 fail=- il=0
+ds4: Metal cleanup discarded 71 live tensor handles
+SMALL_RUNTIME_PASS model=/Users/brianfarley/Desktop/ds4/gguf/qwen-small-quality/Qwen3.8-27B-Q4_64A.gguf tokens=96 hot_bytes=216627200 MTP_drafted=94 accepted=72

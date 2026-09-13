@@ -1,0 +1,20 @@
+{
+  "wall_s": 25.78511108299999,
+  "ttft_s": 5.843747332999996,
+  "text": "Let\u2019s work through it step by step.\n\n**Given:**\n- Request rate: **120 requests/second**\n- Each worker handles: **20 requests/second**\n- Reserve: **25% of total capacity** for spikes\n\n**Step 1 \u2014 Required capacity without reserve**\n\nIf no reserve were needed:\n\n\\[\n120 \\div 20 = 6 \\text{ workers}\n\\]\n\nSo 6 workers would exactly handle the steady load.\n\n**Step 2 \u2014 Account for the 25% reserve**\n\nThe reserve means we should only use **75%** of total capacity for normal load, leaving 25% free for spikes.\n\nLet \\( W \\) = number of workers.\n\nTotal capacity = \\( 20W \\) requests/second.\n\nUsable capacity for normal load = \\( 75\\% \\) of total capacity:\n\n\\[\n0.75 \\times 20W = 15W\n\\]\n\nWe need this usable capacity to cover 120 requests/second:\n\n\\[\n15W \\ge 120\n\\]\n\n\\[\nW \\ge 120 \\div 15 = 8\n\\]\n\nSo **8 workers** are needed.\n\n**Step 3 \u2014 Check the result**\n\nWith 8 workers:\n- Total capacity = \\( 8 \\times 20 = 160 \\) req",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 72,
+    "completion_tokens": 256,
+    "total_tokens": 328,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 72
+    }
+  },
+  "finish": "length",
+  "done": true,
+  "temperature": 0,
+  "case": "short-reasoning",
+  "thinking": false
+}

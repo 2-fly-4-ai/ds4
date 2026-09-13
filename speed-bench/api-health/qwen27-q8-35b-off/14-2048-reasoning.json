@@ -1,0 +1,20 @@
+{
+  "wall_s": 15.346270125000004,
+  "ttft_s": 8.858348500000005,
+  "text": "To determine the number of workers needed, we must first calculate the effective capacity required per worker after accounting for the spike reserve, and then divide the total load by that effective capacity.\n\n### Step 1: Calculate Effective Capacity per Worker\n\nEach worker has a base capacity of 20 requests per second. However, 25% of this capacity must be reserved for spikes. This means only 75% of the worker's capacity is available for regular traffic.\n\n$$\n\\text{Effective Capacity per Worker} = \\text{Base Capacity} \\times (1 - \\text{Reserve Percentage})\n$$\n\n$$\n\\text{Effective Capacity per Worker} = 20 \\times (1 - 0.25)\n$$\n\n$$\n\\text{Effective Capacity per Worker} = 20 \\times 0.75 = 15 \\text{ requests per second}\n$$\n\n### Step 2: Calculate Required Number of Workers\n\nThe service receives 120 requests per second. We divide the total load by the effective capacity per worker to find the number of workers needed.\n\n$$\n\\text{Workers Needed} = \\frac{\\text{Total Requests per Second}}{\\text{Effective",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 2016,
+    "completion_tokens": 256,
+    "total_tokens": 2272,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 2016
+    }
+  },
+  "finish": "length",
+  "done": true,
+  "temperature": 0,
+  "case": "2048-reasoning",
+  "thinking": false
+}

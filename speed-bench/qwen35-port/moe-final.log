@@ -1,0 +1,22 @@
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 0.055 ms, residency requested in 6.578 ms, warmup 3.497 ms (mapped 256.00 MiB from offset 0.00 MiB)
+ds4: Metal mapped mmaped model as 1 overlapping shared buffers
+  router NE=256 k=8 T=1: shared gate logit     ok  max|d|=2.39e-09 (scale 6.40e-01)
+  router NE=256 k=8 T=1: softmax top-k         ok  max|d|=1.76e-08
+  router NE=256 k=8 T=5: shared gate logit     ok  max|d|=2.50e-07 (scale 1.31e+00)
+  router NE=256 k=8 T=5: softmax top-k         ok  max|d|=2.01e-08
+  moe q8_0 E=2048 F=512 slots=8 T=1: reduce+combine ok  max|d|=4.61e-07 (scale 2.78e+00)
+  moe q8_0 E=2048 F=512 slots=8 T=1: mid (+shared) ok  max|d|=5.55e-07 (scale 5.26e+00)
+  moe q8_0 E=2048 F=512 slots=8 T=1: down (+shared) ok  max|d|=1.72e-07 (scale 9.04e-01)
+  moe q8_0 E=2048 F=512 slots=8 T=1: out       ok  max|d|=3.60e-07 (scale 1.68e+00)
+  moe mm q8_0 E=2048 F=512 slots=8 T=1: mid    ok  max|d|=1.49e-03 (scale 5.26e+00)
+  moe mm q8_0 E=2048 F=512 slots=8 T=1: down   ok  max|d|=4.42e-04 (scale 9.04e-01)
+  moe q8_0 E=2048 F=512 slots=8 T=5: reduce+combine ok  max|d|=6.58e-07 (scale 3.40e+00)
+  moe q8_0 E=2048 F=512 slots=8 T=5: mid (+shared) ok  max|d|=5.65e-07 (scale 4.31e+00)
+  moe q8_0 E=2048 F=512 slots=8 T=5: down (+shared) ok  max|d|=1.88e-07 (scale 9.72e-01)
+  moe q8_0 E=2048 F=512 slots=8 T=5: out       ok  max|d|=3.43e-07 (scale 1.73e+00)
+  moe mm q8_0 E=2048 F=512 slots=8 T=5: mid    ok  max|d|=1.16e-03 (scale 4.31e+00)
+  moe mm q8_0 E=2048 F=512 slots=8 T=5: down   ok  max|d|=4.84e-04 (scale 9.72e-01)
+QWEN35_MOE_ORACLE_PASS

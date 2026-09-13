@@ -1,0 +1,20 @@
+{
+  "wall_s": 13.685514083000001,
+  "ttft_s": 5.7730666249999985,
+  "text": "#define BUFFER_CAPACITY 128\ntypedef struct RingBuffer { unsigned head; unsigned tail; int values[BUFFER_CAPACITY]; } RingBuffer;\nstatic int ring_push(RingBuffer *buffer, int value) {\n    unsigned next = (buffer->head + 1u) % BUFFER_CAPACITY;\n    if (next == buffer->tail) return 0;\n    buffer->values[buffer->head] = value;\n    buffer->head = next;\n    return 1;\n}\nstatic int dequeue(RingBuffer *buffer, int *value) {\n    if (buffer->tail == buffer->head) return 0;\n    *value = buffer->values[buffer->tail];\n    buffer->tail = (buffer->tail + 1u) % BUFFER_CAPACITY;\n    return 1;\n}",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 454,
+    "completion_tokens": 176,
+    "total_tokens": 630,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 454
+    }
+  },
+  "finish": "stop",
+  "done": true,
+  "temperature": 0,
+  "case": "short-edit",
+  "thinking": false
+}

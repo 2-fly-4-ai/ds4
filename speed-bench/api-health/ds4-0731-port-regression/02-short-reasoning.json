@@ -1,0 +1,20 @@
+{
+  "wall_s": 6.4719075,
+  "ttft_s": 0.38318662500000045,
+  "text": "To determine how many workers are needed, we need to account for the service\u2019s request rate and the workers\u2019 capacity, including the 25% reserve for spikes.\n\n**Step 1: Calculate the total capacity needed per second**  \nThe service gets 120 requests per second. To handle spikes, we need 25% more capacity than the normal load.  \nTotal capacity needed = 120 requests/second \u00d7 1.25 = **150 requests/second**.\n\n**Step 2: Determine the effective capacity per worker**  \nEach worker handles 20 requests per second, but this is their *normal* capacity. Since we already included the 25% reserve in the total capacity, we use the worker\u2019s full 20 requests/second as their capacity.  \n(Alternatively, if we considered the reserve per worker, we\u2019d reduce their usable capacity to 15, but that would double-count the reserve. The correct approach is to apply the reserve to the total demand.)\n\n**Step 3: Calculate the number of workers**  \nNumber of workers = Total capacity needed \u00f7 Capacity per worker  \n= 150 \u00f7 20 = **7.5 workers**.\n\n**Step 4: Round up**  \nSince we cannot have a fraction of a worker, we round up",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 71,
+    "completion_tokens": 256,
+    "total_tokens": 327,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 71
+    }
+  },
+  "finish": "length",
+  "done": true,
+  "temperature": 0,
+  "case": "short-reasoning",
+  "thinking": false
+}

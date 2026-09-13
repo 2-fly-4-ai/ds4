@@ -1,0 +1,20 @@
+{
+  "wall_s": 6.549114790999994,
+  "ttft_s": 0.033987040999996054,
+  "text": "The brass railing was cold enough to burn Elias\u2019s palms, but he didn\u2019t let go. Below, the Atlantic churned in a violent, ink-black rhythm, swallowing the moonlight whole. The storm had been raging for three days, a relentless assault that had silenced the radio and cracked the glass of the lantern room.\n\nElias adjusted the wick of the great Fresnel lens, his hands trembling not from fear, but from exhaustion. He was the last keeper on the Rock. The automated systems were supposed to have taken over a decade ago, but the funding had dried up, and the Coast Guard had left him to rot with the ghosts.\n\nThen, the bell rang.\n\nIt wasn\u2019t the foghorn. It was the old, iron hand-bell mounted by the door, the one used for emergencies. No one could reach the door. The wind was screaming at eighty miles per hour. The sea was ten feet above the gallery.\n\nElias froze. The bell rang again. *Clang.*\n\nHe turned slowly. The heavy oak door, bolted shut against the gale, was vibrating. Not from the wind. From the inside.\n\n\"Who\u2019s there?\" Elias shouted, his voice cracking from disuse.\n\nThe door",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 2034,
+    "completion_tokens": 256,
+    "total_tokens": 2290,
+    "prompt_tokens_details": {
+      "cached_tokens": 2034,
+      "cache_write_tokens": 0
+    }
+  },
+  "finish": "length",
+  "done": true,
+  "temperature": 0,
+  "case": "2048-story",
+  "thinking": false
+}

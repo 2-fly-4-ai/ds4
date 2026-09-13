@@ -1,0 +1,20 @@
+{
+  "wall_s": 27.292322749999983,
+  "ttft_s": 26.436464374999986,
+  "text": "{\"id\": 1, \"name\": \"Storage Node\", \"quantity\": 12, \"price\": 450.00}",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 2041,
+    "completion_tokens": 31,
+    "total_tokens": 2072,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 2041
+    }
+  },
+  "finish": "stop",
+  "done": true,
+  "temperature": 0,
+  "case": "2048-json",
+  "thinking": false
+}

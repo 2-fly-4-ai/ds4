@@ -1,0 +1,28 @@
+ds4: warming mapped tensor pages: 35.19 GiB
+ds4: warmed tensor pages in 3.035s (checksum=287961564)
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 0.866 ms, residency requested in 162.537 ms, warmup 2.489 ms (mapped 36039.47 MiB from offset 10.48 MiB)
+ds4: Metal mapped mmaped model as 1 overlapping shared buffers
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 0.16 GiB (raw 0.16 + compressed 0.00) + buffers 0.00 GiB + resident model 35.19 GiB = 35.35 GiB planned
+ds4: memory detail: ctx=4096 prefill_cap=4096 raw_kv_rows=4096 compressed_kv_rows=3 backend=metal
+ds4: n-row n=27 encode=3.4 wait=146.1 ms ok=1 fail=- il=0
+ds4: n-row n=20 encode=1.7 wait=94.9 ms ok=1 fail=- il=0
+ds4: n-row n=5 encode=0.8 wait=27.9 ms ok=1 fail=- il=0
+ds4: n-row n=5 encode=0.6 wait=27.7 ms ok=1 fail=- il=0
+ds4: n-row n=5 encode=0.6 wait=28.7 ms ok=1 fail=- il=0
+ds4: n-row n=5 encode=0.6 wait=28.3 ms ok=1 fail=- il=0
+ds4: warming mapped tensor pages: 35.19 GiB
+ds4: warmed tensor pages in 2.081s (checksum=287961564)
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Metal model views created in 0.856 ms, residency requested in 159.518 ms, warmup 3.079 ms (mapped 36039.47 MiB from offset 10.48 MiB)
+ds4: Metal mapped mmaped model as 1 overlapping shared buffers
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 0.16 GiB (raw 0.16 + compressed 0.00) + buffers 0.00 GiB + resident model 35.19 GiB = 35.35 GiB planned
+ds4: memory detail: ctx=4096 prefill_cap=4096 raw_kv_rows=4096 compressed_kv_rows=3 backend=metal
+SMALL_RUNTIME_PASS model=/Users/brianfarley/Desktop/ds4/gguf/qwen-small-quality/35b-mtp/Qwen3.6-35B-A3B-Q8_0.gguf tokens=96 hot_bytes=91387904 MTP_drafted=89 accepted=73
+SMALL_RUNTIME_PASS model=/Users/brianfarley/Desktop/ds4/gguf/qwen-small-quality/35b-mtp/Qwen3.6-35B-A3B-Q8_0.gguf tokens=96 hot_bytes=91387904 MTP_drafted=89 accepted=73

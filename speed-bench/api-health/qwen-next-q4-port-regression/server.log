@@ -1,0 +1,84 @@
+ds4: PLE sidecar table: /Users/brianfarley/Desktop/ds4/gguf/qwen38-q4k-tensor/Qwen3.8-Flash-Next-PLE-Q4_1.gguf (ple.weight [160, 320001536], CPU-only)
+ds4: Metal device Apple M5 Max, 128.00 GiB RAM
+ds4: Metal 4 tensor API enabled for Tensor kernels
+ds4: drift-patch flags hc_stable=on norm_unify=on kv_raw_f32=off rope_exp2_log2=off math_safe=off tensor_matmul=on
+ds4: Qwen PLE remains CPU-mapped; Metal residency restricted to 1 model spans (69.73 GiB)
+ds4: Metal model views created in 2.291 ms, residency requested in 7499.367 ms, warmup 3.562 ms (mapped 71400.42 MiB from offset 10.51 MiB)
+ds4: Metal mapped mmaped model as 1 overlapping shared buffers
+ds4: metal backend initialized for graph diagnostics
+ds4: memory: KV 1.27 GiB (raw 0.99 + compressed 0.28) + buffers 7.52 GiB + resident model 69.73 GiB = 78.52 GiB planned
+ds4: memory detail: ctx=40000 prefill_cap=8192 raw_kv_rows=40000 compressed_kv_rows=10001 backend=metal
+0914 05:56:23 ds4-server: context buffers 9006.95 MiB (ctx=40000, backend=metal, prefill_chunk=8192, raw_kv_rows=40000, compressed_kv_rows=10001)
+0914 05:56:23 ds4-server: tracing session to /Users/brianfarley/Desktop/ds4-qwen35-runtime/speed-bench/api-health/qwen-next-q4-port-regression/trace.log
+0914 05:56:23 ds4-server: listening on http://127.0.0.1:55735
+0914 05:56:23 ds4-server: chat ctx=0..68:68 prompt start
+0914 05:56:24 ds4-server: chat ctx=0..68:68 prefill chunk 68/68 (100.0%) chunk=157.07 t/s avg=157.07 t/s 0.433s
+0914 05:56:24 ds4-server: chat ctx=0..68:68 prompt done 0.433s
+0914 05:56:25 ds4-server: chat ctx=68..118:50 gen=50 decoding chunk=58.97 t/s avg=58.97 t/s 0.848s
+0914 05:56:25 ds4-server: chat ctx=118..168:50 gen=100 decoding chunk=65.63 t/s avg=62.12 t/s 1.610s
+0914 05:56:26 ds4-server: chat ctx=168..218:50 gen=150 decoding chunk=59.21 t/s avg=61.12 t/s 2.454s
+0914 05:56:27 ds4-server: chat ctx=218..268:50 gen=200 decoding chunk=61.27 t/s avg=61.16 t/s 3.270s
+0914 05:56:28 ds4-server: chat ctx=268..318:50 gen=250 decoding chunk=65.42 t/s avg=61.97 t/s 4.034s
+0914 05:56:28 ds4-server: chat ctx=318..324:6 gen=256 decoding chunk=64.58 t/s avg=62.02 t/s 4.127s
+0914 05:56:28 ds4-server: chat ctx=0..68:68 gen=256 finish=length 4.561s
+0914 05:56:28 ds4-server: live kv cache miss live=324 prompt=69 common=15 vision=match reason=token-mismatch
+0914 05:56:28 ds4-server: chat ctx=0..69:69 prompt start
+0914 05:56:28 ds4-server: chat ctx=0..69:69 prefill chunk 69/69 (100.0%) chunk=251.08 t/s avg=251.08 t/s 0.275s
+0914 05:56:28 ds4-server: chat ctx=0..69:69 prompt done 0.275s
+0914 05:56:29 ds4-server: chat ctx=69..119:50 gen=50 decoding chunk=52.34 t/s avg=52.34 t/s 0.955s
+0914 05:56:30 ds4-server: chat ctx=119..169:50 gen=100 decoding chunk=50.53 t/s avg=51.42 t/s 1.945s
+0914 05:56:31 ds4-server: chat ctx=169..219:50 gen=150 decoding chunk=51.42 t/s avg=51.42 t/s 2.917s
+0914 05:56:32 ds4-server: chat ctx=219..269:50 gen=200 decoding chunk=52.54 t/s avg=51.70 t/s 3.869s
+0914 05:56:33 ds4-server: chat ctx=269..319:50 gen=250 decoding chunk=52.64 t/s avg=51.88 t/s 4.819s
+0914 05:56:33 ds4-server: chat ctx=319..325:6 gen=256 decoding chunk=65.48 t/s avg=52.14 t/s 4.910s
+0914 05:56:33 ds4-server: chat ctx=0..69:69 gen=256 finish=length 5.185s
+0914 05:56:33 ds4-server: live kv cache miss live=325 prompt=86 common=15 vision=match reason=token-mismatch
+0914 05:56:33 ds4-server: chat ctx=0..86:86 prompt start
+0914 05:56:33 ds4-server: chat ctx=0..86:86 prefill chunk 86/86 (100.0%) chunk=295.84 t/s avg=295.84 t/s 0.291s
+0914 05:56:33 ds4-server: chat ctx=0..86:86 prompt done 0.291s
+0914 05:56:34 ds4-server: chat ctx=86..136:50 gen=50 decoding chunk=59.58 t/s avg=59.58 t/s 0.839s
+0914 05:56:35 ds4-server: chat ctx=136..186:50 gen=100 decoding chunk=62.12 t/s avg=60.82 t/s 1.644s
+0914 05:56:36 ds4-server: chat ctx=186..236:50 gen=150 decoding chunk=63.83 t/s avg=61.79 t/s 2.428s
+0914 05:56:37 ds4-server: chat ctx=236..286:50 gen=200 decoding chunk=59.95 t/s avg=61.32 t/s 3.262s
+ds4: Qwen3.8 prompt-lookup drafted=7 committed=1 verify=108.404 ms
+0914 05:56:37 ds4-server: chat ctx=286..336:50 gen=250 decoding chunk=54.72 t/s avg=59.87 t/s 4.175s
+0914 05:56:38 ds4-server: chat ctx=336..342:6 gen=256 decoding chunk=63.06 t/s avg=59.95 t/s 4.271s
+0914 05:56:38 ds4-server: chat ctx=0..86:86 gen=256 finish=length 4.561s
+0914 05:56:38 ds4-server: live kv cache miss live=342 prompt=72 common=15 vision=match reason=token-mismatch
+0914 05:56:38 ds4-server: chat ctx=0..72:72 prompt start
+0914 05:56:38 ds4-server: chat ctx=0..72:72 prefill chunk 72/72 (100.0%) chunk=263.90 t/s avg=263.90 t/s 0.273s
+0914 05:56:38 ds4-server: chat ctx=0..72:72 prompt done 0.273s
+0914 05:56:39 ds4-server: chat ctx=72..122:50 gen=50 decoding chunk=62.35 t/s avg=62.35 t/s 0.802s
+0914 05:56:39 ds4-server: chat ctx=122..137:15 gen=65 decoding chunk=70.53 t/s avg=64.07 t/s 1.015s
+0914 05:56:39 ds4-server: chat ctx=0..72:72 gen=65 finish=stop 1.288s
+0914 05:56:39 ds4-server: live kv cache miss live=137 prompt=449 common=15 vision=match reason=token-mismatch
+0914 05:56:39 ds4-server: chat ctx=0..449:449 prompt start
+0914 05:56:39 ds4-server: chat ctx=0..449:449 prefill chunk 449/449 (100.0%) chunk=749.10 t/s avg=749.10 t/s 0.599s
+0914 05:56:39 ds4-server: chat ctx=0..449:449 prompt done 0.599s
+ds4: Qwen3.8 prompt-lookup drafted=7 committed=7 verify=78.998 ms
+ds4: Qwen3.8 prompt-lookup drafted=7 committed=7 verify=79.543 ms
+ds4: Qwen3.8 prompt-lookup drafted=7 committed=1 verify=101.979 ms
+ds4: Qwen3.8 prompt-lookup drafted=7 committed=7 verify=78.699 ms
+0914 05:56:40 ds4-server: chat ctx=449..499:50 gen=50 decoding chunk=60.96 t/s avg=60.96 t/s 0.820s
+ds4: Qwen3.8 prompt-lookup drafted=7 committed=7 verify=79.664 ms
+ds4: Qwen3.8 prompt-lookup drafted=7 committed=7 verify=78.624 ms
+ds4: Qwen3.8 prompt-lookup drafted=7 committed=7 verify=79.782 ms
+ds4: Qwen3.8 prompt-lookup drafted=7 committed=7 verify=78.630 ms
+ds4: Qwen3.8 prompt-lookup drafted=7 committed=7 verify=79.779 ms
+ds4: Qwen3.8 prompt-lookup drafted=7 committed=7 verify=78.634 ms
+0914 05:56:41 ds4-server: chat ctx=499..549:50 gen=100 decoding chunk=99.85 t/s avg=75.70 t/s 1.321s
+ds4: Qwen3.8 prompt-lookup drafted=7 committed=7 verify=79.772 ms
+ds4: Qwen3.8 prompt-lookup drafted=7 committed=7 verify=78.890 ms
+ds4: Qwen3.8 prompt-lookup drafted=7 committed=7 verify=78.800 ms
+ds4: Qwen3.8 prompt-lookup drafted=7 committed=7 verify=78.831 ms
+ds4: Qwen3.8 prompt-lookup drafted=7 committed=7 verify=79.655 ms
+ds4: Qwen3.8 prompt-lookup drafted=7 committed=7 verify=78.446 ms
+0914 05:56:41 ds4-server: chat ctx=549..599:50 gen=150 decoding chunk=100.03 t/s avg=82.38 t/s 1.821s
+ds4: Qwen3.8 prompt-lookup drafted=7 committed=7 verify=79.215 ms
+ds4: Qwen3.8 prompt-lookup drafted=7 committed=7 verify=78.718 ms
+ds4: Qwen3.8 prompt-lookup drafted=6 committed=6 verify=72.635 ms
+0914 05:56:42 ds4-server: chat ctx=599..625:26 gen=176 decoding chunk=101.59 t/s avg=84.75 t/s 2.077s
+0914 05:56:42 ds4-server: chat ctx=0..449:449 gen=176 finish=stop 2.676s
+0914 05:56:42 ds4-server: shutdown requested, draining requests
+ds4: prompt-lookup summary: attempts=20 no_match=0 first_miss=0 verify_passes=20 drafted=139 committed=127 accept=91.4% tokens/pass=6.35 scan=0.02 ms total gate_skips=16 gate_partials=2 gate_ambiguous=0 parity_replays=0
+ds4: Qwen3.8 mtp: 467 verify cycles, 386 drafts accepted (82.7%)

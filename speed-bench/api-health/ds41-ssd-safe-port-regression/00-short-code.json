@@ -1,0 +1,20 @@
+{
+  "wall_s": 30.910131374999995,
+  "ttft_s": 8.991165415999998,
+  "text": "Here's a complete Python LRU cache implementation using a doubly linked list and dictionary, with unit tests covering updates, eviction, and capacity one.\n\n```python\n\"\"\"LRU cache implemented with a doubly linked list and a dictionary.\"\"\"\n\n\nclass _Node:\n    \"\"\"A node in the doubly linked list.\"\"\"\n\n    __slots__ = (\"key\", \"value\", \"prev\", \"next\")\n\n    def __init__(self, key=None, value=None):\n        self.key = key\n        self.value = value\n        self.prev = None\n        self.next = None\n\n\nclass LRUCache:\n    \"\"\"Least-Recently-Used cache with O(1) get and put.\n\n    A dictionary maps keys to nodes for O(1) lookup, and a doubly linked\n    list tracks recency order. The head holds the most recently used item;\n    the tail holds the least recently used item.\n    \"\"\"\n\n    def __init__(self, capacity):\n        if capacity < 1:\n            raise ValueError(\"capacity must be at least 1\")\n        self.capacity = capacity\n        self._map = {}\n        # Sentinel head/tail nodes simplify edge cases.\n        self._head = _Node()\n        self._tail = _Node()\n",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 59,
+    "completion_tokens": 256,
+    "total_tokens": 315,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 59
+    }
+  },
+  "finish": "length",
+  "done": true,
+  "temperature": 0,
+  "case": "short-code",
+  "thinking": false
+}

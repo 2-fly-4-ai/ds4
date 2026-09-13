@@ -64,3 +64,6 @@ __pycache__/
 /misc/
 .*.swp
 .DS_Store
+/tests/test_qwen_small_runtime
+/tests/test_qwen35_moe_port
+/tests/qwen_fixed_token_probe

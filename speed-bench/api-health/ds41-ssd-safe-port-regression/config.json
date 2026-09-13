@@ -1,0 +1,28 @@
+{
+  "source_phase": "v41-16gb",
+  "argv": [
+    "/Users/brianfarley/Desktop/ds4-qwen35-runtime/ds4-server",
+    "-m",
+    "/Users/brianfarley/Desktop/ds4/gguf/DeepSeek-V4.1-Flash-IQ2XXS-w2Q2K.gguf",
+    "--metal",
+    "--ctx",
+    "4096",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "55929",
+    "--trace",
+    "/Users/brianfarley/Desktop/ds4-qwen35-runtime/speed-bench/api-health/ds41-ssd-safe-port-regression/trace.log",
+    "--engram",
+    "/Users/brianfarley/Desktop/ds4/gguf/DeepSeek-V4.1-Flash-Engram.gguf",
+    "--ssd-streaming",
+    "--ssd-streaming-cold",
+    "--ssd-streaming-cache-experts",
+    "16GB"
+  ],
+  "env_overrides": {
+    "DS4_PROMPT_LOOKUP_LOG": "1",
+    "DS4_QWEN_MTP_PROFILE": "1",
+    "DS4_MTP_TIMING": "1"
+  }
+}

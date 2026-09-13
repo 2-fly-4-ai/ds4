@@ -1,0 +1,20 @@
+{
+  "wall_s": 2.8833287080000005,
+  "ttft_s": 0.48548445800000195,
+  "text": "[{\"id\": 4, \"name\": \"Inventory Item GLM53-0004-A\", \"quantity\": 12, \"price\": 19.99}, {\"id\": 5, \"name\": \"Inventory Item GLM53-0004-B\", \"quantity\": 7, \"price\": 45.5}, {\"id\": 6, \"name\": \"Inventory Item GLM53-0004-C\", \"quantity\": 25, \"price\": 8.25}]",
+  "reasoning": "",
+  "usage": {
+    "prompt_tokens": 60,
+    "completion_tokens": 103,
+    "total_tokens": 163,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 60
+    }
+  },
+  "finish": "stop",
+  "done": true,
+  "temperature": 0,
+  "case": "short-json",
+  "thinking": false
+}
