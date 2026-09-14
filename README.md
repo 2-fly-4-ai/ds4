@@ -2,6 +2,9 @@
   <img src="logo.svg" alt="DwarfStar logo" width="220">
 </p>
 
+**This Mac's production setup:** see [DAILY_USE.md](DAILY_USE.md) for installed
+models, validated launch settings, current limitations and benchmark evidence.
+
 **DwarfStar** is a small native inference engine optimized first for
 **DeepSeek V4 Flash** (including the experimental vision model), with
 experimental support for the multimodal **DeepSeek V4.1 Flash** architecture.
