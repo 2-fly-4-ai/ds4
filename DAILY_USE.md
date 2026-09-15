@@ -99,16 +99,16 @@ existing default provider or model.
 
 | Pi GUI option | Context | Notes |
 | --- | ---: | --- |
-| DeepSeek V4 Flash 0731 | 100K | Recommended coding default |
+| DeepSeek V4 Flash 0731 | 262K | Recommended coding default |
 | DeepSeek V4.1 Flash | 16K | Experimental SSD streaming; vision enabled |
-| GLM 5.3 Flash | 32K | Resident, MTP/router enabled |
-| Qwen 3.8 Flash Next Q4 | 64K | Resident, MTP/router enabled |
-| Qwen 3.6 35B-A3B Q8 | 4K | Short tasks only |
-| Qwen 3.8 27B Q8 | 4K | Short tasks only |
-| Qwen 3.8 27B optimized Q4 | 4K | Short tasks only |
-| DeepSeek V4 Vision Exp | 40K | Image input enabled |
-| GLM 5.3 Flash Vision | 32K | Image input enabled |
-| Qwen 3.8 Flash Next Q4 Vision | 64K | Image input enabled |
+| GLM 5.3 Flash | 262K | Resident, MTP/router enabled |
+| Qwen 3.8 Flash Next Q4 | 262K | Resident, MTP/router enabled |
+| Qwen 3.6 35B-A3B Q8 | 262K | Full native window; compact GQA KV |
+| Qwen 3.8 27B Q8 | 128K | Safe 128 GB allocation; MTP sidecar enabled |
+| Qwen 3.8 27B optimized Q4 | 128K | Safe 128 GB allocation; MTP sidecar enabled |
+| DeepSeek V4 Vision Exp | 262K | Image input enabled |
+| GLM 5.3 Flash Vision | 262K | Image input enabled |
+| Qwen 3.8 Flash Next Q4 Vision | 262K | Image input enabled |
 
 Only one giant model can be loaded on this 128 GB Mac at once. Double-click
 `start_pi_coding_server.command` and wait for the initial DeepSeek V4 server to
@@ -128,19 +128,16 @@ Ctrl-C to stop the supervisor and unload its worker. Pi reloads `models.json`
 when its model picker opens; restart Pi GUI if an already-open picker does not
 refresh.
 
-Pi's automatic compaction remains enabled. With the recommended 100K context,
-its installed defaults reserve 16K tokens for the next response and retain
-approximately 20K recent tokens while summarizing older work. The configured
-384K `maxTokens` value is an output ceiling, not the active context allocation:
-the server's 100K context is still the hard prompt-plus-output limit. This high
-ceiling avoids an arbitrary client-side response cap; the server stops at the
-available context boundary.
+Pi's automatic compaction remains enabled and uses the selected model's
+`contextWindow`. The configured 384K `maxTokens` value is only a permissive
+client-side output ceiling; it does not override the active server allocation.
+The server still enforces prompt plus output against the selected profile's
+262K, 128K, or 16K context boundary.
 
-Those global compaction defaults are intentionally aimed at the 100K coding
-model. They do not fit the 4K small-Qwen choices, and the 16K V4.1 choice has no
-room left before its default reserve. Use those entries for short, fresh tasks,
-not a long-running Pi coding session. A future per-model compaction policy would
-be required to make model switching transparent across such different windows.
+DeepSeek V4.1 is the one deliberately short-window entry because its optional
+SSD-streaming mode is configured at 16K. The other profiles now expose the
+measured resident capacities, so Pi can compact against the real window rather
+than the former temporary 4K/32K/64K placeholders.
 
 ## What remains enabled
 
