@@ -111,11 +111,22 @@ existing default provider or model.
 | Qwen 3.8 Flash Next Q4 Vision | 64K | Image input enabled |
 
 Only one giant model can be loaded on this 128 GB Mac at once. Double-click
-`start_pi_coding_server.command`, choose the model from its menu and wait for
-the server-ready message. Then choose the matching entry in Pi GUI's model
-picker. Selecting a Pi entry does not itself unload and replace the MacBook's
-model. Pi reloads `models.json` when its model picker opens; restart Pi GUI if
-an already-open picker does not refresh.
+`start_pi_coding_server.command` and wait for the initial DeepSeek V4 server to
+become ready. The launcher runs a Tailscale-only supervisor on port 8001 and
+the OpenAI-compatible worker on port 8000. Choosing a DwarfStar entry in the
+custom Pi GUI build then gracefully unloads the current worker, starts the
+matching allowlisted profile and waits for `/v1/models` before completing the
+selection. Re-selecting the current model is a no-op. Pi also verifies the
+profile immediately before each send, so a restored session cannot silently
+talk to the wrong loaded model.
+
+The Mac mini stores the supervisor address and control token in
+`~/.pi/agent/dwarfstar-supervisor.json`. The control endpoint is deliberately
+not bound to Wi-Fi or all interfaces. Child logs are under
+`~/Library/Logs/ds4-model-supervisor/` on this MacBook. Stop the launcher with
+Ctrl-C to stop the supervisor and unload its worker. Pi reloads `models.json`
+when its model picker opens; restart Pi GUI if an already-open picker does not
+refresh.
 
 Pi's automatic compaction remains enabled. With the recommended 100K context,
 its installed defaults reserve 16K tokens for the next response and retain
