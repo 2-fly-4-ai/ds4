@@ -30,6 +30,10 @@ GGUF = ROOT / "gguf"
 
 
 def model_profiles() -> Dict[str, Profile]:
+    # Long-context limits below are measured production capacities on the
+    # M5 Max 128 GiB host, not short benchmark defaults.  DeepSeek V4 and GLM
+    # completed 262K sweeps; the installed Qwen Next Q4 completed a fresh
+    # 64K/128K/256K sweep with no swap on 2026-09-16.
     qwen_next = GGUF / "qwen38-q4k-tensor" / "Qwen3.8-Flash-Next-Q4KImatrixExperts-MXFP4Down-BF16Emb-BF16Control-Q8GDN-Q8QSA-Q8Shared-Q8Out-MTP.gguf"
     qwen_ple = GGUF / "qwen38-q4k-tensor" / "Qwen3.8-Flash-Next-PLE-Q4_1.gguf"
     qwen_vision = GGUF / "mmproj-Qwen3.8-Flash-Next-F16.gguf"
@@ -37,10 +41,10 @@ def model_profiles() -> Dict[str, Profile]:
     glm = GGUF / "GLM-5.3-Flash-Q2-Q4K-Attention-SharedDownQ4K.gguf"
     return {
         "deepseek-v4": Profile(
-            "deepseek-v4-flash", 100000,
+            "deepseek-v4-flash", 262144,
             str(GGUF / "DeepSeek-V4-Flash-IQ2XXS-w2Q2K-AOutQ4K-L27-42-chat-v2-imatrix-0731.gguf"), []),
         "deepseek-v4-vision": Profile(
-            "deepseek-v4-flash", 40000,
+            "deepseek-v4-flash", 262144,
             str(GGUF / "DeepSeek-V4-Flash-Vision-Exp-IQ2XXS-w2Q2K-AOutQ4K-L27-42.gguf"),
             ["--vision", str(GGUF / "DeepSeek-V4-Flash-Vision-Encoder.gguf")]),
         "deepseek-v41": Profile(
@@ -51,19 +55,22 @@ def model_profiles() -> Dict[str, Profile]:
              "--ssd-streaming", "--ssd-streaming-cold",
              "--ssd-streaming-cache-experts", "16GB"]),
         "glm53": Profile(
-            "glm-5.3-flash", 32768, str(glm),
+            "glm-5.3-flash", 262144, str(glm),
             ["--mtp", "--mtp-exact-sampling"]),
         "glm53-vision": Profile(
-            "glm-5.3-flash", 32768, str(glm),
+            "glm-5.3-flash", 262144, str(glm),
             ["--mtp", "--mtp-exact-sampling", "--vision",
              str(GGUF / "GLM-5.3-Flash-Vision-Encoder.gguf")]),
         "qwen-next": Profile(
-            "qwen3.8-flash-next", 65536, str(qwen_next),
+            "qwen3.8-flash-next", 262144, str(qwen_next),
             ["--ple", str(qwen_ple), "--mtp", "--mtp-exact-sampling"]),
         "qwen-next-vision": Profile(
-            "qwen3.8-flash-next", 65536, str(qwen_next),
+            "qwen3.8-flash-next", 262144, str(qwen_next),
             ["--ple", str(qwen_ple), "--mtp", "--mtp-exact-sampling",
              "--vision", str(qwen_vision)]),
+        # The dense-Qwen Metal runner currently owns a fixed 4096-token global
+        # KV pool.  Raising these three values alone makes 8K prefill fail;
+        # enlarge and validate that pool before advertising a larger window.
         "qwen35": Profile(
             "qwen", 4096,
             str(GGUF / "qwen-small-quality" / "35b-mtp" / "Qwen3.6-35B-A3B-Q8_0.gguf"),
