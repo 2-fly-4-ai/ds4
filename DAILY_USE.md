@@ -91,6 +91,27 @@ Loopback is local-only. For another computer, explicitly bind `--host` to this
 Mac's current Tailscale IP and use that address in the client. Avoid `0.0.0.0`
 unless you intend LAN exposure; do not expose an unauthenticated API publicly.
 
+### Pi GUI on the Mac mini
+
+The Mac mini's Pi model registry contains an additional provider named
+`DwarfStar on M5 Max`. It points over Tailscale to
+`http://100.109.208.12:8000/v1` and advertises the resident DeepSeek V4 Flash
+0731 model with a 100,000-token context. It does not replace Pi's existing
+default provider or model.
+
+Double-click `start_pi_coding_server.command` on this MacBook, wait for the
+server-ready message, then open Pi GUI's model picker on the Mac mini and choose
+`DwarfStar — DeepSeek V4 Flash (100K)`. Pi reloads `models.json` when its model
+picker opens; restart Pi GUI if an already-open picker does not refresh.
+
+Pi's automatic compaction remains enabled. With the 100K advertised context,
+its installed defaults reserve 16K tokens for the next response and retain
+approximately 20K recent tokens while summarizing older work. The configured
+384K `maxTokens` value is an output ceiling, not the active context allocation:
+the server's 100K context is still the hard prompt-plus-output limit. This high
+ceiling avoids an arbitrary client-side response cap; the server stops at the
+available context boundary.
+
 ## What remains enabled
 
 Production Metal kernels, quant-specific optimizations and supported live-cache
