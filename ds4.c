@@ -19235,6 +19235,20 @@ static struct {
     int inited;
 } g_qwen_pool = {0};
 
+/* The dense-Qwen Metal runner owns one process-global pool.  Size its KV
+ * tensors from the frontend's placement/context hint before the first session
+ * touches the pool.  The old fixed 4096 value made larger --ctx allocations
+ * look valid in the planner but fail as soon as prefill crossed 4096 tokens. */
+static uint32_t g_qwen_pool_context_hint = 4096u;
+
+static void qwen_metal_set_context_hint(int requested_ctx) {
+    uint32_t ctx = requested_ctx > 0 ? (uint32_t)requested_ctx : 4096u;
+    if (ctx < 4096u) ctx = 4096u;
+    /* Engine close releases the global pools before another model is opened.
+     * Never mutate offsets underneath a live allocation. */
+    if (!g_qwen_pool.inited) g_qwen_pool_context_hint = ctx;
+}
+
 
 static int qwen_metal_ensure_pool(void) {
 #ifdef __APPLE__
@@ -19246,7 +19260,7 @@ static int qwen_metal_ensure_pool(void) {
     if (g_qwen_pool.inited) { pthread_mutex_unlock(&init_mu); return 1; }
     pthread_mutex_init(&g_qwen_pool.mu, NULL);
     const uint32_t n_embd = DS4_N_EMBD, n_head = DS4_N_HEAD, head_dim=256, n_head_kv = DS4_N_HEAD_KV, ff_dense=qwen_ff_scratch(), n_vocab=DS4_N_VOCAB;
-    const uint32_t max_ctx = 4096;
+    const uint32_t max_ctx = g_qwen_pool_context_hint;
     g_qwen_pool.max_ctx = max_ctx;
     g_qwen_pool.cur = ds4_gpu_tensor_alloc((uint64_t)n_embd * sizeof(float));
     g_qwen_pool.next = ds4_gpu_tensor_alloc((uint64_t)n_embd * sizeof(float));
@@ -19348,6 +19362,10 @@ static int qwen_metal_ensure_pool(void) {
         return 0;
     }
     g_qwen_pool.inited = 1;
+    fprintf(stderr,
+            "ds4: dense Qwen Metal KV pool ctx=%u K+V=%.2f GiB\n",
+            max_ctx,
+            (double)(2ull * kv_floats * sizeof(float)) / 1073741824.0);
     pthread_mutex_unlock(&init_mu);
     return 1;
 }
@@ -21079,7 +21097,6 @@ static int qwen_mtp_draft_one_cpu(float *logits_out, float *hidden_out, const ds
 
 #ifndef DS4_NO_GPU
 /* MTP single-layer scratch pool and persistent private KV cache. */
-#define QWEN_MTP_KV_CAP 4096u
 static struct {
     int inited;
     pthread_mutex_t mu;
@@ -21101,7 +21118,7 @@ static int qwen_mtp_metal_ensure_pool(void) {
     const uint64_t n_embd = DS4_N_EMBD, n_vocab = DS4_N_VOCAB, ff = qwen_ff_scratch();
     const uint64_t q_full = (uint64_t)DS4_N_HEAD * 256ull * 2ull;
     const uint64_t heads = (uint64_t)DS4_N_HEAD * 256ull, kv = (uint64_t)DS4_N_HEAD_KV * 256ull;
-    uint64_t mtp_kv_cap = (uint64_t)QWEN_MTP_KV_CAP;
+    uint64_t mtp_kv_cap = (uint64_t)g_qwen_pool_context_hint;
     struct { ds4_gpu_tensor **slot; uint64_t bytes; } want[] = {
         { &g_mtp_pool.hidden,     n_embd * f },
         { &g_mtp_pool.e_emb,      n_embd * f },
@@ -21158,6 +21175,10 @@ static int qwen_mtp_metal_ensure_pool(void) {
     if (ok) {
         g_mtp_pool.kv_cap = (uint32_t)mtp_kv_cap;
         g_mtp_pool.inited = 1;
+        fprintf(stderr,
+                "ds4: dense Qwen MTP KV pool ctx=%u K+V=%.2f GiB\n",
+                g_mtp_pool.kv_cap,
+                (double)(2ull * mtp_kv_cap * kv * f) / 1073741824.0);
     }
     pthread_mutex_unlock(&init_mu);
     return ok;
@@ -21203,6 +21224,7 @@ static void qwen_metal_free_pools(void) {
     memset(&g_qwen_pool,0,sizeof(g_qwen_pool));
     memset(&g_mtp_pool,0,sizeof(g_mtp_pool));
     memset(&g_qwen_moe,0,sizeof(g_qwen_moe));
+    g_qwen_pool_context_hint=4096u;
     qwen_mtp_reset_conv();
     if(g_qwen_mtp_sidecar_ready==1) model_close(&g_qwen_mtp_sidecar);
     memset(&g_qwen_mtp_sidecar,0,sizeof(g_qwen_mtp_sidecar));
@@ -21214,7 +21236,8 @@ static void qwen_mtp_metal_reset_kv(void) {
     if (!qwen_mtp_metal_ensure_pool()) return;
     pthread_mutex_lock(&g_mtp_pool.mu);
     if (g_mtp_pool.k_cache && g_mtp_pool.v_cache && g_mtp_pool.kv_cap > 0) {
-        const uint32_t kv_floats = g_mtp_pool.kv_cap * DS4_N_HEAD_KV * DS4_N_HEAD_DIM;
+        const uint64_t kv_floats =
+            (uint64_t)g_mtp_pool.kv_cap * DS4_N_HEAD_KV * DS4_N_HEAD_DIM;
         ds4_gpu_fill_f32_tensor(g_mtp_pool.k_cache, 0.0f, kv_floats);
         ds4_gpu_fill_f32_tensor(g_mtp_pool.v_cache, 0.0f, kv_floats);
     }
@@ -47323,7 +47346,8 @@ static int qwen_generate_hybrid(
     }
 #ifndef DS4_NO_GPU
     if (use_mtp && hidden_stash && prompt->len > 1) {
-        const uint32_t mtp_cap = g_mtp_pool.kv_cap ? g_mtp_pool.kv_cap : (uint32_t)QWEN_MTP_KV_CAP;
+        const uint32_t mtp_cap = g_mtp_pool.kv_cap ?
+            g_mtp_pool.kv_cap : g_qwen_pool_context_hint;
         int start_i = 0;
         if (prompt->len > (int)mtp_cap) {
             start_i = prompt->len - (int)mtp_cap;
@@ -47798,6 +47822,19 @@ static void ds4_engine_print_startup_memory(
         ds4_engine_dynamic_expert_cache_bytes(e);
     const uint64_t expert_reserved_bytes =
         e->ssd_streaming_prefill_headroom_bytes;
+    uint64_t dense_qwen_pool_kv_bytes = 0;
+#ifndef DS4_NO_GPU
+    if (ds4_backend_uses_graph(e->backend) &&
+        (g_ds4_shape.variant == DS4_VARIANT_QWEN38 ||
+         g_ds4_shape.variant == DS4_VARIANT_QWEN35_MOE)) {
+        const uint64_t kv_row_bytes =
+            (uint64_t)DS4_N_HEAD_KV * DS4_N_HEAD_DIM * sizeof(float);
+        /* The dense runner has a process-global K/V pair for every model
+         * layer plus a one-layer K/V pair for its optional MTP head. */
+        dense_qwen_pool_kv_bytes =
+            2ull * (DS4_N_LAYER + 1ull) * (uint64_t)ctx_size * kv_row_bytes;
+    }
+#endif
     uint64_t resident_model_bytes = e->startup_model_span_bytes;
 #ifndef DS4_NO_GPU
     if (e->ssd_streaming_static_decode_map &&
@@ -47816,6 +47853,7 @@ static void ds4_engine_print_startup_memory(
     total = ds4_add_sat_u64(total, resident_model_bytes);
     total = ds4_add_sat_u64(total, dynamic_expert_cache_bytes);
     total = ds4_add_sat_u64(total, expert_reserved_bytes);
+    total = ds4_add_sat_u64(total, dense_qwen_pool_kv_bytes);
 
     const bool color = ds4_log_is_tty(stderr);
     const char *green = color ? "\x1b[32m" : "";
@@ -47840,6 +47878,11 @@ static void ds4_engine_print_startup_memory(
         fprintf(stderr,
                 " + prefill expert reserve %.2f GiB",
                 ds4_bytes_to_gib(expert_reserved_bytes));
+    }
+    if (dense_qwen_pool_kv_bytes != 0) {
+        fprintf(stderr,
+                " + dense Qwen KV pool %.2f GiB",
+                ds4_bytes_to_gib(dense_qwen_pool_kv_bytes));
     }
     fprintf(stderr,
             " = %s%.2f GiB planned%s\n",
@@ -75592,6 +75635,14 @@ static int ds4_engine_open_internal(ds4_engine **out,
     model_open(&e->model, opt->model_path, graph_backend, !opt->inspect_only);
     if (opt->warm_weights) model_warm_weights(&e->model);
     config_validate_model(&e->model);
+#ifndef DS4_NO_GPU
+    if (g_ds4_shape.variant == DS4_VARIANT_QWEN38 ||
+        g_ds4_shape.variant == DS4_VARIANT_QWEN35_MOE) {
+        qwen_metal_set_context_hint(
+            e->placement_ctx_hint > 0 ?
+                e->placement_ctx_hint : opt->context_size);
+    }
+#endif
     if (g_ds4_shape.variant == DS4_VARIANT_QWEN35_MOE && !opt->inspect_only &&
         (opt->backend != DS4_BACKEND_METAL || opt->ssd_streaming || load_slice ||
          (opt->dflash_path && opt->dflash_path[0]) || (opt->mtp_path && opt->mtp_path[0]) ||

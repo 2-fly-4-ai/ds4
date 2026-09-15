@@ -24,9 +24,12 @@ class ModelSupervisorProfilesTest(unittest.TestCase):
             "glm53", "glm53-vision", "qwen-next", "qwen-next-vision",
             "qwen35", "qwen27-q8", "qwen27-q4",
         })
-        self.assertEqual(self.profiles["deepseek-v4"].context, 100000)
-        self.assertEqual(self.profiles["qwen-next"].context, 65536)
-        self.assertEqual(self.profiles["qwen35"].context, 4096)
+        self.assertEqual(self.profiles["deepseek-v4"].context, 262144)
+        self.assertEqual(self.profiles["glm53"].context, 262144)
+        self.assertEqual(self.profiles["qwen-next"].context, 262144)
+        self.assertEqual(self.profiles["qwen35"].context, 262144)
+        self.assertEqual(self.profiles["qwen27-q8"].context, 131072)
+        self.assertEqual(self.profiles["qwen27-q4"].context, 131072)
 
     def test_commands_bind_only_the_requested_tailscale_address(self):
         command = self.supervisor._worker_command(self.profiles["glm53"])

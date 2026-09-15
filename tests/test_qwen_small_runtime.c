@@ -2,8 +2,10 @@
 #include "../ds4.c"
 static void check(int ok,const char *why){if(!ok){fprintf(stderr,"SMALL_RUNTIME_FAIL %s\n",why);exit(2);}}
 static void run_model(const char *path) {
+ int engine_context=getenv("QWEN_ENGINE_CONTEXT")?atoi(getenv("QWEN_ENGINE_CONTEXT")):4096;
+ if(engine_context<4096)engine_context=4096;
  ds4_engine_options opt={.model_path=path,.backend=DS4_BACKEND_METAL,
-   .context_size=4096,.power_percent=100,.warm_weights=true};
+   .context_size=engine_context,.power_percent=100,.warm_weights=true};
  ds4_engine *e=NULL;check(!ds4_engine_open(&e,&opt),"engine");
  qwen_mtp_weights_t head={0};qwen_mtp_bind(&head,&e->model);
  check(qwen_mtp_is_valid(&head),"usable model-shaped MTP head");
@@ -13,14 +15,15 @@ static void run_model(const char *path) {
  encode_chat_prompt(&e->vocab,NULL,"Write a Python function to merge two sorted lists. Explain its time complexity.",DS4_THINK_NONE,&prompt);
  int test_context=getenv("QWEN_TEST_CONTEXT")?atoi(getenv("QWEN_TEST_CONTEXT")):0;
  if(test_context>prompt.len){
-  check(test_context<=3840,"bounded test context");int original=prompt.len;
+  check(test_context<=engine_context-256,"bounded test context");int original=prompt.len;
   prompt.v=realloc(prompt.v,test_context*sizeof(*prompt.v));check(prompt.v!=NULL,"extended prompt");
   for(int i=original;i<test_context;i++)prompt.v[i]=prompt.v[i%original];
   prompt.len=prompt.cap=test_context;
  }
  encode_chat_prompt(&e->vocab,NULL,"Tell a story about a lost sailor.",DS4_THINK_NONE,&other);
- ds4_session *s=NULL,*b=NULL;check(!ds4_session_create(&s,e,4096),"session");
+ ds4_session *s=NULL,*b=NULL;check(!ds4_session_create(&s,e,engine_context),"session");
  check(!ds4_session_sync(s,&prompt,err,sizeof(err)),err);
+ check(g_qwen_pool.max_ctx==(uint32_t)engine_context,"Metal pool follows engine context");
  check(!qwen_hybrid_metal_forward_token_ex(NULL,NULL,NULL,NULL,NULL,0,&e->model,&e->weights,prompt.v[0],g_qwen_pool.max_ctx),"scalar cache bound");
  check(!qwen_hybrid_metal_forward_tokens(NULL,NULL,NULL,NULL,NULL,0,&e->model,&e->weights,prompt.v,2,g_qwen_pool.max_ctx-1,true,false),"verifier cache bound");
  check(ds4_session_payload_bytes(s)==0,"no invalid DS4-format persistence");
@@ -32,7 +35,7 @@ static void run_model(const char *path) {
  check(ds4_session_mark_rewind_point(s),"mark");
  int tokens[96];
  for(int i=0;i<96;i++){tokens[i]=ds4_session_argmax(s);check(!ds4_session_eval(s,tokens[i],err,sizeof(err)),err);}
- check(!ds4_session_create(&b,e,4096),"other session");check(!ds4_session_sync(b,&other,err,sizeof(err)),err);
+ check(!ds4_session_create(&b,e,engine_context),"other session");check(!ds4_session_sync(b,&other,err,sizeof(err)),err);
  check(g_qwen_pool.owner==b,"other owner");
  ds4_session_rewind(s,prompt.len);
  check(s->checkpoint_valid&&g_qwen_pool.owner==s,"restore ownership");

@@ -68,19 +68,20 @@ def model_profiles() -> Dict[str, Profile]:
             "qwen3.8-flash-next", 262144, str(qwen_next),
             ["--ple", str(qwen_ple), "--mtp", "--mtp-exact-sampling",
              "--vision", str(qwen_vision)]),
-        # The dense-Qwen Metal runner currently owns a fixed 4096-token global
-        # KV pool.  Raising these three values alone makes 8K prefill fail;
-        # enlarge and validate that pool before advertising a larger window.
+        # Dense Qwen's Metal KV pool follows the requested context.  The 35B
+        # model's smaller GQA cache fits its native 262K window on 128 GB; the
+        # 27B dense models use a much larger FP32 KV and are capped at the
+        # allocation-tested 128K window to retain working-memory headroom.
         "qwen35": Profile(
-            "qwen", 4096,
+            "qwen", 262144,
             str(GGUF / "qwen-small-quality" / "35b-mtp" / "Qwen3.6-35B-A3B-Q8_0.gguf"),
             [], disk_kv=False),
         "qwen27-q8": Profile(
-            "qwen", 4096,
+            "qwen", 131072,
             str(GGUF / "qwen-small-quality" / "Qwen3.8-27B-Q8_0.gguf"),
             [], disk_kv=False, mtp_head=str(qwen_mtp)),
         "qwen27-q4": Profile(
-            "qwen", 4096,
+            "qwen", 131072,
             str(GGUF / "qwen-small-quality" / "Qwen3.8-27B-Q4_64A.gguf"),
             [], disk_kv=False, mtp_head=str(qwen_mtp)),
     }
