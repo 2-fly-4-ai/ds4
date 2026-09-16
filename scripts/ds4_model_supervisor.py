@@ -167,7 +167,7 @@ class ModelSupervisor:
             env["DS4_QWEN_MTP_HEAD"] = profile.mtp_head
         self.worker = subprocess.Popen(
             self._worker_command(profile), cwd=str(ROOT), env=env,
-            stdout=self.worker_log, stderr=subprocess.STDOUT, start_new_session=True,
+            stdout=self.worker_log, stderr=subprocess.STDOUT,
         )
         deadline = time.monotonic() + self.ready_timeout
         while time.monotonic() < deadline:

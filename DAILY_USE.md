@@ -128,6 +128,16 @@ Ctrl-C to stop the supervisor and unload its worker. Pi reloads `models.json`
 when its model picker opens; restart Pi GUI if an already-open picker does not
 refresh.
 
+Keep the launcher Terminal window open while using Pi GUI. The model API on
+port 8000 can outlive a temporary shell, but the switch endpoint on port 8001
+cannot. If Pi reports `Unable to switch DwarfStar ... fetch failed`, check
+`http://100.109.208.12:8001/status` from the Mac mini and restart the launcher
+in a regular macOS Terminal window. Do not run this Desktop-hosted launcher as
+a LaunchAgent: macOS privacy restrictions prevent its background Python job
+from reading the model files on Desktop. The worker remains in the
+supervisor's process group so a normal Terminal interrupt does not leave a
+detached model server.
+
 Pi's automatic compaction remains enabled and uses the selected model's
 `contextWindow`. The configured 384K `maxTokens` value is only a permissive
 client-side output ceiling; it does not override the active server allocation.
