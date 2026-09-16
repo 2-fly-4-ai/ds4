@@ -50707,6 +50707,9 @@ typedef struct ds4_glm_gpu_graph {
     ds4_gpu_tensor *qk_low;
     ds4_gpu_tensor *attn_partial_lora;
     ds4_gpu_tensor *attn_partial_ms;
+    ds4_gpu_tensor *attn_exact_scores;
+    ds4_gpu_tensor *attn_exact_lora;
+    ds4_gpu_tensor *attn_exact_denom;
     ds4_gpu_tensor *batch_indexer_k;
     ds4_gpu_tensor *batch_indexer_gate;
     ds4_gpu_tensor *batch_indexer_q;
@@ -51498,6 +51501,25 @@ static bool glm_graph_indexed_decode_split_group8_available(uint32_t n_selected)
            (DS4_N_HEAD % 8u) == 0 &&
            DS4_N_KV_LORA == 512u &&
            DS4_N_ROT == 64u &&
+           glm_graph_compact_cache_is_f16();
+#endif
+}
+
+/* Exact phased GLM-5.3 attention from upstream PR #964. Keep the original
+ * kernel as an explicit A/B and unsupported-shape fallback. */
+static bool glm_graph_indexed_decode_exact_available(
+        const ds4_glm_gpu_graph *g, bool tp_split_heads, uint32_t n_selected) {
+#ifndef __APPLE__
+    (void)g;
+    (void)tp_split_heads;
+    (void)n_selected;
+    return false;
+#else
+    return ds4_gpu_device_is_m5_apple_silicon() &&
+           getenv("DS4_METAL_DISABLE_M5_GLM53_DSA_EXACT") == NULL &&
+           n_selected >= 128u && g->glm53 && !tp_split_heads &&
+           g->attn_exact_scores && g->attn_exact_lora && g->attn_exact_denom &&
+           DS4_N_ROT == 0u && DS4_N_KV_LORA == 512u && DS4_N_HEAD <= 64u &&
            glm_graph_compact_cache_is_f16();
 #endif
 }
@@ -52634,6 +52656,9 @@ static void glm_graph_free(ds4_glm_gpu_graph *g) {
     ds4_gpu_tensor_free(g->kv_raw);
     ds4_gpu_tensor_free(g->attn_partial_ms);
     ds4_gpu_tensor_free(g->attn_partial_lora);
+    ds4_gpu_tensor_free(g->attn_exact_scores);
+    ds4_gpu_tensor_free(g->attn_exact_lora);
+    ds4_gpu_tensor_free(g->attn_exact_denom);
     ds4_gpu_tensor_free(g->qk_low);
     ds4_gpu_tensor_free(g->indexer_selected);
     ds4_gpu_tensor_free(g->indexer_pool_selected);
@@ -53016,6 +53041,16 @@ static bool glm_graph_alloc_slice(
     DS4_GLM_GRAPH_ALLOC_TENSOR(g->qk_low, qk_low_bytes);
     DS4_GLM_GRAPH_ALLOC_TENSOR(g->attn_partial_lora, attn_partial_lora_bytes);
     DS4_GLM_GRAPH_ALLOC_TENSOR(g->attn_partial_ms, attn_partial_ms_bytes);
+    if (g->glm53) {
+        const uint32_t selected_limit = glm53_graph_indexer_selected_limit();
+        const uint32_t exact_rows = g->ctx_cap > selected_limit ?
+            g->ctx_cap : selected_limit;
+        DS4_GLM_GRAPH_ALLOC_TENSOR(g->attn_exact_scores,
+                                   (uint64_t)DS4_N_HEAD * exact_rows * sizeof(float));
+        DS4_GLM_GRAPH_ALLOC_TENSOR(g->attn_exact_lora, qk_low_bytes);
+        DS4_GLM_GRAPH_ALLOC_TENSOR(g->attn_exact_denom,
+                                   (uint64_t)DS4_N_HEAD * sizeof(float));
+    }
     DS4_GLM_GRAPH_ALLOC_TENSOR(g->kv_raw, kv_raw_bytes);
     DS4_GLM_GRAPH_ALLOC_TENSOR(g->kv_norm, kv_norm_bytes);
     DS4_GLM_GRAPH_ALLOC_TENSOR(g->k_nope, k_nope_bytes);
@@ -62172,6 +62207,18 @@ static bool glm_graph_forward_token(
                  * rest of the layer stays finite (timing-only). */
                 ok = ds4_gpu_tensor_fill_f32(g->heads, 0.0f,
                                              (uint64_t)g->heads_dim) != 0;
+            } else if (ok && l->attn_v_b->type == DS4_TENSOR_Q8_0 &&
+                       glm_graph_indexed_decode_exact_available(
+                           g, tp_split_layer_heads, last_indexer_selected_count)) {
+                ok = ds4_gpu_glm_attention_indexed_decode_exact_typed_tensor(
+                         g->heads, g->attn_exact_scores, g->attn_exact_lora,
+                         g->attn_exact_denom, g->qk_low,
+                         g->layer_kv_lora_cache[il], model->map, model->size,
+                         l->attn_v_b->abs_offset, l->attn_v_b->type,
+                         last_indexer_selected, last_indexer_selected_count,
+                         g->compact_cache_cap, glm_graph_compact_cache_is_f16(),
+                         DS4_N_HEAD, DS4_N_KV_LORA, (uint32_t)g->q_nope,
+                         DS4_N_ROT, DS4_N_VALUE_MLA) != 0;
             } else if (ok && glm_graph_indexed_decode_split_group8_available(last_indexer_selected_count)) {
                 const uint32_t split_block_rows =
                     glm_graph_indexed_decode_split_block_rows_for(last_indexer_selected_count);

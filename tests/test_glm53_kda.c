@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/mman.h>
 
 #include "ds4.h"
@@ -39,6 +40,106 @@ static float bf16_to_f32(uint16_t value) {
     union { uint32_t u; float f; } bits = { .u = (uint32_t)value << 16 };
     return bits.f;
 }
+
+#ifdef __APPLE__
+/* The production GLM-5.3 path uses F16 compact KV and Q8_0 V. Check the
+ * focused M5 port against the existing generic kernel, including invalid
+ * selection sentinels and the 2051-row edge used by the indexer. */
+static void check_glm53_exact_indexed_attention(uint8_t *model, size_t model_bytes) {
+    enum {
+        HEADS = 8, LORA = 512, NOPE = 64, VALUE = 2,
+        CAP = 2083, MAX_SELECTED = 2051, VALUE_OFFSET = 49152,
+        Q8_ROW_BYTES = (LORA / 32) * 34,
+    };
+    static const uint32_t cases[] = {128, 513, 2051};
+    const size_t kv_bytes = (size_t)CAP * LORA * sizeof(uint16_t);
+    uint16_t *kv = malloc(kv_bytes);
+    float *low = malloc((size_t)HEADS * LORA * sizeof(float));
+    uint32_t *selected = malloc((size_t)MAX_SELECTED * sizeof(uint32_t));
+    require_ok(kv && low && selected, "exact attention host allocation");
+    require_ok(VALUE_OFFSET + (size_t)HEADS * VALUE * Q8_ROW_BYTES <= model_bytes,
+               "exact attention fixture value rows");
+    for (uint32_t row = 0; row < CAP; row++) {
+        for (uint32_t j = 0; j < LORA; j++) {
+            const uint16_t magnitude = (j + row) % 3u == 0u ? 0x3800u : 0x3400u;
+            kv[(size_t)row * LORA + j] =
+                magnitude | (((row * 7u + j * 3u) & 1u) ? 0x8000u : 0u);
+        }
+    }
+    for (uint32_t h = 0; h < HEADS; h++) {
+        for (uint32_t j = 0; j < LORA; j++) {
+            low[(size_t)h * LORA + j] =
+                (float)((int)((h * 11u + j * 5u) % 23u) - 11) / 32.0f;
+        }
+    }
+    for (uint32_t row = 0; row < HEADS * VALUE; row++) {
+        uint8_t *weight = model + VALUE_OFFSET + (size_t)row * Q8_ROW_BYTES;
+        for (uint32_t block = 0; block < LORA / 32u; block++) {
+            const uint16_t one = 0x3c00u;
+            memcpy(weight + block * 34u, &one, sizeof(one));
+            int8_t *qs = (int8_t *)(weight + block * 34u + 2u);
+            for (uint32_t i = 0; i < 32u; i++) {
+                qs[i] = (int8_t)((int)((row * 3u + block * 7u + i) % 15u) - 7);
+            }
+        }
+    }
+    ds4_gpu_tensor *heads = ds4_gpu_tensor_alloc(HEADS * VALUE * sizeof(float));
+    ds4_gpu_tensor *q = ds4_gpu_tensor_alloc(HEADS * NOPE * sizeof(float));
+    ds4_gpu_tensor *low_gpu = ds4_gpu_tensor_alloc(HEADS * LORA * sizeof(float));
+    ds4_gpu_tensor *kv_gpu = ds4_gpu_tensor_alloc(kv_bytes);
+    ds4_gpu_tensor *rope = ds4_gpu_tensor_alloc(1u);
+    ds4_gpu_tensor *sel_gpu = ds4_gpu_tensor_alloc(MAX_SELECTED * sizeof(uint32_t));
+    ds4_gpu_tensor *scores = ds4_gpu_tensor_alloc(HEADS * MAX_SELECTED * sizeof(float));
+    ds4_gpu_tensor *lora = ds4_gpu_tensor_alloc(HEADS * LORA * sizeof(float));
+    ds4_gpu_tensor *denom = ds4_gpu_tensor_alloc(HEADS * sizeof(float));
+    require_ok(heads && q && low_gpu && kv_gpu && rope && sel_gpu &&
+               scores && lora && denom, "exact attention GPU allocation");
+    require_ok(ds4_gpu_tensor_fill_f32(q, 0.0f, HEADS * NOPE) &&
+               ds4_gpu_tensor_write(low_gpu, 0, low, HEADS * LORA * sizeof(float)) &&
+               ds4_gpu_tensor_write(kv_gpu, 0, kv, kv_bytes),
+               "exact attention input write");
+    for (size_t c = 0; c < sizeof(cases) / sizeof(cases[0]); c++) {
+        const uint32_t n = cases[c];
+        for (uint32_t s = 0; s < n; s++) selected[s] = (s * 7919u) % CAP;
+        selected[0] = CAP;
+        selected[1] = CAP - 1u;
+        selected[n - 1u] = UINT32_MAX;
+        for (uint32_t s = 50; s < n; s += 97u) selected[s] = CAP + 3u;
+        require_ok(ds4_gpu_tensor_write(sel_gpu, 0, selected, n * sizeof(uint32_t)),
+                   "exact attention selection write");
+        require_ok(ds4_gpu_glm_attention_indexed_decode_typed_tensor(
+            heads, q, low_gpu, kv_gpu, rope, model, model_bytes, VALUE_OFFSET,
+            8u, sel_gpu, n, CAP, true, HEADS, LORA, NOPE, 0u, VALUE, 0u,
+            0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f),
+            "generic indexed attention");
+        float generic[HEADS * VALUE], exact[HEADS * VALUE];
+        require_ok(ds4_gpu_tensor_read(heads, 0, generic, sizeof(generic)),
+                   "generic indexed attention read");
+        require_ok(ds4_gpu_glm_attention_indexed_decode_exact_typed_tensor(
+            heads, scores, lora, denom, low_gpu, kv_gpu, model, model_bytes,
+            VALUE_OFFSET, 8u, sel_gpu, n, CAP, true, HEADS, LORA, NOPE, 0u, VALUE),
+            "exact indexed attention");
+        require_ok(ds4_gpu_tensor_read(heads, 0, exact, sizeof(exact)),
+                   "exact indexed attention read");
+        if (memcmp(exact, generic, sizeof(exact)) != 0) {
+            fprintf(stderr, "exact attention differs from generic at %u rows\n", n);
+            exit(1);
+        }
+    }
+    ds4_gpu_tensor_free(denom);
+    ds4_gpu_tensor_free(lora);
+    ds4_gpu_tensor_free(scores);
+    ds4_gpu_tensor_free(sel_gpu);
+    ds4_gpu_tensor_free(rope);
+    ds4_gpu_tensor_free(kv_gpu);
+    ds4_gpu_tensor_free(low_gpu);
+    ds4_gpu_tensor_free(q);
+    ds4_gpu_tensor_free(heads);
+    free(selected);
+    free(low);
+    free(kv);
+}
+#endif
 
 int main(void) {
     enum {
@@ -96,6 +197,9 @@ int main(void) {
 
     require_ok(ds4_gpu_init(), "GPU initialization");
     require_ok(ds4_gpu_set_model_map(model, MODEL_BYTES), "model map registration");
+#ifdef __APPLE__
+    check_glm53_exact_indexed_attention(model, MODEL_BYTES);
+#endif
 
     uint16_t *bf16_weights = (uint16_t *)(model + BF16_OFFSET);
     for (uint32_t o = 0; o < BF16_OUT; o++) {
